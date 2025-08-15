@@ -1,0 +1,25 @@
+{
+  "name": "bike-rent-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "migrate": "knex migrate:latest"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.3.1",
+    "grammy": "^1.17.0",
+    "knex": "^2.5.1",
+    "module-alias": "^2.2.3",
+    "node-calendar": "^0.1.5",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "_moduleAliases": {
+    "@": "./src"
+  }
+}

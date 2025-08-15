@@ -1,0 +1,41 @@
+// knexfile.js
+require("dotenv").config();
+
+const DEV_CONNECTION = {
+  host: process.env.PG_HOST || "localhost",
+  port: Number(process.env.PG_PORT || 5432),
+  user: process.env.PG_USER || "postgres",
+  password: process.env.PG_PASSWORD || "3010",
+  database: process.env.PG_DATABASE || "bike_rent",
+};
+
+const PROD_CONNECTION = process.env.DATABASE_URL
+  ? {
+      connectionString: process.env.DATABASE_URL,
+      // для большинства managed‑PG (Railway/Render/Heroku/etc)
+      ssl: process.env.PG_SSL === "false" ? false : {rejectUnauthorized: false},
+    }
+  : {
+      host: process.env.PG_HOST,
+      port: Number(process.env.PG_PORT || 5432),
+      user: process.env.PG_USER,
+      password: process.env.PG_PASSWORD,
+      database: process.env.PG_DATABASE,
+      ssl: process.env.PG_SSL === "true" ? {rejectUnauthorized: false} : false,
+    };
+
+module.exports = {
+  development: {
+    client: "pg",
+    connection: DEV_CONNECTION,
+    pool: {min: 0, max: 10},
+    migrations: {directory: "./migrations"}, // <- поменяй путь при необходимости
+  },
+
+  production: {
+    client: "pg",
+    connection: PROD_CONNECTION,
+    pool: {min: 2, max: 20},
+    migrations: {directory: "./migrations"},
+  },
+};
