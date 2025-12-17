@@ -1,25 +1,22 @@
-﻿const db = require("../connect");
+const db = require("../connect");
 const dayjs = require("dayjs");
 
 module.exports = async (ctx) => {
   const telegramId = ctx.from.id;
-  console.log("1");
-  // Получаем пользователя
+
   const user = await db("users").where({telegram_id: telegramId}).first();
   if (!user) {
-    return ctx.reply("❌ Вы не зарегистрированы.");
+    return ctx.reply("Вы не зарегистрированы.");
   }
 
-  // Получаем все аренды в статусе "process"
   const rentals = await db("rentals")
     .where("user_id", user.id)
     .andWhere("status", "process");
 
   if (rentals.length === 0) {
-    return ctx.answerCallbackQuery("❌ Нет бронирований для подтверждения.");
+    return ctx.answerCallbackQuery("Нет бронирований для подтверждения.");
   }
-  // Финальная проверка на занятость байка
-  // Получаем id пользователя
+
   for (const rental of rentals) {
     const overlapping = await db("rentals")
       .where("bike_id", rental.bike_id)
@@ -35,7 +32,6 @@ module.exports = async (ctx) => {
             );
           });
       })
-      // Исключаем свои аренды в статусе "process"
       .andWhere(function () {
         this.whereNot(function () {
           this.where("status", "process").andWhere("user_id", user.id);
@@ -44,11 +40,12 @@ module.exports = async (ctx) => {
 
     const bike = await db("bikes").where("id", rental.bike_id).first();
     if (overlapping.length > 0) {
-      return ctx.reply(`❌ Байк "${bike.name}" уже занят на выбранные даты.`);
+      return ctx.reply(
+        `Байк "${bike.name}" уже занят на выбранные даты. Проверьте новый период.`
+      );
     }
   }
 
-  // Обновляем статус на active
   await db("rentals")
     .where("user_id", user.id)
     .andWhere("status", "process")
@@ -71,18 +68,19 @@ module.exports = async (ctx) => {
     const admin = await db("users").where({is_admin: true}).first();
     if (!admin) {
       await ctx.reply(
-        "Извините. Сейчас в системе нет Администратора. Пожалуйста, отмение эту аренду и повторите попытку позднее."
+        "Извините. Сейчас в системе нет администратора. Пожалуйста, отмените эту аренду и повторите попытку позднее."
       );
       return;
     }
-    const text = `📩 <b>Новая аренда</b>\n\n👤 Пользователь: ${
+    const text = `🚨 <b>Новая аренда</b>\n\nПользователь: ${
       user.name || "(без имени)"
-    } Telegram: @${user.telegram_name}
-    }\n🛵 Байк: <b>${bike.name}</b>\n📅 Срок: ${dayjs(rental.start_date).format(
+    } Telegram: @${user.telegram_name || "-"}\nБайк: <b>${bike.name}</b>\nСрок: ${dayjs(
+      rental.start_date
+    ).format("DD.MM")} - ${dayjs(rental.end_date).format(
       "DD.MM"
-    )} – ${dayjs(rental.end_date).format("DD.MM")}\n💰 ${
-      rental.total_price
-    } ฿\n💬 ${rental.comment || "—"}`;
+    )}\nИтог: ${rental.total_price} THB\nКомментарий: ${
+      rental.comment || "-"
+    }`;
 
     await ctx.api.sendMessage(admin.telegram_id, text, {
       parse_mode: "HTML",
@@ -90,11 +88,11 @@ module.exports = async (ctx) => {
         inline_keyboard: [
           [
             {
-              text: "✅ Подтвердить",
+              text: "Подтвердить",
               callback_data: `admin:rental:approve:${rental.id}`,
             },
             {
-              text: "❌ Отклонить",
+              text: "Отклонить",
               callback_data: `admin:rental:cancel:${rental.id}`,
             },
           ],

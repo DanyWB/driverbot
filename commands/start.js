@@ -1,12 +1,11 @@
-﻿const db = require("../connect");
+const db = require("../connect");
 const {registerUser} = require("../services/userService");
 const {setUserCommands} = require("../utils/setCommands");
+
 module.exports = async (ctx) => {
   const telegramId = ctx.from.id;
 
-  // Получаем пользователя из БД
   let user = await db("users").where({telegram_id: telegramId}).first();
-
   let isNewUser = false;
 
   if (!user) {
@@ -19,13 +18,13 @@ module.exports = async (ctx) => {
     isNewUser = true;
   }
 
-  await setUserCommands(user, ctx); // передаем бот в setUserCommands
+  await setUserCommands(user, ctx);
 
-  // Показываем приветствие
   if (isNewUser) {
     await ctx.reply(
-      `👋 Добро пожаловать, ${ctx.from.first_name || "пользователь"}!\n\n` +
-        `Чтобы продолжить, пожалуйста, пройдите небольшую регистрацию.`
+      `👋 Добро пожаловать, ${
+        ctx.from.first_name || "пользователь"
+      }!\n\nЧтобы продолжить, пожалуйста, пройдите небольшую регистрацию.`
     );
   } else {
     await ctx.reply(
@@ -35,7 +34,6 @@ module.exports = async (ctx) => {
     );
   }
 
-  // Проверка, какие поля заполнены
   const isNameOk = !!user.name;
   const isPhoneOk = !!user.phone;
   const isPassportOk = !!user.passport_photo_file_id;
@@ -43,7 +41,7 @@ module.exports = async (ctx) => {
   if (!isNameOk) {
     ctx.session.step = "waiting_for_name";
     ctx.session.scenario = "registration";
-    return ctx.reply("👤 Пожалуйста, введите ваше имя:");
+    return ctx.reply("✏️ Пожалуйста, введите ваше имя:");
   }
 
   if (!isPhoneOk) {
@@ -57,21 +55,19 @@ module.exports = async (ctx) => {
   if (!isPassportOk) {
     ctx.session.step = "waiting_for_passport";
     ctx.session.scenario = "registration";
-    return ctx.reply("🛂 Пожалуйста, отправьте фото паспорта:");
+    return ctx.reply("🪪 Пожалуйста, отправьте фото паспорта:");
   }
 
-  // Главное меню
-  // Главное меню
-  return ctx.reply("📋 Главное меню:", {
+  return ctx.reply("🏠 Главное меню:", {
     reply_markup: {
       inline_keyboard: [
-        [{text: "🛵 Забронировать байк", callback_data: "book:start"}],
-        [{text: "⚙️ Моя Аренда", callback_data: "book:add_rental"}],
+        [{text: "📅 Забронировать байк", callback_data: "book:start"}],
+        [{text: "🧾 Моя аренда", callback_data: "book:add_rental"}],
         [
           {text: "✏️ Изменить имя", callback_data: "update:name"},
           {text: "📞 Изменить номер", callback_data: "update:tel"},
         ],
-        [{text: "🖼 Загрузить паспорт", callback_data: "update:passport"}],
+        [{text: "🪪 Загрузить паспорт", callback_data: "update:passport"}],
       ],
     },
   });

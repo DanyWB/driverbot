@@ -1,16 +1,15 @@
-﻿const db = require("../connect");
+const db = require("../connect");
 const dayjs = require("dayjs");
 
 module.exports = async (ctx) => {
   const booking = ctx.session.booking;
 
   if (!booking || !booking.startDate || !booking.endDate) {
-    return ctx.answerCallbackQuery("❌ Даты аренды не выбраны.");
+    return ctx.answerCallbackQuery("Даты аренды не выбраны.");
   }
 
   const {startDate, endDate} = booking;
 
-  // Получаем байки, которые заняты хотя бы в один из дней периода
   const busyBikes = await db("rentals")
     .select("bike_id")
     .where("status", "!=", "cancelled")
@@ -27,25 +26,21 @@ module.exports = async (ctx) => {
 
   const busyIds = busyBikes.map((b) => b.bike_id);
 
-  // Получаем все байки, не входящие в список занятых
   const availableBikes = await db("bikes")
     .select("id", "name")
     .whereNotIn("id", busyIds);
 
   if (availableBikes.length === 0) {
     return ctx.editMessageText(
-      "❌ К сожалению, нет доступных байков на выбранные даты.",
+      "😔 К сожалению, нет доступных байков на выбранные даты.",
       {
         reply_markup: {
-          inline_keyboard: [
-            [{text: "🔙 Назад", callback_data: "book:restart"}],
-          ],
+          inline_keyboard: [[{text: "⬅️ Назад", callback_data: "book:restart"}]],
         },
       }
     );
   }
 
-  // Формируем inline-кнопки по доступным байкам
   const keyboard = availableBikes.map((bike) => [
     {
       text: bike.name,
@@ -53,10 +48,9 @@ module.exports = async (ctx) => {
     },
   ]);
 
-  // Добавляем кнопку Назад
-  keyboard.push([{text: "🔙 Назад", callback_data: "book:restart"}]);
+  keyboard.push([{text: "⬅️ Назад", callback_data: "book:restart"}]);
 
-  await ctx.editMessageText("🛵 Доступные байки:", {
+  await ctx.editMessageText("🏍️ Доступные байки:", {
     reply_markup: {inline_keyboard: keyboard},
   });
 };

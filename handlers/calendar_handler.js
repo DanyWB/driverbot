@@ -1,4 +1,4 @@
-﻿const {generateCalendarKeyboard} = require("../utils/calendar");
+const {generateCalendarKeyboard} = require("../utils/calendar");
 const dayjs = require("dayjs");
 const db = require("../connect");
 
@@ -14,7 +14,6 @@ module.exports = async (ctx) => {
 
   const {booking} = ctx.session;
 
-  // Выбор даты начала
   if (!booking.startDate) {
     booking.startDate = date;
 
@@ -25,30 +24,28 @@ module.exports = async (ctx) => {
       {
         reply_markup: generateCalendarKeyboard(date, {
           startDate: date,
-          // Здесь позже добавим disable для занятых дат
         }),
       }
     );
     return;
   }
 
-  // Выбор даты окончания
   if (!booking.endDate) {
     const start = dayjs(booking.startDate);
     const end = dayjs(date);
 
     if (end.isBefore(start)) {
       return ctx.answerCallbackQuery(
-        "⛔ Дата окончания не может быть раньше начала."
+        "Дата окончания не может быть раньше начала."
       );
     }
 
     booking.endDate = date;
 
     await ctx.editMessageText(
-      `✅ Вы выбрали период аренды:\n${start.format(
+      `📅 Вы выбрали период аренды:\n${start.format(
         "DD.MM.YYYY"
-      )} – ${end.format("DD.MM.YYYY")}\n\nТеперь выберите байк.`,
+      )} - ${end.format("DD.MM.YYYY")}\n\nТеперь выберите байк.`,
       {
         reply_markup: {
           inline_keyboard: [
@@ -58,7 +55,7 @@ module.exports = async (ctx) => {
                 callback_data: "book:show_available_bikes",
               },
             ],
-            [{text: "🔙 Назад", callback_data: "book:restart"}],
+            [{text: "Назад", callback_data: "book:restart"}],
           ],
         },
       }

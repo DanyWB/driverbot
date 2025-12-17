@@ -1,0 +1,25 @@
+const dayjs = require("dayjs");
+
+const createEmptyBooking = () => ({
+  scenario: null,
+  step: null,
+  selectedBikeId: null,
+  startDate: null,
+  endDate: null,
+  totalPrice: null,
+  calendarMonth: dayjs().month() + 1, // 1-based month for UI
+  calendarYear: dayjs().year(),
+});
+
+function ensureBooking(ctx) {
+  if (!ctx.session.booking) {
+    ctx.session.booking = createEmptyBooking();
+  }
+  return ctx.session.booking;
+}
+
+function resetBooking(ctx) {
+  ctx.session.booking = null;
+}
+
+module.exports = {ensureBooking, resetBooking, createEmptyBooking};
