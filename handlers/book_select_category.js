@@ -1,9 +1,8 @@
-﻿const {Composer} = require("grammy");
+const {Composer} = require("grammy");
 const composer = new Composer();
 const db = require("../connect");
 
 composer.callbackQuery(/^book:cat:(\d+)$/, async (ctx) => {
-  console.log("✅ Хендлер категории сработал:", ctx.callbackQuery.data);
   const categoryId = Number(ctx.match[1]);
   ctx.session.booking = ctx.session.booking || {};
   ctx.session.booking.categoryId = categoryId;
@@ -13,9 +12,9 @@ composer.callbackQuery(/^book:cat:(\d+)$/, async (ctx) => {
     .where({category_id: categoryId});
 
   if (!bikes.length) {
-    return ctx.editMessageText("🚫 В этой категории пока нет байков.", {
+    return ctx.editMessageText("😔 В этой категории пока нет байков.", {
       reply_markup: {
-        inline_keyboard: [[{text: "↩️ Назад", callback_data: "book:start"}]],
+        inline_keyboard: [[{text: "⬅️ Назад", callback_data: "book:start"}]],
       },
     });
   }
@@ -26,9 +25,9 @@ composer.callbackQuery(/^book:cat:(\d+)$/, async (ctx) => {
       callback_data: `book:select_bike:${bike.id}`,
     },
   ]);
-  buttons.push([{text: "🔙 Назад", callback_data: "book:start"}]);
+  buttons.push([{text: "⬅️ Назад", callback_data: "book:start"}]);
 
-  await ctx.editMessageText("🛵 Выберите байк:", {
+  await ctx.editMessageText("🏍️ Выберите байк:", {
     reply_markup: {inline_keyboard: buttons},
   });
 });

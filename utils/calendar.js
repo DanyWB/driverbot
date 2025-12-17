@@ -1,5 +1,5 @@
-﻿const dayjs = require("dayjs");
-const calendar = require("node-calendar"); // установи через npm i node-calendar
+const dayjs = require("dayjs");
+const calendar = require("node-calendar");
 
 function generateCalendarKeyboard(year, month, bookedDates = []) {
   const bookedSet = new Set(bookedDates);
@@ -11,14 +11,11 @@ function generateCalendarKeyboard(year, month, bookedDates = []) {
 
   const keyboard = [];
 
-  // Заголовок
   keyboard.push([{text: monthName, callback_data: "noop"}]);
 
-  // День недели
   const weekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   keyboard.push(weekdays.map((d) => ({text: d, callback_data: "noop"})));
 
-  // Дни месяца
   for (const week of monthDates) {
     const row = week.map((day) => {
       if (day === 0) return {text: " ", callback_data: "noop"};
@@ -26,18 +23,17 @@ function generateCalendarKeyboard(year, month, bookedDates = []) {
         day
       ).padStart(2, "0")}`;
       if (bookedSet.has(dateStr)) {
-        return {text: "❌", callback_data: "noop"};
+        return {text: "⛔", callback_data: "noop"};
       }
       return {text: String(day), callback_data: `book:select_date:${dateStr}`};
     });
     keyboard.push(row);
   }
 
-  // Навигация
   keyboard.push([
-    {text: "⬅️", callback_data: "book:calendar_prev"},
-    {text: "↩️ Назад", callback_data: "book:start"},
-    {text: "➡️", callback_data: "book:calendar_next"},
+    {text: "◀️", callback_data: "book:calendar_prev"},
+    {text: "⬅️ Назад", callback_data: "book:start"},
+    {text: "▶️", callback_data: "book:calendar_next"},
   ]);
 
   return {inline_keyboard: keyboard};

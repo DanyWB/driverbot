@@ -55,10 +55,15 @@ async function getUserProfile(userId) {
   return await db("users").where({telegram_id: userId}).first();
 }
 
+async function getUserByTelegramId(userId) {
+  return db("users").where({telegram_id: userId}).first();
+}
+
 module.exports = {
   updateUserPhone,
   updateUserName,
   updateUserPassportPhoto,
   registerUser,
   getUserProfile,
+  getUserByTelegramId,
 };

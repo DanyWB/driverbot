@@ -1,4 +1,4 @@
-﻿const db = require("../connect");
+const db = require("../connect");
 const dayjs = require("dayjs");
 
 module.exports = async (ctx) => {
@@ -12,15 +12,15 @@ module.exports = async (ctx) => {
     !booking.selectedBikeId ||
     !booking.totalPrice
   ) {
-    return ctx.answerCallbackQuery("❌ Недостаточно данных для аренды.");
+    return ctx.answerCallbackQuery("Недостаточно данных для аренды.");
   }
 
   try {
-    // Получаем пользователя
     const user = await db("users").where({telegram_id: telegramId}).first();
     if (!user) {
-      return ctx.reply("❌ Вы не зарегистрированы.");
+      return ctx.reply("Вы не зарегистрированы.");
     }
+
     const existingRental = await db("rentals")
       .where({
         user_id: user.id,
@@ -29,7 +29,6 @@ module.exports = async (ctx) => {
       })
       .first();
 
-    // Добавляем запись в rentals
     if (!existingRental) {
       await db("rentals").insert({
         user_id: user.id,
@@ -41,9 +40,6 @@ module.exports = async (ctx) => {
       });
     }
 
-    // Очищаем временные данные сценария
-
-    // Получаем все байки пользователя со статусом "process"
     const rentals = await db("rentals")
       .join("bikes", "rentals.bike_id", "bikes.id")
       .where("user_id", user.id)
@@ -56,16 +52,16 @@ module.exports = async (ctx) => {
         "rentals.total_price"
       );
 
-    let text = "📋 <b>Текущая аренда:</b>\n\n";
+    let text = "🧾 <b>Текущая аренда:</b>\n\n";
 
     for (const rental of rentals) {
       const days =
         dayjs(rental.end_date).diff(dayjs(rental.start_date), "day") + 1;
-      text += `🛵 <b>${rental.name}</b>\n📅 ${dayjs(rental.start_date).format(
+      text += `🏍️ <b>${rental.name}</b>\n${dayjs(rental.start_date).format(
         "DD.MM.YYYY"
-      )} – ${dayjs(rental.end_date).format("DD.MM.YYYY")} (${days} дней)\n💰 ${
-        rental.total_price
-      } ฿\n\n`;
+      )} - ${dayjs(rental.end_date).format(
+        "DD.MM.YYYY"
+      )} (${days} дней)\nСтоимость: ${rental.total_price} THB\n\n`;
     }
 
     await ctx.editMessageText(text, {
@@ -79,14 +75,14 @@ module.exports = async (ctx) => {
             },
           ],
           [{text: "➕ Добавить байк", callback_data: "book:start"}],
-          [{text: "🗑 Удалить байк", callback_data: "book:delete_bike"}],
-          [{text: "🔄 Сбросить", callback_data: "book:reset_rental"}],
+          [{text: "🗑️ Удалить байк", callback_data: "book:delete_bike"}],
+          [{text: "♻️ Сбросить", callback_data: "book:reset_rental"}],
           [{text: "💬 Пожелания", callback_data: "book:comment"}],
         ],
       },
     });
   } catch (error) {
     console.error("Ошибка при добавлении аренды:", error);
-    return ctx.reply("❌ Произошла ошибка при сохранении аренды.");
+    return ctx.reply("⚠️ Произошла ошибка при сохранении аренды.");
   }
 };

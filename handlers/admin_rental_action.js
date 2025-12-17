@@ -6,7 +6,7 @@ module.exports = async (ctx) => {
   const rentalId = Number(rentalIdRaw);
 
   const rental = await db("rentals").where({id: rentalId}).first();
-  if (!rental) return ctx.reply("❌ Аренда не найдена.");
+  if (!rental) return ctx.reply("Аренда не найдена.");
 
   const newStatus = action === "approve" ? "approved" : "cancelled";
 
@@ -14,7 +14,7 @@ module.exports = async (ctx) => {
 
   await ctx.editMessageReplyMarkup({inline_keyboard: []});
   await ctx.editMessageText(
-    `📝 Аренда #${rentalId} ${
+    `Заявка #${rentalId} ${
       newStatus === "approved" ? "подтверждена" : "отклонена"
     }.`
   );
