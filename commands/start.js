@@ -1,6 +1,7 @@
 const db = require("../connect");
 const {registerUser} = require("../services/userService");
 const {setUserCommands} = require("../utils/setCommands");
+const {getMainMenuKeyboard} = require("../utils/mainMenu");
 const {
   t,
   getLanguageKeyboard,
@@ -82,21 +83,6 @@ module.exports = async (ctx) => {
   }
 
   return ctx.reply(t(lang, "menu_title"), {
-    reply_markup: {
-      inline_keyboard: [
-        [{text: t(lang, "menu_book"), callback_data: "book:start"}],
-        [{text: t(lang, "menu_rental"), callback_data: "book:add_rental"}],
-        [
-          {text: t(lang, "menu_update_name"), callback_data: "update:name"},
-          {text: t(lang, "menu_update_tel"), callback_data: "update:tel"},
-        ],
-        [
-          {
-            text: t(lang, "menu_update_passport"),
-            callback_data: "update:passport",
-          },
-        ],
-      ],
-    },
+    reply_markup: getMainMenuKeyboard(lang),
   });
 };

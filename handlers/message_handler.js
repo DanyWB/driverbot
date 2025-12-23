@@ -4,11 +4,18 @@ const {
   handlePhoneStep,
   handlePassportStep,
 } = require("./registration_steps");
+const {detectMainMenuAction} = require("../utils/mainMenu");
+const {handleMainMenuAction} = require("./main_menu");
 const {t, getCtxLang} = require("../utils/i18n");
 
 module.exports = async (ctx) => {
   const step = ctx.session?.step;
   const telegramId = ctx.from.id;
+  const action = detectMainMenuAction(ctx.message?.text);
+
+  if (action) {
+    return handleMainMenuAction(ctx, action);
+  }
 
   if (!step) return;
 
