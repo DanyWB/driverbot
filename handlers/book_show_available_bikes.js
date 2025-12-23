@@ -1,11 +1,12 @@
 const db = require("../connect");
-const dayjs = require("dayjs");
+const {t, getCtxLang} = require("../utils/i18n");
 
 module.exports = async (ctx) => {
   const booking = ctx.session.booking;
+  const lang = getCtxLang(ctx);
 
   if (!booking || !booking.startDate || !booking.endDate) {
-    return ctx.answerCallbackQuery("Даты аренды не выбраны.");
+    return ctx.answerCallbackQuery(t(lang, "booking_dates_not_selected"));
   }
 
   const {startDate, endDate} = booking;
@@ -32,10 +33,10 @@ module.exports = async (ctx) => {
 
   if (availableBikes.length === 0) {
     return ctx.editMessageText(
-      "😔 К сожалению, нет доступных байков на выбранные даты.",
+      t(lang, "booking_no_available_bikes"),
       {
         reply_markup: {
-          inline_keyboard: [[{text: "⬅️ Назад", callback_data: "book:restart"}]],
+          inline_keyboard: [[{text: t(lang, "btn_back"), callback_data: "book:restart"}]],
         },
       }
     );
@@ -48,9 +49,9 @@ module.exports = async (ctx) => {
     },
   ]);
 
-  keyboard.push([{text: "⬅️ Назад", callback_data: "book:restart"}]);
+  keyboard.push([{text: t(lang, "btn_back"), callback_data: "book:restart"}]);
 
-  await ctx.editMessageText("🏍️ Доступные байки:", {
+  await ctx.editMessageText(t(lang, "booking_available_bikes_title"), {
     reply_markup: {inline_keyboard: keyboard},
   });
 };

@@ -3,6 +3,7 @@ const db = require("../connect");
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const dayjs = require("dayjs");
 const {ensureBooking} = require("../services/bookingService");
+const {t, getCtxLang, getCalendarLabels, getWeekdays} = require("../utils/i18n");
 
 module.exports = async (ctx) => {
   const data = ctx.callbackQuery.data;
@@ -12,7 +13,9 @@ module.exports = async (ctx) => {
   booking.scenario = booking.scenario || "date_first";
   booking.step = booking.step || "select_date";
 
-  // Шаг 1 - выбираем начальную дату
+  const lang = getCtxLang(ctx);
+
+  // Step 1 - pick start date
   if (!booking.startDate) {
     booking.startDate = selectedDate;
     booking.step = "select_end_date";
@@ -24,21 +27,28 @@ module.exports = async (ctx) => {
       blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
     }
 
-    return ctx.editMessageText("📅 Выберите дату окончания аренды:", {
+    return ctx.editMessageText(t(lang, "booking_choose_end_date"), {
       reply_markup: require("../utils/calendar").generateCalendarKeyboard(
         Number(selectedDate.split("-")[0]),
         Number(selectedDate.split("-")[1]),
-        blockedDays
+        blockedDays,
+        {
+          lang,
+          labels: getCalendarLabels(lang),
+          weekdays: getWeekdays(lang),
+        }
       ),
     });
   }
 
-  // Шаг 2 - выбираем дату окончания
+  // Step 2 - pick end date
   const start = dayjs(booking.startDate);
   const end = dayjs(selectedDate);
 
   if (end.isBefore(start)) {
-    await ctx.answerCallbackQuery("Дата окончания не может быть раньше начала.", {show_alert: true});
+    await ctx.answerCallbackQuery(t(lang, "booking_end_before_start"), {
+      show_alert: true,
+    });
     return;
   }
 
@@ -66,16 +76,18 @@ module.exports = async (ctx) => {
       booking.startDate = null;
       booking.endDate = null;
       booking.step = "select_start_date";
-      return ctx.reply(
-        "В выбранном диапазоне уже есть занятые даты. Попробуйте снова.\n\n📅 Выберите дату начала аренды:",
-        {
-          reply_markup: require("../utils/calendar").generateCalendarKeyboard(
-            dayjs().year(),
-            dayjs().month() + 1,
-            blockedDays
-          ),
-        }
-      );
+      return ctx.reply(t(lang, "booking_range_conflict"), {
+        reply_markup: require("../utils/calendar").generateCalendarKeyboard(
+          dayjs().year(),
+          dayjs().month() + 1,
+          blockedDays,
+          {
+            lang,
+            labels: getCalendarLabels(lang),
+            weekdays: getWeekdays(lang),
+          }
+        ),
+      });
     }
   }
 

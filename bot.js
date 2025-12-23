@@ -5,6 +5,7 @@ const path = require("path");
 const attachDb = require("./middlewares/attachDb");
 const sessionStorage = require("./middlewares/sessionStorage");
 const resetFlow = require("./middlewares/resetFlow");
+const {t, getCtxLang} = require("./utils/i18n");
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
@@ -40,29 +41,30 @@ bot.callbackQuery(/^book:cat:\d+$/, require("./handlers/book_select_category"));
 bot.callbackQuery("book:show_available_bikes", require("./handlers/book_show_available_bikes"));
 bot.callbackQuery(/^book:select_date:\d{4}-\d{2}-\d{2}$/, require("./handlers/calendar_handler"));
 bot.callbackQuery(["book:calendar_prev", "book:calendar_next", "book:restart", "home"], require("./handlers/navigation"));
-bot.callbackQuery(["book:restart", "home"], require("./handlers/navigation"));
+bot.callbackQuery(/^lang:set:(ru|en|ua)$/, require("./handlers/language_select"));
 
 bot.callbackQuery("update:name", async (ctx) => {
   ctx.session.step = "waiting_for_name";
   ctx.session.scenario = null;
   await ctx.answerCallbackQuery();
-  return ctx.reply("✏️ Введите новое имя:");
+  const lang = getCtxLang(ctx);
+  return ctx.reply(t(lang, "update_name_prompt"));
 });
 
 bot.callbackQuery("update:tel", async (ctx) => {
   ctx.session.step = "waiting_for_phone";
   ctx.session.scenario = null;
   await ctx.answerCallbackQuery();
-  return ctx.reply(
-    "📞 Введите новый номер телефона в международном формате (например, +79995551234):"
-  );
+  const lang = getCtxLang(ctx);
+  return ctx.reply(t(lang, "update_tel_prompt"));
 });
 
 bot.callbackQuery("update:passport", async (ctx) => {
   ctx.session.step = "waiting_for_passport";
   ctx.session.scenario = null;
   await ctx.answerCallbackQuery();
-  return ctx.reply("🪪 Отправьте новое фото паспорта:");
+  const lang = getCtxLang(ctx);
+  return ctx.reply(t(lang, "update_passport_prompt"));
 });
 
 bot.callbackQuery(

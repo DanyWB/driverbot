@@ -1,15 +1,17 @@
 // utils/setCommands.js
+const {t, normalizeLang} = require("./i18n");
 
-async function setUserCommands(user, ctx) {
+async function setUserCommands(user, ctx, langOverride) {
   const botApi = ctx.api;
   const telegramId = user.telegram_id;
+  const lang = normalizeLang(langOverride || user.lang);
 
   const commands = [
-    {command: "start", description: "🏠 Главное меню"},
-    {command: "book", description: "📅 Начать бронирование"},
-    {command: "add_name", description: "✏️ Изменить имя"},
-    {command: "add_tel", description: "📞 Изменить номер"},
-    {command: "add_passport", description: "🪪 Загрузить паспорт"},
+    {command: "start", description: t(lang, "cmd_start")},
+    {command: "book", description: t(lang, "cmd_book")},
+    {command: "add_name", description: t(lang, "cmd_add_name")},
+    {command: "add_tel", description: t(lang, "cmd_add_tel")},
+    {command: "add_passport", description: t(lang, "cmd_add_passport")},
   ];
 
   await Promise.all([
