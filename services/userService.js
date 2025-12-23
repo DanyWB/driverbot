@@ -59,6 +59,19 @@ async function getUserByTelegramId(userId) {
   return db("users").where({telegram_id: userId}).first();
 }
 
+async function updateUserLanguage(userId, lang) {
+  try {
+    await db("users")
+      .insert({telegram_id: userId, lang})
+      .onConflict("telegram_id")
+      .merge({lang});
+    return true;
+  } catch (error) {
+    console.error("Ошибка при сохранении языка:", error);
+    return false;
+  }
+}
+
 module.exports = {
   updateUserPhone,
   updateUserName,
@@ -66,4 +79,5 @@ module.exports = {
   registerUser,
   getUserProfile,
   getUserByTelegramId,
+  updateUserLanguage,
 };

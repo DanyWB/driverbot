@@ -1,12 +1,14 @@
 const db = require("../connect");
 const dayjs = require("dayjs");
+const {t, getCtxLang} = require("../utils/i18n");
 
 module.exports = async (ctx) => {
   const telegramId = ctx.from.id;
+  const lang = getCtxLang(ctx);
 
   const user = await db("users").where({telegram_id: telegramId}).first();
   if (!user) {
-    return ctx.reply("Вы не зарегистрированы.");
+    return ctx.reply(t(lang, "not_registered"));
   }
 
   const rentals = await db("rentals")
@@ -14,7 +16,7 @@ module.exports = async (ctx) => {
     .andWhere("status", "process");
 
   if (rentals.length === 0) {
-    return ctx.answerCallbackQuery("Нет бронирований для подтверждения.");
+    return ctx.answerCallbackQuery(t(lang, "booking_no_bookings_to_confirm"));
   }
 
   for (const rental of rentals) {
@@ -41,7 +43,7 @@ module.exports = async (ctx) => {
     const bike = await db("bikes").where("id", rental.bike_id).first();
     if (overlapping.length > 0) {
       return ctx.reply(
-        `Байк "${bike.name}" уже занят на выбранные даты. Проверьте новый период.`
+        t(lang, "booking_bike_busy", {name: bike.name})
       );
     }
   }
@@ -54,33 +56,30 @@ module.exports = async (ctx) => {
       confirmed_at: dayjs().toISOString(),
     });
 
-  await ctx.editMessageText(
-    "✅ Ваша аренда подтверждена!\nОжидайте подтверждения администратора.",
-    {
-      reply_markup: {
-        inline_keyboard: [[{text: "🏠 В меню", callback_data: "home"}]],
-      },
-    }
-  );
+  await ctx.editMessageText(t(lang, "booking_confirmed"), {
+    reply_markup: {
+      inline_keyboard: [[{text: t(lang, "btn_home"), callback_data: "home"}]],
+    },
+  });
 
   for (const rental of rentals) {
     const bike = await db("bikes").where({id: rental.bike_id}).first();
     const admin = await db("users").where({is_admin: true}).first();
     if (!admin) {
       await ctx.reply(
-        "Извините. Сейчас в системе нет администратора. Пожалуйста, отмените эту аренду и повторите попытку позднее."
+        t(lang, "booking_admin_missing")
       );
       return;
     }
-    const text = `🚨 <b>Новая аренда</b>\n\nПользователь: ${
-      user.name || "(без имени)"
-    } Telegram: @${user.telegram_name || "-"}\nБайк: <b>${bike.name}</b>\nСрок: ${dayjs(
-      rental.start_date
-    ).format("DD.MM")} - ${dayjs(rental.end_date).format(
-      "DD.MM"
-    )}\nИтог: ${rental.total_price} THB\nКомментарий: ${
-      rental.comment || "-"
-    }`;
+    const text = t(lang, "booking_admin_new", {
+      user: user.name || t(lang, "user_no_name"),
+      username: user.telegram_name || "-",
+      bike: bike.name,
+      start: dayjs(rental.start_date).format("DD.MM"),
+      end: dayjs(rental.end_date).format("DD.MM"),
+      price: rental.total_price,
+      comment: rental.comment || "-",
+    });
 
     await ctx.api.sendMessage(admin.telegram_id, text, {
       parse_mode: "HTML",
@@ -88,11 +87,11 @@ module.exports = async (ctx) => {
         inline_keyboard: [
           [
             {
-              text: "Подтвердить",
+              text: t(lang, "admin_btn_approve"),
               callback_data: `admin:rental:approve:${rental.id}`,
             },
             {
-              text: "Отклонить",
+              text: t(lang, "admin_btn_cancel"),
               callback_data: `admin:rental:cancel:${rental.id}`,
             },
           ],

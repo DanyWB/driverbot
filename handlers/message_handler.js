@@ -4,6 +4,7 @@ const {
   handlePhoneStep,
   handlePassportStep,
 } = require("./registration_steps");
+const {t, getCtxLang} = require("../utils/i18n");
 
 module.exports = async (ctx) => {
   const step = ctx.session?.step;
@@ -11,11 +12,11 @@ module.exports = async (ctx) => {
 
   if (!step) return;
 
-  // Пожелание к аренде
   if (step === "awaiting_comment" && ctx.message?.text) {
+    const lang = getCtxLang(ctx);
     const user = await db("users").where({telegram_id: telegramId}).first();
     if (!user) {
-      await ctx.reply("Ошибка: пользователь не найден.");
+      await ctx.reply(t(lang, "user_not_found"));
       return;
     }
 
@@ -25,12 +26,12 @@ module.exports = async (ctx) => {
 
     ctx.session.step = null;
 
-    await ctx.reply("💬 Ваши пожелания сохранены.", {
+    await ctx.reply(t(lang, "booking_comment_saved"), {
       reply_markup: {
         inline_keyboard: [
           [
             {
-              text: "➕ Добавить байк к аренде",
+              text: t(lang, "booking_add_bike_to_rental_btn"),
               callback_data: "book:add_rental",
             },
           ],

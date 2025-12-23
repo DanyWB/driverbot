@@ -1,15 +1,14 @@
 const {generateCalendarKeyboard} = require("../utils/calendar");
 const dayjs = require("dayjs");
-const db = require("../connect");
+const {t, getCtxLang, getCalendarLabels, getWeekdays} = require("../utils/i18n");
 
 module.exports = async (ctx) => {
-  const data = ctx.callbackQuery.data; // например: 'calendar:2025-07-06'
+  const data = ctx.callbackQuery.data; // e.g. 'calendar:2025-07-06'
   const date = data.split(":")[1];
+  const lang = getCtxLang(ctx);
 
   if (!ctx.session.booking) {
-    return ctx.answerCallbackQuery(
-      "Ошибка: нет активного сценария бронирования."
-    );
+    return ctx.answerCallbackQuery(t(lang, "calendar_no_scenario"));
   }
 
   const {booking} = ctx.session;
@@ -18,13 +17,16 @@ module.exports = async (ctx) => {
     booking.startDate = date;
 
     await ctx.editMessageText(
-      `📅 Дата начала аренды: ${dayjs(date).format(
-        "DD.MM.YYYY"
-      )}\n\nТеперь выберите дату окончания аренды.`,
+      t(lang, "booking_start_date_selected", {
+        date: dayjs(date).format("DD.MM.YYYY"),
+      }),
       {
-        reply_markup: generateCalendarKeyboard(date, {
-          startDate: date,
-        }),
+        reply_markup: generateCalendarKeyboard(
+          dayjs(date).year(),
+          dayjs(date).month() + 1,
+          [],
+          {lang, labels: getCalendarLabels(lang), weekdays: getWeekdays(lang)}
+        ),
       }
     );
     return;
@@ -35,27 +37,26 @@ module.exports = async (ctx) => {
     const end = dayjs(date);
 
     if (end.isBefore(start)) {
-      return ctx.answerCallbackQuery(
-        "Дата окончания не может быть раньше начала."
-      );
+      return ctx.answerCallbackQuery(t(lang, "booking_end_before_start"));
     }
 
     booking.endDate = date;
 
     await ctx.editMessageText(
-      `📅 Вы выбрали период аренды:\n${start.format(
-        "DD.MM.YYYY"
-      )} - ${end.format("DD.MM.YYYY")}\n\nТеперь выберите байк.`,
+      t(lang, "booking_period_selected", {
+        start: start.format("DD.MM.YYYY"),
+        end: end.format("DD.MM.YYYY"),
+      }),
       {
         reply_markup: {
           inline_keyboard: [
             [
               {
-                text: "Выбрать байк",
+                text: t(lang, "booking_choose_bike_btn"),
                 callback_data: "book:show_available_bikes",
               },
             ],
-            [{text: "Назад", callback_data: "book:restart"}],
+            [{text: t(lang, "btn_back"), callback_data: "book:restart"}],
           ],
         },
       }

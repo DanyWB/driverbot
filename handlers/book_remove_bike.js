@@ -1,10 +1,12 @@
 const db = require("../connect");
+const {t, getCtxLang} = require("../utils/i18n");
 
 module.exports = async (ctx) => {
   const telegramId = ctx.from.id;
+  const lang = getCtxLang(ctx);
   const user = await db("users").where({telegram_id: telegramId}).first();
   if (!user) {
-    return ctx.reply("Пользователь не найден.");
+    return ctx.reply(t(lang, "user_not_found"));
   }
 
   const rentals = await db("rentals")
@@ -13,7 +15,7 @@ module.exports = async (ctx) => {
     .select("rentals.id as rental_id", "bikes.name", "bikes.id as bike_id");
 
   if (!rentals || rentals.length === 0) {
-    return ctx.reply("У вас нет байков в процессе аренды.");
+    return ctx.reply(t(lang, "booking_no_bikes_in_process"));
   }
   try {
     await ctx.deleteMessage();
@@ -22,14 +24,14 @@ module.exports = async (ctx) => {
   }
   const keyboard = rentals.map((rental) => [
     {
-      text: `Удалить ${rental.name}`,
+      text: t(lang, "booking_delete_bike_item", {name: rental.name}),
       callback_data: `book:confirm_remove:${rental.rental_id}`,
     },
   ]);
 
-  keyboard.push([{text: "⬅️ Назад", callback_data: "book:add_rental"}]);
+  keyboard.push([{text: t(lang, "btn_back"), callback_data: "book:add_rental"}]);
 
-  return ctx.reply("🗑️ Выберите байк, который хотите удалить из аренды:", {
+  return ctx.reply(t(lang, "booking_delete_prompt"), {
     reply_markup: {
       inline_keyboard: keyboard,
     },

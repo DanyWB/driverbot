@@ -3,17 +3,20 @@ const dayjs = require("dayjs");
 const {generateCalendarKeyboard} = require("../utils/calendar");
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const {ensureBooking} = require("../services/bookingService");
+const {t, getCtxLang, getCalendarLabels, getWeekdays} = require("../utils/i18n");
 
 module.exports = async (ctx) => {
   const data = ctx.callbackQuery?.data;
   const parts = data.split(":");
   const bikeId = Number(parts[2]);
   if (!bikeId || isNaN(bikeId)) {
-    return ctx.answerCallbackQuery("Неверный формат ID байка.");
+    const lang = getCtxLang(ctx);
+    return ctx.answerCallbackQuery(t(lang, "booking_invalid_bike_id"));
   }
 
   const booking = ensureBooking(ctx);
   booking.selectedBikeId = bikeId;
+  const lang = getCtxLang(ctx);
 
   if (!booking.startDate || !booking.endDate) {
     booking.step = "select_start_date";
@@ -25,21 +28,25 @@ module.exports = async (ctx) => {
       blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
     }
 
-    return ctx.editMessageText("📅 Пожалуйста, выберите дату начала аренды.", {
+    return ctx.editMessageText(t(lang, "booking_choose_start_date"), {
       reply_markup: generateCalendarKeyboard(
         booking.calendarYear,
         booking.calendarMonth,
-        blockedDays
+        blockedDays,
+        {
+          lang,
+          labels: getCalendarLabels(lang),
+          weekdays: getWeekdays(lang),
+        }
       ),
     });
   }
 
   const bike = await db("bikes").where({id: bikeId}).first();
   if (!bike) {
-    return ctx.editMessageText("Байк не найден.");
+    return ctx.editMessageText(t(lang, "booking_bike_not_found"));
   }
 
-  // Проверяем пересечения с занятыми датами выбранного байка
   const blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
   const start = dayjs(booking.startDate);
   const end = dayjs(booking.endDate);
@@ -54,16 +61,18 @@ module.exports = async (ctx) => {
     booking.startDate = null;
     booking.endDate = null;
     booking.step = "select_start_date";
-    return ctx.editMessageText(
-      "В выбранном диапазоне есть занятые даты для этого байка. Выберите другой период.",
-      {
-        reply_markup: generateCalendarKeyboard(
-          booking.calendarYear,
-          booking.calendarMonth,
-          blockedDays
-        ),
-      }
-    );
+    return ctx.editMessageText(t(lang, "booking_range_conflict_bike"), {
+      reply_markup: generateCalendarKeyboard(
+        booking.calendarYear,
+        booking.calendarMonth,
+        blockedDays,
+        {
+          lang,
+          labels: getCalendarLabels(lang),
+          weekdays: getWeekdays(lang),
+        }
+      ),
+    });
   }
 
   const month = start.month() + 1;
@@ -73,9 +82,7 @@ module.exports = async (ctx) => {
   );
 
   if (!matchingSeason) {
-    return ctx.editMessageText(
-      "Не удалось определить сезон по выбранной дате."
-    );
+    return ctx.editMessageText(t(lang, "booking_season_not_found"));
   }
 
   const seasonId = matchingSeason.id;
@@ -105,20 +112,27 @@ module.exports = async (ctx) => {
 
   booking.totalPrice = totalPrice;
 
-  const text = `🏍️ <b>${bike.name}</b>\n\n<b>Период аренды:</b> ${dayjs(
-    booking.startDate
-  ).format("DD.MM.YYYY")} - ${dayjs(booking.endDate).format(
-    "DD.MM.YYYY"
-  )} (${days} дней)\n<b>Стоимость:</b> ${totalPrice} THB\n\n${
-    bike.description || ""
-  }`;
+  const text = t(lang, "booking_bike_summary", {
+    name: bike.name,
+    start: dayjs(booking.startDate).format("DD.MM.YYYY"),
+    end: dayjs(booking.endDate).format("DD.MM.YYYY"),
+    days,
+    days_label: t(lang, "days_label"),
+    price: totalPrice,
+    desc: bike.description || "",
+  });
 
   await ctx.editMessageText(text, {
     parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [
-        [{text: "✅ Добавить в аренду", callback_data: "book:add_rental"}],
-        [{text: "⬅️ Назад", callback_data: "book:show_available_bikes"}],
+        [
+          {
+            text: t(lang, "booking_add_to_rental_btn"),
+            callback_data: "book:add_rental",
+          },
+        ],
+        [{text: t(lang, "btn_back"), callback_data: "book:show_available_bikes"}],
       ],
     },
   });

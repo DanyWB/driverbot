@@ -1,6 +1,12 @@
 const db = require("../connect");
 const {registerUser} = require("../services/userService");
 const {setUserCommands} = require("../utils/setCommands");
+const {
+  t,
+  getLanguageKeyboard,
+  isSupportedLang,
+  normalizeLang,
+} = require("../utils/i18n");
 
 module.exports = async (ctx) => {
   const telegramId = ctx.from.id;
@@ -18,19 +24,38 @@ module.exports = async (ctx) => {
     isNewUser = true;
   }
 
-  await setUserCommands(user, ctx);
-
   if (isNewUser) {
+    ctx.session.justRegistered = true;
+  }
+
+  if (isNewUser || !isSupportedLang(user.lang)) {
+    await ctx.reply(t("ru", "lang_prompt"), {
+      reply_markup: getLanguageKeyboard(),
+    });
+    return;
+  }
+
+  const lang = normalizeLang(user.lang);
+  ctx.session.lang = lang;
+
+  await setUserCommands(user, ctx, lang);
+
+  const isFirstVisit = Boolean(ctx.session.justRegistered);
+  if (isFirstVisit) {
+    ctx.session.justRegistered = null;
+  }
+
+  if (isFirstVisit) {
     await ctx.reply(
-      `👋 Добро пожаловать, ${
-        ctx.from.first_name || "пользователь"
-      }!\n\nЧтобы продолжить, пожалуйста, пройдите небольшую регистрацию.`
+      t(lang, "welcome_new", {
+        name: ctx.from.first_name || t(lang, "user_default_name"),
+      })
     );
   } else {
     await ctx.reply(
-      `👋 С возвращением, ${
-        user.name || ctx.from.first_name || "пользователь"
-      }!`
+      t(lang, "welcome_back", {
+        name: user.name || ctx.from.first_name || t(lang, "user_default_name"),
+      })
     );
   }
 
@@ -41,33 +66,36 @@ module.exports = async (ctx) => {
   if (!isNameOk) {
     ctx.session.step = "waiting_for_name";
     ctx.session.scenario = "registration";
-    return ctx.reply("✏️ Пожалуйста, введите ваше имя:");
+    return ctx.reply(t(lang, "enter_name"));
   }
 
   if (!isPhoneOk) {
     ctx.session.step = "waiting_for_phone";
     ctx.session.scenario = "registration";
-    return ctx.reply(
-      "📞 Пожалуйста, введите номер телефона в международном формате (например, +79995551234):"
-    );
+    return ctx.reply(t(lang, "enter_phone"));
   }
 
   if (!isPassportOk) {
     ctx.session.step = "waiting_for_passport";
     ctx.session.scenario = "registration";
-    return ctx.reply("🪪 Пожалуйста, отправьте фото паспорта:");
+    return ctx.reply(t(lang, "enter_passport"));
   }
 
-  return ctx.reply("🏠 Главное меню:", {
+  return ctx.reply(t(lang, "menu_title"), {
     reply_markup: {
       inline_keyboard: [
-        [{text: "📅 Забронировать байк", callback_data: "book:start"}],
-        [{text: "🧾 Моя аренда", callback_data: "book:add_rental"}],
+        [{text: t(lang, "menu_book"), callback_data: "book:start"}],
+        [{text: t(lang, "menu_rental"), callback_data: "book:add_rental"}],
         [
-          {text: "✏️ Изменить имя", callback_data: "update:name"},
-          {text: "📞 Изменить номер", callback_data: "update:tel"},
+          {text: t(lang, "menu_update_name"), callback_data: "update:name"},
+          {text: t(lang, "menu_update_tel"), callback_data: "update:tel"},
         ],
-        [{text: "🪪 Загрузить паспорт", callback_data: "update:passport"}],
+        [
+          {
+            text: t(lang, "menu_update_passport"),
+            callback_data: "update:passport",
+          },
+        ],
       ],
     },
   });

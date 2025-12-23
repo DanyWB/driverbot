@@ -3,10 +3,12 @@ const {createEmptyBooking, ensureBooking} = require("../services/bookingService"
 const {generateCalendarKeyboard} = require("../utils/calendar");
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const db = require("../connect");
+const {getCtxLang, getCalendarLabels, getWeekdays} = require("../utils/i18n");
 
-// Универсальные кнопки навигации назад/в меню/календарь.
+// Universal navigation handlers for back/home and calendar navigation.
 module.exports = async (ctx) => {
   const action = ctx.callbackQuery?.data;
+  const lang = getCtxLang(ctx);
 
   if (action === "book:restart") {
     ctx.session.booking = createEmptyBooking();
@@ -26,10 +28,9 @@ module.exports = async (ctx) => {
     const currentYear = booking.calendarYear || dayjs().year();
 
     const direction = action.endsWith("prev") ? -1 : 1;
-    const newDate = dayjs(`${currentYear}-${String(currentMonth).padStart(2, "0")}-01`).add(
-      direction,
-      "month"
-    );
+    const newDate = dayjs(
+      `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`
+    ).add(direction, "month");
 
     booking.calendarMonth = newDate.month() + 1;
     booking.calendarYear = newDate.year();
@@ -42,7 +43,12 @@ module.exports = async (ctx) => {
     const keyboard = generateCalendarKeyboard(
       booking.calendarYear,
       booking.calendarMonth,
-      blockedDays
+      blockedDays,
+      {
+        lang,
+        labels: getCalendarLabels(lang),
+        weekdays: getWeekdays(lang),
+      }
     );
 
     await ctx.editMessageReplyMarkup({reply_markup: keyboard});
