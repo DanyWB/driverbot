@@ -5,6 +5,7 @@ module.exports = {
   lang_save_error: "Failed to save language. Please try again later.",
 
   cmd_start: "🏠 Main menu",
+  cmd_menu: "📋 Open menu",
   cmd_book: "📅 Start booking",
   cmd_add_name: "✏️ Update name",
   cmd_add_tel: "📞 Update phone",
@@ -25,11 +26,27 @@ module.exports = {
   update_passport_prompt: "🪪 Send a new passport photo:",
 
   menu_title: "🏠 Main menu:",
+  menu_my_rent: "🛵 My Rent",
+  menu_support: "💬 Support",
+  menu_prices: "💸 Look Prices",
+  menu_account: "👤 My Account",
+  menu_conditions: "📝 Rent Conditions",
+  menu_about: "ℹ️ About Us",
   menu_book: "📅 Book a bike",
   menu_rental: "🧾 My rental",
   menu_update_name: "✏️ Update name",
   menu_update_tel: "📞 Update phone",
   menu_update_passport: "🪪 Upload passport",
+
+  support_info:
+    "💬 Support.\nSend your question here and we'll reply as soon as possible.",
+  prices_info:
+    "💸 Prices are shown for each bike when you pick dates.\nTap “My Rent” to choose dates and see totals.",
+  account_info: "👤 My account. Choose what you want to update:",
+  conditions_info:
+    "📝 Rent conditions:\n- Passport photo required;\n- Deposit/ID by agreement;\n- Helmets on request;\n- Damages are charged separately.\nIf you need details, tap “Support”.",
+  about_info:
+    "🏝️ DRIVE PHANGAN — scooter and car rental on Koh Phangan.\nOfficially operating since 2019.\n🛵 Every year we update our fleet with new models — for those who value comfort, style, and freedom.\n\n🚀 Renting with us is honest and transparent — no shady tricks or scratch scams.\n⭐ Over 100 positive reviews on Google Maps and many returning customers season after season.\nReliable, simple, and with care for your perfect vacation ✨\n\n🤖 This bot is made to keep booking quick and effortless — everything is automated. You can complete all steps right here. If you have any questions, we are always online!\n\n📍 Find us easily:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://instagram.com/drivephangan\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
 
   name_invalid:
     "Name must contain only letters and be at least 2 characters long. Try again.",
@@ -77,6 +94,7 @@ module.exports = {
 
   booking_invalid_bike_id: "Invalid bike ID format.",
   booking_bike_not_found: "Bike not found.",
+  booking_season_not_found: "Failed to determine season for the selected date.",
 
   booking_period_label: "Rental period:",
   booking_price_label: "Price:",
@@ -99,7 +117,7 @@ module.exports = {
     "✅ Your rental is confirmed!\nPlease wait for admin confirmation.",
   booking_no_bookings_to_confirm: "No bookings to confirm.",
   booking_bike_busy:
-    "Bike \"{name}\" is already booked for these dates. Please choose another period.",
+    'Bike "{name}" is already booked for these dates. Please choose another period.',
   booking_admin_missing:
     "Sorry. There is no admin in the system right now. Please cancel this rental and try again later.",
   booking_admin_new:
@@ -122,8 +140,6 @@ module.exports = {
   booking_add_bike_to_rental_btn: "➕ Add a bike to the rental",
   booking_bike_summary:
     "🏍️ <b>{name}</b>\n\n<b>Rental period:</b> {start} - {end} ({days} {days_label})\n<b>Price:</b> {price} THB\n\n{desc}",
-  booking_season_not_found:
-    "Failed to determine season for the selected date.",
 
   btn_back: "⬅️ Back",
   btn_home: "🏠 Home",
