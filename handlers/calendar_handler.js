@@ -37,7 +37,10 @@ module.exports = async (ctx) => {
     const end = dayjs(date);
 
     if (end.isBefore(start)) {
-      return ctx.answerCallbackQuery(t(lang, "booking_end_before_start"));
+      return ctx.answerCallbackQuery({
+        text: t(lang, "booking_end_before_start"),
+        show_alert: true,
+      });
     }
 
     booking.endDate = date;

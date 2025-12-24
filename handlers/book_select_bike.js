@@ -18,7 +18,7 @@ module.exports = async (ctx) => {
   booking.selectedBikeId = bikeId;
   const lang = getCtxLang(ctx);
 
-  if (!booking.startDate || !booking.endDate) {
+  if (!booking.startDate || !booking.startTime || !booking.endDate || !booking.endTime) {
     booking.step = "select_start_date";
     booking.calendarMonth = dayjs().month() + 1;
     booking.calendarYear = dayjs().year();
@@ -47,20 +47,27 @@ module.exports = async (ctx) => {
     return ctx.editMessageText(t(lang, "booking_bike_not_found"));
   }
 
-  const blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
-  const start = dayjs(booking.startDate);
-  const end = dayjs(booking.endDate);
-  const selectedDates = [];
-  let current = start;
-  while (current.isBefore(end) || current.isSame(end, "day")) {
-    selectedDates.push(current.format("YYYY-MM-DD"));
-    current = current.add(1, "day");
-  }
-  const hasConflict = selectedDates.some((d) => blockedDays.includes(d));
-  if (hasConflict) {
+  const {makeDateTime} = require("../utils/timeSlots");
+  const {applyOverlapCondition} = require("../utils/overlap");
+  const startAt = makeDateTime(booking.startDate, booking.startTime)?.toISOString();
+  const endAt = makeDateTime(booking.endDate, booking.endTime)?.toISOString();
+
+  const conflict = await db("rentals")
+    .where("bike_id", bikeId)
+    .whereNotIn("status", ["cancelled", "cancelled_by_client"])
+    .andWhere((qb) => applyOverlapCondition(qb, startAt, endAt, booking.startDate, booking.endDate))
+    .first();
+
+  if (conflict) {
     booking.startDate = null;
     booking.endDate = null;
     booking.step = "select_start_date";
+    let blockedDays = [];
+    try {
+      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
+    } catch (e) {
+      blockedDays = [];
+    }
     return ctx.editMessageText(t(lang, "booking_range_conflict_bike"), {
       reply_markup: generateCalendarKeyboard(
         booking.calendarYear,
@@ -74,6 +81,10 @@ module.exports = async (ctx) => {
       ),
     });
   }
+
+  // Dates for pricing calculation
+  const start = dayjs(startAt);
+  const end = dayjs(endAt);
 
   const month = start.month() + 1;
   const seasons = await db("seasons").select("id", "months");
@@ -108,21 +119,39 @@ module.exports = async (ctx) => {
     .where({bike_id: bikeId, season_id: seasonId, days_type: daysType})
     .first();
 
-  const totalPrice = priceRow ? priceRow.price_per_day * days : 10;
+  const totalPrice = priceRow ? priceRow.price_per_day * days : 0;
 
   booking.totalPrice = totalPrice;
+  booking.priceUnknown = !priceRow;
+
+  return showBikeSummary(ctx, bike, booking);
+};
+
+function showBikeSummary(ctx, bike, bookingOverride) {
+  const booking = bookingOverride || ensureBooking(ctx);
+  const lang = getCtxLang(ctx);
+  const startLabel = booking.startDate
+    ? dayjs(booking.startDate).format("DD.MM.YYYY")
+    : "-";
+  const endLabel = booking.endDate
+    ? dayjs(booking.endDate).format("DD.MM.YYYY")
+    : "-";
+  const days =
+    booking.startDate && booking.endDate
+      ? dayjs(booking.endDate).diff(dayjs(booking.startDate), "day") + 1
+      : 0;
 
   const text = t(lang, "booking_bike_summary", {
     name: bike.name,
-    start: dayjs(booking.startDate).format("DD.MM.YYYY"),
-    end: dayjs(booking.endDate).format("DD.MM.YYYY"),
+    start: startLabel,
+    end: endLabel,
     days,
     days_label: t(lang, "days_label"),
-    price: totalPrice,
+    price: booking.priceUnknown ? t(lang, "booking_price_tbd") : booking.totalPrice || 0,
     desc: bike.description || "",
   });
 
-  await ctx.editMessageText(text, {
+  return ctx.editMessageText(text, {
     parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [
@@ -132,8 +161,16 @@ module.exports = async (ctx) => {
             callback_data: "book:add_rental",
           },
         ],
+        [
+          {
+            text: t(lang, "booking_options_btn"),
+            callback_data: "book:options",
+          },
+        ],
         [{text: t(lang, "btn_back"), callback_data: "book:show_available_bikes"}],
       ],
     },
   });
-};
+}
+
+module.exports.showBikeSummary = showBikeSummary;

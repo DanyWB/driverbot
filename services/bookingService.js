@@ -5,10 +5,16 @@ const createEmptyBooking = () => ({
   step: null,
   selectedBikeId: null,
   startDate: null,
+  startTime: null,
   endDate: null,
+  endTime: null,
   totalPrice: null,
   calendarMonth: dayjs().month() + 1, // 1-based month for UI
   calendarYear: dayjs().year(),
+  helmets: 0,
+  deliveryRequired: false,
+  deliveryAddress: null,
+  notes: null,
 });
 
 function ensureBooking(ctx) {

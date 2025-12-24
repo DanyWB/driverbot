@@ -1,10 +1,25 @@
 const {createEmptyBooking} = require("../services/bookingService");
 const {t, getCtxLang} = require("../utils/i18n");
+const db = require("../connect");
 
 module.exports = async (ctx) => {
+  const lang = getCtxLang(ctx);
+  const user = await db("users").where({telegram_id: ctx.from.id}).first();
+
+  if (!user || !user.name) {
+    ctx.session.step = "waiting_for_name";
+    ctx.session.scenario = "registration";
+    return ctx.reply(t(lang, "enter_name"));
+  }
+
+  if (!user.phone) {
+    ctx.session.step = "waiting_for_phone";
+    ctx.session.scenario = "registration";
+    return ctx.reply(t(lang, "enter_phone"));
+  }
+
   ctx.session.booking = createEmptyBooking();
 
-  const lang = getCtxLang(ctx);
   const text = t(lang, "booking_intro");
 
   await ctx.reply(text, {

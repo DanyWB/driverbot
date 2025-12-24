@@ -40,25 +40,35 @@ async function handleNameStep(ctx) {
 }
 
 async function handlePhoneStep(ctx) {
-  const phone = ctx.message?.text?.trim() || "";
+  const phone =
+    ctx.message?.contact?.phone_number || ctx.message?.text?.trim() || "";
   const fromId = ctx.from.id;
   const lang = getCtxLang(ctx);
 
-  if (!isValidPhone(phone)) {
-    await ctx.reply(t(lang, "phone_invalid"));
-    return true;
+  if (ctx.message?.contact) {
+    // accept contact without regex validation
+  } else {
+    if (!isValidPhone(phone)) {
+      await ctx.reply(t(lang, "phone_invalid"));
+      return true;
+    }
   }
 
   const success = await updateUserPhone(fromId, phone);
   if (!success) {
-    await ctx.reply(t(lang, "phone_save_error"));
+    await ctx.reply(t(lang, "phone_save_error"), {
+      reply_markup: {remove_keyboard: true},
+    });
     return true;
   }
 
-  await ctx.reply(t(lang, "phone_saved"));
+  await ctx.reply(t(lang, "phone_saved"), {
+    reply_markup: {remove_keyboard: true},
+  });
 
   const user = await getUserByTelegramId(fromId);
-  if (ctx.session?.scenario === "registration" || !user.passport_photo_file_id) {
+  const hasPassport = user.passport_photo_file_id || user.meta?.passport_number;
+  if (ctx.session?.scenario === "registration" || !hasPassport) {
     ctx.session.step = "waiting_for_passport";
     ctx.session.scenario = "registration";
     await ctx.reply(t(lang, "enter_passport"));
@@ -73,11 +83,28 @@ async function handlePhoneStep(ctx) {
 
 async function handlePassportStep(ctx) {
   const photo = ctx.message?.photo?.pop();
+  const passportNumber = ctx.message?.text?.trim();
   const fromId = ctx.from.id;
   const lang = getCtxLang(ctx);
 
-  if (!photo) {
+  if (!photo && !passportNumber) {
     await ctx.reply(t(lang, "passport_missing"));
+    return true;
+  }
+
+  if (passportNumber) {
+    const {updateUserPassportNumber} = require("../services/userService");
+    const success = await updateUserPassportNumber(fromId, passportNumber);
+    if (!success) {
+      await ctx.reply(t(lang, "passport_save_error"));
+      return true;
+    }
+
+    await ctx.reply(t(lang, "passport_saved"));
+
+    ctx.session.step = null;
+    ctx.session.scenario = null;
+    await require("../commands/start")(ctx);
     return true;
   }
 

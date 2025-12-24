@@ -62,7 +62,8 @@ module.exports = async (ctx) => {
 
   const isNameOk = !!user.name;
   const isPhoneOk = !!user.phone;
-  const isPassportOk = !!user.passport_photo_file_id;
+  const passportNumber = user.meta?.passport_number;
+  const isPassportOk = !!(user.passport_photo_file_id || passportNumber);
 
   if (!isNameOk) {
     ctx.session.step = "waiting_for_name";

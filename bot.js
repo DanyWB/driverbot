@@ -36,12 +36,46 @@ bot.callbackQuery(/^book:confirm_remove:\d+$/, require("./handlers/book_confirm_
 bot.callbackQuery("book:delete_bike", require("./handlers/book_remove_bike"));
 bot.callbackQuery("book:reset_rental", require("./handlers/book_reset"));
 bot.callbackQuery(/^book:select_bike:\d+$/, require("./handlers/book_select_bike"));
+bot.callbackQuery(/^book:time:(start|end):\d{2}:\d{2}$/, require("./handlers/book_select_time"));
+bot.callbackQuery(["book:options", "book:options:helmets:+", "book:options:helmets:-", "book:options:delivery", "book:options:address", "book:options:notes", "book:options:back"], require("./handlers/book_options"));
 
 bot.callbackQuery(/^book:cat:\d+$/, require("./handlers/book_select_category"));
 bot.callbackQuery("book:show_available_bikes", require("./handlers/book_show_available_bikes"));
 bot.callbackQuery(/^book:select_date:\d{4}-\d{2}-\d{2}$/, require("./handlers/calendar_handler"));
 bot.callbackQuery(["book:calendar_prev", "book:calendar_next", "book:restart", "home"], require("./handlers/navigation"));
 bot.callbackQuery(/^lang:set:(ru|en|ua)$/, require("./handlers/language_select"));
+bot.callbackQuery(
+  ["support:call", "support:faq", "support:find", "support:back"],
+  require("./handlers/support").handleSupportAction
+);
+bot.callbackQuery(
+  ["conditions:open", "conditions:accept", "conditions:accept_toggle"],
+  require("./handlers/conditions").handleConditionsAction
+);
+bot.callbackQuery(
+  [
+    "rent:book",
+    "rent:current",
+    "rent:history",
+    "rent:contract",
+    "rent:payment",
+    "rent:settings",
+    "rent:support",
+    /^rent:details:\d+$/,
+    /^rent:cancel:\d+$/,
+    /^rent:cancel_confirm:\d+$/,
+  ],
+  (ctx, next) => {
+    const data = ctx.callbackQuery?.data || "";
+    if (data.startsWith("rent:details:")) {
+      return require("./handlers/rent_details")(ctx);
+    }
+    if (data.startsWith("rent:cancel")) {
+      return require("./handlers/rent_cancel")(ctx);
+    }
+    return require("./handlers/rent_menu").handleRentMenuAction(ctx, next);
+  }
+);
 
 bot.callbackQuery("update:name", async (ctx) => {
   ctx.session.step = "waiting_for_name";
@@ -56,7 +90,15 @@ bot.callbackQuery("update:tel", async (ctx) => {
   ctx.session.scenario = null;
   await ctx.answerCallbackQuery();
   const lang = getCtxLang(ctx);
-  return ctx.reply(t(lang, "update_tel_prompt"));
+  return ctx.reply(t(lang, "update_tel_prompt"), {
+    reply_markup: {
+      keyboard: [
+        [{text: t(lang, "share_contact_btn"), request_contact: true}],
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: true,
+    },
+  });
 });
 
 bot.callbackQuery("update:passport", async (ctx) => {
@@ -75,5 +117,15 @@ bot.callbackQuery(
 bot.catch((err) => {
   console.error("Ошибка в обработчике бота:", err);
 });
+
+// Reminders scheduler (every minute)
+const {sendDueReminders} = require("./utils/reminders");
+setInterval(async () => {
+  try {
+    await sendDueReminders(bot, require("./connect"));
+  } catch (e) {
+    // ignore scheduler errors
+  }
+}, 60 * 1000);
 
 module.exports = bot;
