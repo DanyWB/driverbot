@@ -41,6 +41,34 @@ async function updateUserPassportPhoto(userId, filename) {
   }
 }
 
+async function updateUserPassportNumber(userId, passportNumber) {
+  try {
+    const user = await db("users").where({telegram_id: userId}).first();
+    let meta = {};
+    if (user?.meta) {
+      if (typeof user.meta === "object") {
+        meta = user.meta;
+      } else {
+        try {
+          meta = JSON.parse(user.meta);
+        } catch (e) {
+          meta = {};
+        }
+      }
+    }
+    const nextMeta = {...meta, passport_number: passportNumber};
+
+    await db("users")
+      .insert({telegram_id: userId, meta: nextMeta})
+      .onConflict("telegram_id")
+      .merge({meta: nextMeta});
+    return true;
+  } catch (error) {
+    console.error("Ошибка при сохранении номера паспорта:", error);
+    return false;
+  }
+}
+
 async function registerUser(user) {
   const existing = await db("users").where({telegram_id: user.id}).first();
   if (!existing) {
@@ -80,4 +108,5 @@ module.exports = {
   getUserProfile,
   getUserByTelegramId,
   updateUserLanguage,
+  updateUserPassportNumber,
 };

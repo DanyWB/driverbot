@@ -1,6 +1,8 @@
 const db = require("../connect");
 const {createEmptyBooking} = require("../services/bookingService");
 const {t, getCtxLang} = require("../utils/i18n");
+const {sendConditions} = require("./conditions");
+const {sendSupportMenu} = require("./support");
 
 async function handleMainMenuAction(ctx, action) {
   const lang = getCtxLang(ctx);
@@ -12,16 +14,12 @@ async function handleMainMenuAction(ctx, action) {
 
   if (action === "rent") {
     ctx.session.booking = createEmptyBooking();
-    return require("../commands/book")(ctx);
+    const {sendRentMenu} = require("./rent_menu");
+    return sendRentMenu(ctx, lang);
   }
 
   if (action === "support") {
-    return ctx.reply(t(lang, "support_info"), {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [[{text: t(lang, "btn_back"), callback_data: "home"}]],
-      },
-    });
+    return sendSupportMenu(ctx, lang);
   }
 
   if (action === "prices") {
@@ -57,12 +55,7 @@ async function handleMainMenuAction(ctx, action) {
   }
 
   if (action === "conditions") {
-    return ctx.reply(t(lang, "conditions_info"), {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [[{text: t(lang, "btn_back"), callback_data: "home"}]],
-      },
-    });
+    return sendConditions(ctx, lang);
   }
 
   if (action === "about") {

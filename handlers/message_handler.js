@@ -59,4 +59,26 @@ module.exports = async (ctx) => {
   if (step === "waiting_for_passport") {
     return handlePassportStep(ctx);
   }
+
+  if (step === "waiting_for_delivery_address") {
+    const booking = ctx.session.booking || {};
+    booking.deliveryAddress = ctx.message?.text || "";
+    ctx.session.booking = booking;
+    ctx.session.step = null;
+    ctx.session.scenario = null;
+    const lang = getCtxLang(ctx);
+    await ctx.reply(t(lang, "booking_options_address_saved"));
+    return;
+  }
+
+  if (step === "waiting_for_notes") {
+    const booking = ctx.session.booking || {};
+    booking.notes = ctx.message?.text || "";
+    ctx.session.booking = booking;
+    ctx.session.step = null;
+    ctx.session.scenario = null;
+    const lang = getCtxLang(ctx);
+    await ctx.reply(t(lang, "booking_options_notes_saved"));
+    return;
+  }
 };
