@@ -7,9 +7,8 @@ module.exports = {
   cmd_start: "🏠 Главное меню",
   cmd_menu: "📋 Открыть меню",
   cmd_book: "📅 Начать бронирование",
-  cmd_add_name: "✏️ Изменить имя",
-  cmd_add_tel: "📞 Изменить номер",
-  cmd_add_passport: "🪪 Загрузить паспорт",
+  cmd_language: "🌍 Сменить язык",
+  cmd_admin: "👑 Админ-панель",
 
   welcome_new:
     "👋 Добро пожаловать, {name}!\n\nЧтобы продолжить, пожалуйста, пройдите небольшую регистрацию.",
@@ -44,18 +43,36 @@ module.exports = {
   support_btn_call: "📞 Позвонить нам",
   support_btn_faq: "📄 FAQ",
   support_btn_find: "📍 Как нас найти",
+  support_btn_admin: "💬 Написать администратору",
   support_call_text:
-    "📞 Телефон: +66 99 999 9999\n💬 WhatsApp: +66 99 999 9999\n\nНажмите кнопку ниже, чтобы открыть чат в WhatsApp.",
+    "📞 Телефон: +66 97 181 9946\n💬 WhatsApp: +66 97 181 9946\n\nНажмите кнопку ниже, чтобы открыть чат в WhatsApp.",
   support_call_whatsapp_btn: "💬 Написать в WhatsApp",
   support_faq_text:
     "📄 FAQ\n\n• Как забронировать? — Выберите даты и байк в боте, подтвердите аренду.\n• Какие документы нужны? — Фото паспорта.\n• Есть ли шлемы? — Да, выдаём по запросу.\n• Доставка байка? — Доступна, уточните адрес в комментариях.\n• Оплата? — Уточним при подтверждении бронирования.",
   support_find_text:
-    "📍 Адрес: Koh Phangan, Thailand\n\nНас легко найти:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://instagram.com/drivephangan\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
+    "📍 Адрес: Koh Phangan, Thailand\n\nНас легко найти:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://www.instagram.com/drive_phangan/\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
 
   prices_info:
     "💸 Актуальные цены видны при выборе байка и дат.\nНажмите «Моя аренда», чтобы выбрать даты и увидеть стоимость.",
+  prices_choose_season:
+    "Выберите сезон:\n\n🔺 Высокий сезон (декабрь, январь, февраль, март)\n🟠 Средний сезон (апрель, май, октябрь, ноябрь)\n🔻 Низкий сезон (июнь, июль, август, сентябрь)",
+  prices_season_high: "🔺 Высокий сезон",
+  prices_season_middle: "🟠 Средний сезон",
+  prices_season_low: "🔻 Низкий сезон",
+  prices_image_missing:
+    "Не удалось загрузить прайс-лист. Пожалуйста, попробуйте еще раз.",
+  prices_loading: "Загружаю прайс-лист…",
   account_info:
     "👤 Здесь вы можете указать свои данные для бронирования. Выберите, что хотите обновить:",
+  account_profile_title: "👤 Мой профиль",
+  account_name_label: "Имя",
+  account_phone_label: "Телефон",
+  account_passport_label: "Паспорт",
+  account_passport_photo: "Фото загружено",
+  account_passport_missing: "Не указан",
+  account_value_missing: "Не указано",
+  account_passport_number_value: "Номер: {number}",
+  account_profile_hint: "Выберите, что хотите изменить:",
   conditions_info:
     "🆔 Документы\nОбязательно:\n• Фото международного паспорта\n• Водительские права (международные — желательно)\n• Возраст от 18 лет\nПодписание договора аренды — обязательно.\n\n💰 Депозит и оплата\nДепозит:\n• Паспорт или денежный залог\n• Сумма зависит от модели:\n▫️ Обычные байки — 100–300$\n▫️ Мощные байки (300–350cc) — от 400$ и выше\n\nОплата:\n• Наличными или онлайн\n• Все условия обсуждаются заранее — никаких скрытых платежей\n\nВозврат раньше срока аренды:\nЕсли вы планируете вернуть скутер раньше срока, пожалуйста, учитывайте:\n• При посуточной аренде — возврат менее чем за 3 дня до окончания срока не компенсируется\n• При помесячной аренде — возврат менее чем за 7 дней до окончания также не подлежит перерасчёту\n• В остальных случаях возможен пересчёт стоимости аренды с учётом новых условий\n\n🛵 Повреждения и ответственность\nПеред арендой делается фото и видео мотобайка\nВ случае повреждений:\n• Оплата по реальной стоимости оригинальных запчастей и работы\n• В редких случаях может учитываться простой на ремонт\nСтраховка на скутеры не распространяется\nПробитое колесо арендатор ремонтирует самостоятельно — обычно 100–200 бат в ближайшей мастерской\nЕсли разрядился аккумулятор из-за оставленного света фар — сервисный сбор от 100 до 400 бат, в зависимости от локации\n\n⏱ Возврат и продление аренды\nАренда считается на сутки — возврат в то же время, когда байк был получен\nЕсли хотите продлить аренду, предупредите заранее, желательно за несколько дней\nВ высокий сезон техника часто бронируется день в день — важно соблюдать договорённости\nПродление на полдня (например, с обеда до вечера) — возможно по договорённости, обычно около 50% стоимости дня\n\n📍 Получение транспорта\nВыдача техники — на Бантае\nДоставка скутера:\n• По острову — от 100 до 400 бат (по расстоянию)\n• К пирсу Тонгсала — 150 бат\n• По Бантаю — бесплатно",
   conditions_accept_btn: "✅ Принять условия аренды",
@@ -79,6 +96,15 @@ module.exports = {
   rent_btn_support: "💬 SUPPORT",
   rent_btn_confirm: "✅ Подтвердить бронирование",
   rent_current_empty: "У вас нет активных или ожидающих бронирований.",
+  rent_current_title: "📌 Ваши текущие бронирования",
+  rent_current_draft_title: "📝 Черновик бронирования",
+  rent_current_draft_hint:
+    "Можно продолжить оформление или вернуться в бронирование позже.",
+  rent_current_draft_continue_btn: "Продолжить бронирование",
+  rent_current_back_btn: "⬅️ К текущим бронированиям",
+  rent_current_actions_title: "⚙️ Управление черновиком",
+  rent_current_actions_hint:
+    "Добавьте байк, оставьте пожелания или подтвердите бронь перед отправкой администратору.",
   rent_history_empty: "История пуста.",
   rent_details_title: "📍 Детали брони",
   rent_details_status: "Статус: {status}",
@@ -90,6 +116,15 @@ module.exports = {
   rent_status_cancelled: "отменена",
   rent_status_completed: "завершена",
   rent_status_approved: "подтверждена",
+  reminder_start_24h: "Напоминание: аренда начинается через 24 часа",
+  reminder_start_1h: "Напоминание: аренда начинается через 1 час",
+  reminder_end_24h: "Напоминание: аренда заканчивается через 24 часа",
+  reminder_end_1h: "Напоминание: аренда заканчивается через 1 час",
+  reminder_model_label: "Модель",
+  reminder_period_label: "Период",
+  reminder_status_label: "Статус",
+  reminder_view_current_btn: "Текущие брони",
+  reminder_view_details_btn: "Детали брони",
   user_rental_approved:
     "Ваша бронь #{id} подтверждена администратором ✅\nМодель: {model}\nДаты: {start} — {end}\nСтатус: {status}\nПосмотреть детали можно в разделе My Rent.",
   rent_view_details_btn: "Посмотреть бронь",
@@ -104,6 +139,7 @@ module.exports = {
   rent_details_deposit: "Депозит: {deposit} THB",
   rent_details_contract: "Договор: {contract}",
   rent_action_details: "📍 Детали",
+  rent_action_edit: "✏️ Редактировать",
   rent_action_cancel: "❌ Отменить",
   rent_action_back: "◀️ Назад",
   rent_cancel_confirm: "Отменить бронирование ID {id}?",
@@ -111,7 +147,7 @@ module.exports = {
   rent_cannot_cancel: "Нельзя отменить эту бронь.",
   rent_history_details: "📍 Детали (история)",
   about_info:
-    "🏝️ DRIVE PHANGAN — аренда скутеров и авто на Ко Пангане.\nОфициально работаем с 2019 года.\n🛵 Каждый год пополняем парк новыми моделями — для тех, кто ценит комфорт, стиль и свободу передвижения.\n\n🚀 Аренда у нас — это честно и прозрачно: никаких мутных схем и разводов на царапинах.\n⭐ Более 100 честных отзывов на Google Maps и множество клиентов, которые возвращаются к нам сезон за сезоном.\nНадёжно, просто и с заботой о вашем отдыхе ✨\n\n🤖 Этот бот создан, чтобы сделать процесс аренды максимально простым и удобным — всё автоматизировано, без лишней рутины. Вы можете пройти все этапы бронирования прямо здесь. Если возникнут вопросы — мы всегда на связи!\n\n📍 Нас легко найти:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://instagram.com/drivephangan\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
+    "🏝️ DRIVE PHANGAN — аренда скутеров и авто на Ко Пангане.\nОфициально работаем с 2019 года.\n🛵 Каждый год пополняем парк новыми моделями — для тех, кто ценит комфорт, стиль и свободу передвижения.\n\n🚀 Аренда у нас — это честно и прозрачно: никаких мутных схем и разводов на царапинах.\n⭐ Более 100 честных отзывов на Google Maps и множество клиентов, которые возвращаются к нам сезон за сезоном.\nНадёжно, просто и с заботой о вашем отдыхе ✨\n\n🤖 Этот бот создан, чтобы сделать процесс аренды максимально простым и удобным — всё автоматизировано, без лишней рутины. Вы можете пройти все этапы бронирования прямо здесь. Если возникнут вопросы — мы всегда на связи!\n\n📍 Нас легко найти:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://www.instagram.com/drive_phangan/\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
 
   name_invalid:
     "Имя должно содержать только буквы и быть не короче 2 символов. Попробуйте снова.",
@@ -160,7 +196,7 @@ module.exports = {
   booking_no_availability_lead:
     "На эти даты свободных байков нет. Мы создали заявку для оператора. Он свяжется с вами и постарается найти вариант.",
   admin_no_availability_lead:
-    "🚨 Нет доступных байков на даты {start} - {end}.\nПользователь: {user} @{username}\nКатегория: {category}\nКомментарий: {comment}",
+    "🚨 <b>Нет доступных байков</b>\n\n📅 Даты: {start} — {end}\n👤 Пользователь: {user} (@{username})\n📞 Телефон: {phone}\n🏷️ Категория: {category}\n✏️ Комментарий: {comment}",
   booking_available_bikes_title: "🏍️ Доступные байки:",
 
   booking_range_conflict:
@@ -168,6 +204,7 @@ module.exports = {
   booking_range_conflict_bike:
     "В выбранном диапазоне есть занятые даты для этого байка. Выберите другой период.",
   booking_end_before_start: "Дата окончания не может быть раньше начала.",
+  booking_date_in_past: "Нельзя выбрать дату в прошлом.",
 
   booking_invalid_bike_id: "Неверный формат ID байка.",
   booking_bike_not_found: "Байк не найден.",
@@ -198,7 +235,7 @@ module.exports = {
   booking_admin_missing:
     "Извините. Сейчас в системе нет администратора. Пожалуйста, отмените эту аренду и повторите попытку позднее.",
   booking_admin_new:
-    "🚨 <b>Новая аренда</b>\n\nПользователь: {user} Telegram: @{username}\nБайк: <b>{bike}</b>\nСрок: {start} - {end}\nИтог: {price} THB\nКомментарий: {comment}\n\n🪖 Шлемы: {helmets}\n🚚 Доставка: {delivery}\n🏠 Адрес: {address}",
+    "🚨 <b>Новая заявка</b>\n\n👤 {user} (@{username})\n📞 Телефон: {phone}\n🛵 Модель: <b>{bike}</b>\n📅 Период: {start} — {end}\n💰 Стоимость: {price}\n🧾 Депозит: {deposit}\n🪪 Документы: {docs}\n\n🪖 Шлемы: {helmets}\n🚚 Доставка: {delivery}\n🏠 Адрес: {address}\n✏️ Пожелания: {comment}",
 
   booking_delete_failed: "Не удалось удалить байк.",
   booking_bike_removed: "🗑️ Байк удалён из вашей аренды.",
@@ -216,10 +253,11 @@ module.exports = {
     "📅 Дата начала аренды: {date}\n\nТеперь выберите дату окончания аренды.",
   booking_add_bike_to_rental_btn: "➕ Добавить байк к аренде",
   booking_bike_summary:
-    "🏍️ <b>{name}</b>\n\n<b>Период аренды:</b> {start} - {end} ({days} {days_label})\n<b>Стоимость:</b> {price} THB\n\n{desc}",
+    "🛵 <b>{name}</b>\n\n<b>Период аренды:</b> {start} - {end} ({days} {days_label})\n<b>Стоимость в день:</b> {price_per_day} THB\n<b>Стоимость:</b> {price} THB\n\n{desc}",
 
   btn_back: "⬅️ Назад",
   btn_home: "🏠 В меню",
+  btn_main_menu: "◀️ Главное меню",
 
   cal_prev: "◀️",
   cal_next: "▶️",
@@ -233,6 +271,18 @@ module.exports = {
   admin_request_status: "Заявка #{id} {status}.",
   admin_btn_approve: "Подтвердить",
   admin_btn_cancel: "Отклонить",
+  admin_docs_ok: "есть",
+  admin_docs_missing: "не загружены",
+  admin_cancel_by_client:
+    "🚨 <b>Отмена клиентом</b>\n\nID: {id}\n👤 {user} (@{username})\n📞 Телефон: {phone}\n📅 Даты: {start} — {end}",
+  admin_decline_prompt:
+    "Введите причину отказа для заявки #{id}. Это сообщение увидит клиент.",
+  admin_decline_skip_btn: "Отклонить без причины",
+  admin_decline_done: "Заявка #{id} отклонена. Причина: {reason}",
+
+  user_rental_declined:
+    "❌ Ваша заявка #{id} отклонена.\nПричина: {reason}\nЕсли остались вопросы — напишите в поддержку.",
+  user_decline_reason_default: "Причина не указана.",
 
   user_no_name: "(без имени)",
   user_default_name: "пользователь",
@@ -242,21 +292,47 @@ module.exports = {
   skip_registration_reply: "Хорошо, если передумаете — введите /start снова.",
 
   booking_options_title:
-    "⚙️ Опции аренды:\n• Шлемы: {helmets}\n• Доставка: {delivery}\n• Адрес доставки: {address}\n• Пожелания: {notes}",
+    "⚙️ Опции аренды:\n• Время начала: {start_time}\n• Время окончания: {end_time}\n• Шлемы: {helmets}\n• Доставка: {delivery}\n• Адрес доставки: {address}\n• Пожелания: {notes}",
   booking_options_btn: "⚙️ Опции",
   booking_options_delivery_on: "включена",
   booking_options_delivery_off: "нет",
   booking_options_no_address: "не указан",
   booking_options_no_notes: "не указаны",
+  booking_options_time_not_set: "не указано",
   booking_options_helmets_inc: "➕ Шлем",
   booking_options_helmets_dec: "➖ Шлем",
   booking_options_toggle_delivery: "🚚 Доставка да/нет",
   booking_options_set_address: "🏠 Адрес доставки",
   booking_options_set_notes: "✏️ Пожелания",
+  booking_options_time_start: "🕘 Время начала",
+  booking_options_time_end: "🕘 Время окончания",
   booking_options_back: "⬅️ Назад",
   booking_options_saved: "Опции обновлены.",
   booking_options_address_prompt: "🏠 Введите адрес доставки:",
   booking_options_notes_prompt: "✏️ Введите ваши пожелания/комментарий:",
   booking_options_address_saved: "Адрес доставки сохранён.",
   booking_options_notes_saved: "Пожелания сохранены.",
+  admin_not_allowed: "Доступ запрещён.",
+  admin_menu_title: "👑 Админ-панель",
+  admin_menu_active_btn: "🟢 Активные заявки",
+  admin_menu_pending_btn: "⏳ Неподтверждённые",
+  admin_menu_confirmed_btn: "✅ Подтверждённые",
+  admin_list_title_active: "Активные заявки",
+  admin_list_title_pending: "Неподтверждённые заявки",
+  admin_list_title_confirmed: "Подтверждённые заявки",
+  admin_list_empty: "Заявок нет.",
+  admin_list_client: "Клиент",
+  admin_list_phone: "Телефон",
+  admin_list_dates: "Даты",
+  admin_list_status: "Статус",
+  admin_deposit_btn: "💸 Депозит",
+  admin_deposit_prompt: "Введите текст депозита для брони #{id}:",
+  admin_deposit_saved: "Депозит обновлён для брони #{id}.",
+  rent_deposit_title: "💸 Депозит и оплата",
+  rent_deposit_empty: "Нет активных бронирований для депозита.",
+  rent_deposit_required_label: "Депозит",
+  rent_deposit_status_label: "Статус",
+  rent_deposit_status_paid: "оплачен",
+  rent_deposit_status_unpaid: "не оплачен",
+  rent_deposit_note_label: "Комментарий",
 };

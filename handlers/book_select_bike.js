@@ -18,7 +18,7 @@ module.exports = async (ctx) => {
   booking.selectedBikeId = bikeId;
   const lang = getCtxLang(ctx);
 
-  if (!booking.startDate || !booking.startTime || !booking.endDate || !booking.endTime) {
+  if (!booking.startDate || !booking.endDate) {
     booking.step = "select_start_date";
     booking.calendarMonth = dayjs().month() + 1;
     booking.calendarYear = dayjs().year();
@@ -37,11 +37,18 @@ module.exports = async (ctx) => {
           lang,
           labels: getCalendarLabels(lang),
           weekdays: getWeekdays(lang),
+          disablePast: true,
         }
       ),
     });
   }
 
+  return finalizeBikeSelection(ctx, booking, bikeId, lang);
+};
+
+async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride) {
+  const booking = bookingOverride || ensureBooking(ctx);
+  const lang = langOverride || getCtxLang(ctx);
   const bike = await db("bikes").where({id: bikeId}).first();
   if (!bike) {
     return ctx.editMessageText(t(lang, "booking_bike_not_found"));
@@ -55,12 +62,20 @@ module.exports = async (ctx) => {
   const conflict = await db("rentals")
     .where("bike_id", bikeId)
     .whereNotIn("status", ["cancelled", "cancelled_by_client"])
-    .andWhere((qb) => applyOverlapCondition(qb, startAt, endAt, booking.startDate, booking.endDate))
+    .andWhere((qb) =>
+      applyOverlapCondition(qb, startAt, endAt, booking.startDate, booking.endDate)
+    )
     .first();
 
   if (conflict) {
     booking.startDate = null;
+    booking.startTime = null;
     booking.endDate = null;
+    booking.endTime = null;
+    booking.timeSource = null;
+    booking.totalPrice = null;
+    booking.pricePerDay = null;
+    booking.priceUnknown = false;
     booking.step = "select_start_date";
     let blockedDays = [];
     try {
@@ -77,14 +92,15 @@ module.exports = async (ctx) => {
           lang,
           labels: getCalendarLabels(lang),
           weekdays: getWeekdays(lang),
+          disablePast: true,
         }
       ),
     });
   }
 
-  // Dates for pricing calculation
-  const start = dayjs(startAt);
-  const end = dayjs(endAt);
+  // Dates for pricing calculation (time is optional)
+  const start = startAt ? dayjs(startAt) : dayjs(booking.startDate);
+  const end = endAt ? dayjs(endAt) : dayjs(booking.endDate);
 
   const month = start.month() + 1;
   const seasons = await db("seasons").select("id", "months");
@@ -120,22 +136,24 @@ module.exports = async (ctx) => {
     .first();
 
   const totalPrice = priceRow ? priceRow.price_per_day * days : 0;
-
   booking.totalPrice = totalPrice;
+  booking.pricePerDay = priceRow ? priceRow.price_per_day : null;
   booking.priceUnknown = !priceRow;
 
   return showBikeSummary(ctx, bike, booking);
-};
+}
 
 function showBikeSummary(ctx, bike, bookingOverride) {
   const booking = bookingOverride || ensureBooking(ctx);
   const lang = getCtxLang(ctx);
-  const startLabel = booking.startDate
+  let startLabel = booking.startDate
     ? dayjs(booking.startDate).format("DD.MM.YYYY")
     : "-";
-  const endLabel = booking.endDate
+  let endLabel = booking.endDate
     ? dayjs(booking.endDate).format("DD.MM.YYYY")
     : "-";
+  if (booking.startTime) startLabel += ` ${booking.startTime}`;
+  if (booking.endTime) endLabel += ` ${booking.endTime}`;
   const days =
     booking.startDate && booking.endDate
       ? dayjs(booking.endDate).diff(dayjs(booking.startDate), "day") + 1
@@ -148,6 +166,9 @@ function showBikeSummary(ctx, bike, bookingOverride) {
     days,
     days_label: t(lang, "days_label"),
     price: booking.priceUnknown ? t(lang, "booking_price_tbd") : booking.totalPrice || 0,
+    price_per_day: booking.priceUnknown
+      ? t(lang, "booking_price_tbd")
+      : booking.pricePerDay || 0,
     desc: bike.description || "",
   });
 
@@ -174,3 +195,4 @@ function showBikeSummary(ctx, bike, bookingOverride) {
 }
 
 module.exports.showBikeSummary = showBikeSummary;
+module.exports.finalizeBikeSelection = finalizeBikeSelection;

@@ -8,6 +8,22 @@ const {
 const {isValidName, isValidPhone} = require("../utils/validators");
 const {t, getCtxLang} = require("../utils/i18n");
 
+async function finishProfileUpdate(ctx, lang) {
+  const returnToProfile = Boolean(ctx.session?.returnToProfile);
+  ctx.session.step = null;
+  ctx.session.scenario = null;
+  ctx.session.returnToProfile = null;
+
+  if (returnToProfile) {
+    const {sendAccountMenu} = require("./account_menu");
+    await sendAccountMenu(ctx, lang);
+    return true;
+  }
+
+  await require("../commands/start")(ctx);
+  return true;
+}
+
 async function handleNameStep(ctx) {
   const name = ctx.message?.text?.trim() || "";
   const fromId = ctx.from.id;
@@ -26,6 +42,9 @@ async function handleNameStep(ctx) {
 
   await ctx.reply(t(lang, "name_saved"));
 
+  const returnToProfile = Boolean(ctx.session?.returnToProfile);
+  ctx.session.returnToProfile = null;
+
   if (ctx.session?.scenario === "registration") {
     ctx.session.step = "waiting_for_phone";
     ctx.session.scenario = "registration";
@@ -33,9 +52,13 @@ async function handleNameStep(ctx) {
     return true;
   }
 
-  ctx.session.step = null;
-  ctx.session.scenario = null;
-  await require("../commands/start")(ctx);
+  if (returnToProfile) {
+    const {sendAccountMenu} = require("./account_menu");
+    await sendAccountMenu(ctx, lang);
+    return true;
+  }
+
+  await finishProfileUpdate(ctx, lang);
   return true;
 }
 
@@ -66,18 +89,32 @@ async function handlePhoneStep(ctx) {
     reply_markup: {remove_keyboard: true},
   });
 
+  const returnToProfile = Boolean(ctx.session?.returnToProfile);
+  ctx.session.returnToProfile = null;
+
   const user = await getUserByTelegramId(fromId);
   const hasPassport = user.passport_photo_file_id || user.meta?.passport_number;
-  if (ctx.session?.scenario === "registration" || !hasPassport) {
+  if (ctx.session?.scenario === "registration") {
     ctx.session.step = "waiting_for_passport";
     ctx.session.scenario = "registration";
     await ctx.reply(t(lang, "enter_passport"));
     return true;
   }
 
-  ctx.session.step = null;
-  ctx.session.scenario = null;
-  await require("../commands/start")(ctx);
+  if (!hasPassport && !returnToProfile) {
+    ctx.session.step = "waiting_for_passport";
+    ctx.session.scenario = "registration";
+    await ctx.reply(t(lang, "enter_passport"));
+    return true;
+  }
+
+  if (returnToProfile) {
+    const {sendAccountMenu} = require("./account_menu");
+    await sendAccountMenu(ctx, lang);
+    return true;
+  }
+
+  await finishProfileUpdate(ctx, lang);
   return true;
 }
 
@@ -102,9 +139,16 @@ async function handlePassportStep(ctx) {
 
     await ctx.reply(t(lang, "passport_saved"));
 
-    ctx.session.step = null;
-    ctx.session.scenario = null;
-    await require("../commands/start")(ctx);
+    const returnToProfile = Boolean(ctx.session?.returnToProfile);
+    ctx.session.returnToProfile = null;
+
+    if (returnToProfile) {
+      const {sendAccountMenu} = require("./account_menu");
+      await sendAccountMenu(ctx, lang);
+      return true;
+    }
+
+    await finishProfileUpdate(ctx, lang);
     return true;
   }
 
@@ -123,9 +167,16 @@ async function handlePassportStep(ctx) {
 
     await ctx.reply(t(lang, "passport_saved"));
 
-    ctx.session.step = null;
-    ctx.session.scenario = null;
-    await require("../commands/start")(ctx);
+    const returnToProfile = Boolean(ctx.session?.returnToProfile);
+    ctx.session.returnToProfile = null;
+
+    if (returnToProfile) {
+      const {sendAccountMenu} = require("./account_menu");
+      await sendAccountMenu(ctx, lang);
+      return true;
+    }
+
+    await finishProfileUpdate(ctx, lang);
     return true;
   } catch (err) {
     console.error("Ошибка загрузки файла:", err);

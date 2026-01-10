@@ -6,8 +6,13 @@ module.exports = async (ctx) => {
   const booking = ctx.session.booking;
   const lang = getCtxLang(ctx);
 
-  if (!booking || !booking.startDate || !booking.endDate || !booking.startTime || !booking.endTime) {
+  if (!booking || !booking.startDate || !booking.endDate) {
     return ctx.answerCallbackQuery(t(lang, "booking_dates_not_selected"));
+  }
+
+  if (booking.selectedBikeId) {
+    const {finalizeBikeSelection} = require("./book_select_bike");
+    return finalizeBikeSelection(ctx, booking, booking.selectedBikeId, lang);
   }
 
   const {startDate, endDate} = booking;
@@ -26,7 +31,7 @@ module.exports = async (ctx) => {
   const busyIds = busyBikes.map((b) => b.bike_id);
 
   const availableBikes = await db("bikes")
-    .select("id", "name")
+    .select("id", "name", "category_id", "emoji")
     .whereNotIn("id", busyIds);
 
   if (availableBikes.length === 0) {
@@ -48,14 +53,17 @@ module.exports = async (ctx) => {
         if (admin) {
           const catName = category?.name || "-";
           const textAdmin = t(lang, "admin_no_availability_lead", {
-            start: dayjs(startDate).format("DD.MM"),
-            end: dayjs(endDate).format("DD.MM"),
+            start: dayjs(startDate).format("DD.MM.YYYY"),
+            end: dayjs(endDate).format("DD.MM.YYYY"),
             user: user.name || t(lang, "user_no_name"),
             username: user.telegram_name || "-",
+            phone: user.phone || "-",
             category: catName,
             comment: booking.notes || "-",
           });
-          await ctx.api.sendMessage(admin.telegram_id, textAdmin);
+          await ctx.api.sendMessage(admin.telegram_id, textAdmin, {
+            parse_mode: "HTML",
+          });
         }
       }
     } catch (e) {
@@ -72,9 +80,44 @@ module.exports = async (ctx) => {
     });
   }
 
+  if (booking.scenario === "date_first") {
+    booking.categoryId = null;
+    const categoryIds = [
+      ...new Set(availableBikes.map((bike) => bike.category_id).filter(Boolean)),
+    ];
+    const categories = await db("categories")
+      .select("id", "name")
+      .whereIn("id", categoryIds)
+      .orderBy("id");
+
+    const categoryLabels = {
+      1: "booking_category_light",
+      2: "booking_category_comfort",
+      3: "booking_category_maxy",
+    };
+
+    if (categories.length) {
+      const keyboard = categories.map((category) => [
+        {
+          text: categoryLabels[category.id]
+            ? t(lang, categoryLabels[category.id])
+            : category.name,
+          callback_data: `book:cat:${category.id}`,
+        },
+      ]);
+
+      keyboard.push([{text: t(lang, "btn_back"), callback_data: "book:restart"}]);
+
+      return ctx.editMessageText(t(lang, "booking_choose_category"), {
+        reply_markup: {inline_keyboard: keyboard},
+      });
+    }
+  }
+
+  const {DEFAULT_BIKE_EMOJI} = require("../utils/constants");
   const keyboard = availableBikes.map((bike) => [
     {
-      text: bike.name,
+      text: `${bike.emoji || DEFAULT_BIKE_EMOJI} ${bike.name}`,
       callback_data: `book:select_bike:${bike.id}`,
     },
   ]);

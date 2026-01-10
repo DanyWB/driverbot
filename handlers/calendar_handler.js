@@ -25,7 +25,13 @@ module.exports = async (ctx) => {
           dayjs(date).year(),
           dayjs(date).month() + 1,
           [],
-          {lang, labels: getCalendarLabels(lang), weekdays: getWeekdays(lang)}
+          {
+            lang,
+            labels: getCalendarLabels(lang),
+            weekdays: getWeekdays(lang),
+            disablePast: true,
+            selectedDate: booking.startDate,
+          }
         ),
       }
     );

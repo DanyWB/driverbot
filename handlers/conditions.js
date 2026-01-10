@@ -18,7 +18,7 @@ function conditionsKeyboard(lang, accepted) {
           callback_data: "book:start",
         },
       ],
-      [{text: t(lang, "btn_back"), callback_data: "home"}],
+      [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
     ],
   };
 }

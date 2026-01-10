@@ -1,9 +1,10 @@
 const dayjs = require("dayjs");
 const showAvailableBikes = require("./book_show_available_bikes");
 const db = require("../connect");
+const {generateCalendarKeyboard} = require("../utils/calendar");
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const {ensureBooking} = require("../services/bookingService");
-const {t, getCtxLang} = require("../utils/i18n");
+const {t, getCtxLang, getCalendarLabels, getWeekdays} = require("../utils/i18n");
 
 module.exports = async (ctx) => {
   const data = ctx.callbackQuery.data;
@@ -15,22 +16,44 @@ module.exports = async (ctx) => {
 
   const lang = getCtxLang(ctx);
 
-  // Step 1: pick start date
-  if (!booking.startDate) {
-    booking.startDate = selectedDate;
-    booking.startTime = null;
-    booking.step = "select_start_time";
-    return ctx.editMessageText(t(lang, "booking_choose_start_time"), {
-      reply_markup: require("./book_select_time").getTimeKeyboard("start"),
+  const today = dayjs().startOf("day");
+  const picked = dayjs(selectedDate);
+  if (picked.isBefore(today, "day")) {
+    await ctx.answerCallbackQuery({
+      text: t(lang, "booking_date_in_past"),
+      show_alert: true,
     });
+    return;
   }
 
-  // If user changes start date before time chosen
-  if (booking.startDate && !booking.startTime) {
+  // Step 1: pick start date
+  if (!booking.startDate || booking.step === "select_start_date") {
     booking.startDate = selectedDate;
-    booking.step = "select_start_time";
-    return ctx.editMessageText(t(lang, "booking_choose_start_time"), {
-      reply_markup: require("./book_select_time").getTimeKeyboard("start"),
+    booking.startTime = null;
+    booking.endDate = null;
+    booking.endTime = null;
+    booking.step = "select_end_date";
+    booking.calendarYear = dayjs(selectedDate).year();
+    booking.calendarMonth = dayjs(selectedDate).month() + 1;
+
+    let blockedDays = [];
+    if (booking.selectedBikeId) {
+      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
+    }
+
+    return ctx.editMessageText(t(lang, "booking_choose_end_date"), {
+      reply_markup: generateCalendarKeyboard(
+        dayjs(selectedDate).year(),
+        dayjs(selectedDate).month() + 1,
+        blockedDays,
+        {
+          lang,
+          labels: getCalendarLabels(lang),
+          weekdays: getWeekdays(lang),
+          minDate: booking.startDate,
+          selectedDate: booking.startDate,
+        }
+      ),
     });
   }
 
@@ -47,10 +70,8 @@ module.exports = async (ctx) => {
   }
 
   booking.endDate = selectedDate;
-  booking.step = "select_end_time";
   booking.endTime = null;
+  booking.step = "dates_selected";
 
-  return ctx.editMessageText(t(lang, "booking_choose_end_time"), {
-    reply_markup: require("./book_select_time").getTimeKeyboard("end"),
-  });
+  return showAvailableBikes(ctx);
 };

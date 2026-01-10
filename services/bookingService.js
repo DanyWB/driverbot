@@ -8,7 +8,10 @@ const createEmptyBooking = () => ({
   startTime: null,
   endDate: null,
   endTime: null,
+  timeSource: null,
   totalPrice: null,
+  pricePerDay: null,
+  priceUnknown: false,
   calendarMonth: dayjs().month() + 1, // 1-based month for UI
   calendarYear: dayjs().year(),
   helmets: 0,

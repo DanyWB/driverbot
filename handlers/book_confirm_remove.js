@@ -31,7 +31,7 @@ module.exports = async (ctx) => {
       reply_markup: {
         inline_keyboard: [
           [{text: t(lang, "rent_btn_book"), callback_data: "rent:book"}],
-          [{text: t(lang, "btn_back"), callback_data: "home"}],
+          [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
         ],
       },
     });
@@ -47,7 +47,7 @@ module.exports = async (ctx) => {
       inline_keyboard: [
         [{text: t(lang, "booking_confirm_btn"), callback_data: "book:confirm_rental"}],
         [{text: t(lang, "rent_btn_book"), callback_data: "rent:book"}],
-        [{text: t(lang, "btn_back"), callback_data: "home"}],
+        [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
       ],
     },
   });

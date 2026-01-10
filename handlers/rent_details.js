@@ -26,15 +26,40 @@ module.exports = async (ctx) => {
     return ctx.reply(t(lang, "rent_current_empty"));
   }
 
+  if (rental.status === "process") {
+    const {buildDraftMenuPayload} = require("./booking_draft_menu");
+    const payload = await buildDraftMenuPayload(ctx, {
+      lang,
+      backAction: "rent:current",
+    });
+    if (payload?.error) {
+      return ctx.reply(payload.error);
+    }
+    if (payload?.empty) {
+      return ctx.reply(t(lang, "booking_no_bikes_in_process"));
+    }
+    return ctx.editMessageText(payload.text, {
+      parse_mode: "HTML",
+      reply_markup: payload.reply_markup,
+    });
+  }
+
   const statusKey = `rent_status_${rental.status}`;
   const statusLabel = t(lang, statusKey) || rental.status;
+  const startLabel = rental.start_at
+    ? dayjs(rental.start_at).format("DD.MM.YYYY HH:mm")
+    : dayjs(rental.start_date).format("DD.MM.YYYY");
+  const endLabel = rental.end_at
+    ? dayjs(rental.end_at).format("DD.MM.YYYY HH:mm")
+    : dayjs(rental.end_date).format("DD.MM.YYYY");
+
   const text = [
     `<b>${t(lang, "rent_details_title")}</b>`,
     `ID: ${rental.booking_public_id || rental.id}`,
     `${t(lang, "rent_details_status", {status: statusLabel})}`,
     `${t(lang, "rent_details_dates", {
-      start: dayjs(rental.start_date).format("DD.MM.YYYY"),
-      end: dayjs(rental.end_date).format("DD.MM.YYYY"),
+      start: startLabel,
+      end: endLabel,
     })}`,
     `${t(lang, "rent_details_model", {model: rental.bike_name})}`,
     rental.bike_desc
@@ -66,7 +91,7 @@ module.exports = async (ctx) => {
     .join("\n");
 
   const inline_keyboard = [];
-  if (["process", "pending", "active", "ready"].includes(rental.status)) {
+  if (["process", "pending", "active", "ready", "approved"].includes(rental.status)) {
     inline_keyboard.push([
       {text: t(lang, "rent_action_cancel"), callback_data: `rent:cancel:${rentalId}`},
     ]);

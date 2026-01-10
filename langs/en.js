@@ -7,9 +7,8 @@ module.exports = {
   cmd_start: "🏠 Main menu",
   cmd_menu: "📋 Open menu",
   cmd_book: "📅 Start booking",
-  cmd_add_name: "✏️ Update name",
-  cmd_add_tel: "📞 Update phone",
-  cmd_add_passport: "🪪 Upload passport",
+  cmd_language: "🌍 Change language",
+  cmd_admin: "👑 Admin panel",
 
   welcome_new:
     "👋 Welcome, {name}!\n\nTo continue, please complete a short registration.",
@@ -44,8 +43,25 @@ module.exports = {
     "💬 Support.\nSend your question here and we'll reply as soon as possible.",
   prices_info:
     "💸 Prices are shown for each bike when you pick dates.\nTap “My Rent” to choose dates and see totals.",
+  prices_choose_season:
+    "Choose a season:\n\n🔺 High season (December, January, February, March)\n🟠 Mid season (April, May, October, November)\n🔻 Low season (June, July, August, September)",
+  prices_season_high: "🔺 High season",
+  prices_season_middle: "🟠 Mid season",
+  prices_season_low: "🔻 Low season",
+  prices_image_missing:
+    "Couldn't load the price list. Please try again.",
+  prices_loading: "Loading price list…",
   account_info:
     "👤 Add your booking details here. Choose what you want to update:",
+  account_profile_title: "👤 My Profile",
+  account_name_label: "Name",
+  account_phone_label: "Phone",
+  account_passport_label: "Passport",
+  account_passport_photo: "Photo uploaded",
+  account_passport_missing: "Not provided",
+  account_value_missing: "Not set",
+  account_passport_number_value: "Number: {number}",
+  account_profile_hint: "Choose what you want to update:",
   conditions_info:
     "🆔 Documents\nRequired:\n• Photo of international passport\n• Driver’s license (international preferred)\n• Age 18+\nSigning the rental agreement is mandatory.\n\n💰 Deposit & payment\nDeposit:\n• Passport or cash deposit\n• Amount depends on model:\n▫️ Standard bikes — $100–$300\n▫️ Powerful bikes (300–350cc) — from $400 and above\n\nPayment:\n• Cash or online\n• All terms are discussed in advance — no hidden fees\n\nEarly return:\nIf you plan to return earlier, please note:\n• Daily rental — return less than 3 days before end is not refunded\n• Monthly rental — return less than 7 days before end is also not recalculated\n• Other cases: possible recalculation by agreement\n\n🛵 Damage & responsibility\nWe take photos/video of the bike before rental.\nIf damaged:\n• Payment at real cost of original parts and labor\n• Rarely, downtime for repair may be considered\nInsurance doesn’t cover scooters.\nPunctured tire: tenant fixes it (usually 100–200 THB nearby).\nIf battery drained due to lights left on — service fee 100–400 THB, depending on location.\n\n⏱ Return & extension\nRental is per 24h — return at the same time you received the bike.\nIf you want to extend, warn us in advance (ideally a few days).\nIn high season bikes are often booked day-to-day — we must honor other bookings.\nHalf-day extension (e.g., noon to evening) — possible by agreement, usually ~50% of day price.\n\n📍 Pickup\nPickup on Bantai.\nDelivery:\n• Around the island — 100–400 THB (distance-based)\n• Thong Sala pier — 150 THB\n• Within Bantai — free",
   conditions_accept_btn: "✅ Accept rental terms",
@@ -69,6 +85,15 @@ module.exports = {
   rent_btn_support: "💬 Support",
   rent_btn_confirm: "✅ Confirm booking",
   rent_current_empty: "You have no active or pending bookings.",
+  rent_current_title: "📌 Your current bookings",
+  rent_current_draft_title: "📝 Draft booking",
+  rent_current_draft_hint:
+    "You can continue the booking now or come back to it later.",
+  rent_current_draft_continue_btn: "Continue booking",
+  rent_current_back_btn: "⬅️ Back to current bookings",
+  rent_current_actions_title: "⚙️ Draft management",
+  rent_current_actions_hint:
+    "Add bikes, leave notes, or confirm before sending to the admin.",
   rent_history_empty: "History is empty.",
   rent_details_title: "📍 Booking details",
   rent_details_status: "Status: {status}",
@@ -80,6 +105,15 @@ module.exports = {
   rent_status_cancelled: "cancelled",
   rent_status_completed: "completed",
   rent_status_approved: "approved",
+  reminder_start_24h: "Reminder: rental starts in 24 hours",
+  reminder_start_1h: "Reminder: rental starts in 1 hour",
+  reminder_end_24h: "Reminder: rental ends in 24 hours",
+  reminder_end_1h: "Reminder: rental ends in 1 hour",
+  reminder_model_label: "Model",
+  reminder_period_label: "Period",
+  reminder_status_label: "Status",
+  reminder_view_current_btn: "Current bookings",
+  reminder_view_details_btn: "Booking details",
   user_rental_approved:
     "Your booking #{id} has been approved ✅\nModel: {model}\nDates: {start} — {end}\nStatus: {status}\nYou can view details in My Rent.",
   rent_view_details_btn: "View booking",
@@ -94,6 +128,7 @@ module.exports = {
   rent_details_deposit: "Deposit: {deposit} THB",
   rent_details_contract: "Contract: {contract}",
   rent_action_details: "📍 Details",
+  rent_action_edit: "✏️ Edit",
   rent_action_cancel: "❌ Cancel",
   rent_action_back: "◀️ Back",
   rent_cancel_confirm: "Cancel booking ID {id}?",
@@ -101,19 +136,20 @@ module.exports = {
   rent_cannot_cancel: "You cannot cancel this booking.",
   rent_history_details: "📍 Details (history)",
   about_info:
-    "🏝️ DRIVE PHANGAN — scooter and car rental on Koh Phangan.\nOfficially operating since 2019.\n🛵 Every year we update our fleet with new models — for those who value comfort, style, and freedom.\n\n🚀 Renting with us is honest and transparent — no shady tricks or scratch scams.\n⭐ Over 100 positive reviews on Google Maps and many returning customers season after season.\nReliable, simple, and with care for your perfect vacation ✨\n\n🤖 This bot is made to keep booking quick and effortless — everything is automated. You can complete all steps right here. If you have any questions, we are always online!\n\n📍 Find us easily:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://instagram.com/drivephangan\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
+    "🏝️ DRIVE PHANGAN — scooter and car rental on Koh Phangan.\nOfficially operating since 2019.\n🛵 Every year we update our fleet with new models — for those who value comfort, style, and freedom.\n\n🚀 Renting with us is honest and transparent — no shady tricks or scratch scams.\n⭐ Over 100 positive reviews on Google Maps and many returning customers season after season.\nReliable, simple, and with care for your perfect vacation ✨\n\n🤖 This bot is made to keep booking quick and effortless — everything is automated. You can complete all steps right here. If you have any questions, we are always online!\n\n📍 Find us easily:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://www.instagram.com/drive_phangan/\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
   support_info:
     "💬 Support.\nIf you have questions, choose a convenient contact option below.",
   support_btn_call: "📞 Call us",
   support_btn_faq: "📄 FAQ",
   support_btn_find: "📍 How to find us",
+  support_btn_admin: "💬 Message admin",
   support_call_text:
-    "📞 Phone: +66 99 999 9999\n💬 WhatsApp: +66 99 999 9999\n\nTap the button below to open a WhatsApp chat.",
+    "📞 Phone: +66 97 181 9946\n💬 WhatsApp: +66 97 181 9946\n\nTap the button below to open a WhatsApp chat.",
   support_call_whatsapp_btn: "💬 Chat on WhatsApp",
   support_faq_text:
     "📄 FAQ\n\n• How to book? — Pick dates and a bike in the bot, then confirm.\n• What docs are needed? — Passport photo.\n• Helmets? — Yes, on request.\n• Delivery? — Available, add your address in comments.\n• Payment? — We’ll confirm it after booking.",
   support_find_text:
-    "📍 Address: Koh Phangan, Thailand\n\nFind us easily:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://instagram.com/drivephangan\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
+    "📍 Address: Koh Phangan, Thailand\n\nFind us easily:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://www.instagram.com/drive_phangan/\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
 
   name_invalid:
     "Name must contain only letters and be at least 2 characters long. Try again.",
@@ -162,7 +198,7 @@ module.exports = {
   booking_no_availability_lead:
     "No bikes are free for these dates. We created a request for the operator — they will contact you and try to find an option.",
   admin_no_availability_lead:
-    "🚨 No availability for {start} - {end}.\nUser: {user} @{username}\nCategory: {category}\nComment: {comment}",
+    "🚨 <b>No availability</b>\n\n📅 Dates: {start} — {end}\n👤 User: {user} (@{username})\n📞 Phone: {phone}\n🏷️ Category: {category}\n✏️ Comment: {comment}",
   booking_available_bikes_title: "🏍️ Available bikes:",
 
   booking_range_conflict:
@@ -170,6 +206,7 @@ module.exports = {
   booking_range_conflict_bike:
     "The selected range includes booked dates for this bike. Choose another period.",
   booking_end_before_start: "End date cannot be earlier than start date.",
+  booking_date_in_past: "You cannot select a date in the past.",
 
   booking_invalid_bike_id: "Invalid bike ID format.",
   booking_bike_not_found: "Bike not found.",
@@ -200,7 +237,7 @@ module.exports = {
   booking_admin_missing:
     "Sorry. There is no admin in the system right now. Please cancel this rental and try again later.",
   booking_admin_new:
-    "🚨 <b>New rental</b>\n\nUser: {user} Telegram: @{username}\nBike: <b>{bike}</b>\nDates: {start} - {end}\nTotal: {price} THB\nComment: {comment}\n\n🪖 Helmets: {helmets}\n🚚 Delivery: {delivery}\n🏠 Address: {address}",
+    "🚨 <b>New booking request</b>\n\n👤 {user} (@{username})\n📞 Phone: {phone}\n🛵 Model: <b>{bike}</b>\n📅 Period: {start} — {end}\n💰 Price: {price}\n🧾 Deposit: {deposit}\n🪪 Documents: {docs}\n\n🪖 Helmets: {helmets}\n🚚 Delivery: {delivery}\n🏠 Address: {address}\n✏️ Notes: {comment}",
 
   booking_delete_failed: "Failed to remove the bike.",
   booking_bike_removed: "🗑️ Bike removed from your rental.",
@@ -218,10 +255,11 @@ module.exports = {
     "📅 Start date: {date}\n\nNow choose the end date.",
   booking_add_bike_to_rental_btn: "➕ Add a bike to the rental",
   booking_bike_summary:
-    "🏍️ <b>{name}</b>\n\n<b>Rental period:</b> {start} - {end} ({days} {days_label})\n<b>Price:</b> {price} THB\n\n{desc}",
+    "🛵 <b>{name}</b>\n\n<b>Rental period:</b> {start} - {end} ({days} {days_label})\n<b>Price per day:</b> {price_per_day} THB\n<b>Price:</b> {price} THB\n\n{desc}",
 
   btn_back: "⬅️ Back",
   btn_home: "🏠 Home",
+  btn_main_menu: "◀️ Main menu",
 
   cal_prev: "◀️",
   cal_next: "▶️",
@@ -235,6 +273,18 @@ module.exports = {
   admin_request_status: "Request #{id} {status}.",
   admin_btn_approve: "Approve",
   admin_btn_cancel: "Reject",
+  admin_docs_ok: "provided",
+  admin_docs_missing: "missing",
+  admin_cancel_by_client:
+    "🚨 <b>Cancelled by client</b>\n\nID: {id}\n👤 {user} (@{username})\n📞 Phone: {phone}\n📅 Dates: {start} — {end}",
+  admin_decline_prompt:
+    "Please type a rejection reason for booking #{id}. The client will see this.",
+  admin_decline_skip_btn: "Reject without reason",
+  admin_decline_done: "Booking #{id} rejected. Reason: {reason}",
+
+  user_rental_declined:
+    "❌ Your booking #{id} was rejected.\nReason: {reason}\nIf you have questions, please contact support.",
+  user_decline_reason_default: "Reason not provided.",
 
   user_no_name: "(no name)",
   user_default_name: "user",
@@ -244,21 +294,47 @@ module.exports = {
   skip_registration_reply: "Okay. If you change your mind, send /start again.",
 
   booking_options_title:
-    "⚙️ Options:\n• Helmets: {helmets}\n• Delivery: {delivery}\n• Delivery address: {address}\n• Notes: {notes}",
+    "⚙️ Options:\n• Start time: {start_time}\n• End time: {end_time}\n• Helmets: {helmets}\n• Delivery: {delivery}\n• Delivery address: {address}\n• Notes: {notes}",
   booking_options_btn: "⚙️ Options",
   booking_options_delivery_on: "on",
   booking_options_delivery_off: "off",
   booking_options_no_address: "not set",
   booking_options_no_notes: "not set",
+  booking_options_time_not_set: "not set",
   booking_options_helmets_inc: "➕ Helmet",
   booking_options_helmets_dec: "➖ Helmet",
   booking_options_toggle_delivery: "🚚 Delivery on/off",
   booking_options_set_address: "🏠 Delivery address",
   booking_options_set_notes: "✏️ Notes",
+  booking_options_time_start: "🕘 Start time",
+  booking_options_time_end: "🕘 End time",
   booking_options_back: "⬅️ Back",
   booking_options_saved: "Options updated.",
   booking_options_address_prompt: "🏠 Enter delivery address:",
   booking_options_notes_prompt: "✏️ Enter your notes:",
   booking_options_address_saved: "Delivery address saved.",
   booking_options_notes_saved: "Notes saved.",
+  admin_not_allowed: "Access denied.",
+  admin_menu_title: "👑 Admin panel",
+  admin_menu_active_btn: "🟢 Active requests",
+  admin_menu_pending_btn: "⏳ Unconfirmed",
+  admin_menu_confirmed_btn: "✅ Confirmed",
+  admin_list_title_active: "Active requests",
+  admin_list_title_pending: "Unconfirmed requests",
+  admin_list_title_confirmed: "Confirmed requests",
+  admin_list_empty: "No requests found.",
+  admin_list_client: "Client",
+  admin_list_phone: "Phone",
+  admin_list_dates: "Dates",
+  admin_list_status: "Status",
+  admin_deposit_btn: "💸 Deposit",
+  admin_deposit_prompt: "Enter deposit text for booking #{id}:",
+  admin_deposit_saved: "Deposit updated for booking #{id}.",
+  rent_deposit_title: "💸 Deposit and payment",
+  rent_deposit_empty: "No active bookings for deposit info.",
+  rent_deposit_required_label: "Deposit",
+  rent_deposit_status_label: "Status",
+  rent_deposit_status_paid: "paid",
+  rent_deposit_status_unpaid: "not paid",
+  rent_deposit_note_label: "Note",
 };

@@ -13,7 +13,10 @@ module.exports = async (ctx) => {
     scenario === "date_first" ? "select_start_date" : "select_bike_category";
   booking.selectedBikeId = null;
   booking.startDate = null;
+  booking.startTime = null;
   booking.endDate = null;
+  booking.endTime = null;
+  booking.timeSource = null;
   booking.calendarMonth = dayjs().month() + 1;
   booking.calendarYear = dayjs().year();
 
@@ -28,6 +31,7 @@ module.exports = async (ctx) => {
         lang,
         labels: getCalendarLabels(lang),
         weekdays: getWeekdays(lang),
+        disablePast: true,
       }
     );
 
