@@ -288,7 +288,8 @@ async function handleRentMenuAction(ctx) {
     const user = await db("users").where({telegram_id: ctx.from.id}).first();
     if (!user) return ctx.reply(t(lang, "not_registered"));
     const rentals = await db("rentals")
-      .where("user_id", user.id)
+      .leftJoin("bikes", "rentals.bike_id", "bikes.id")
+      .where("rentals.user_id", user.id)
       .whereIn("status", [
         "cancelled",
         "cancelled_by_client",
@@ -296,25 +297,46 @@ async function handleRentMenuAction(ctx) {
         "finished",
         "expired",
         "returned",
-      ]);
+      ])
+      .select("rentals.*", "bikes.name as bike_name")
+      .orderBy("rentals.created_at", "desc");
 
     if (!rentals.length) {
-    return ctx.reply(t(lang, "rent_history_empty"), {
-      reply_markup: getRentMenuKeyboard(lang),
-    });
-  }
+      return ctx.reply(t(lang, "rent_history_empty"), {
+        reply_markup: getRentMenuKeyboard(lang),
+      });
+    }
 
-    let text = t(lang, "rent_btn_history") + ":\n\n";
+    let text = `<b>${t(lang, "rent_btn_history")}</b>\n\n`;
     const keyboard = [];
     rentals.forEach((r) => {
-      text += `• ${t(lang, "rent_history_details")} ID ${r.booking_public_id || r.id}: ${
-        r.start_date || "-"
-      } - ${r.end_date || "-"} (${r.status})\n`;
+      const statusKey = `rent_status_${r.status}`;
+      const statusLabel = t(lang, statusKey) || r.status;
+      const startLabel = r.start_at
+        ? dayjs(r.start_at).format("DD.MM.YYYY HH:mm")
+        : r.start_date
+        ? dayjs(r.start_date).format("DD.MM.YYYY")
+        : "-";
+      const endLabel = r.end_at
+        ? dayjs(r.end_at).format("DD.MM.YYYY HH:mm")
+        : r.end_date
+        ? dayjs(r.end_date).format("DD.MM.YYYY")
+        : "-";
+      text += `🛵 <b>${r.bike_name || "-"}</b>\n`;
+      text += `ID: ${r.booking_public_id || r.id}\n`;
+      text += `${t(lang, "rent_details_dates", {
+        start: startLabel,
+        end: endLabel,
+      })}\n`;
+      text += `${t(lang, "rent_details_price", {
+        price: r.total_price || t(lang, "booking_price_tbd"),
+      })}\n`;
+      text += `${t(lang, "rent_details_status", {status: statusLabel})}\n\n`;
       keyboard.push([{text: t(lang, "rent_action_details"), callback_data: `rent:details:${r.id}`}]);
     });
     keyboard.push([{text: t(lang, "btn_main_menu"), callback_data: "home"}]);
 
-    return ctx.reply(text, {reply_markup: {inline_keyboard: keyboard}});
+    return ctx.reply(text, {parse_mode: "HTML", reply_markup: {inline_keyboard: keyboard}});
   }
 
   if (action === "rent:contract") {
