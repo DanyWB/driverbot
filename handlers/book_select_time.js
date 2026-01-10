@@ -1,25 +1,12 @@
 const dayjs = require("dayjs");
 const {ensureBooking} = require("../services/bookingService");
 const {getTimeSlots, makeDateTime} = require("../utils/timeSlots");
+const {getTimeKeyboard} = require("../utils/timeKeyboard");
 const {generateCalendarKeyboard} = require("../utils/calendar");
 const {getCalendarLabels, getWeekdays, getCtxLang, t} = require("../utils/i18n");
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const db = require("../connect");
 const showAvailableBikes = require("./book_show_available_bikes");
-
-function getTimeKeyboard(kind) {
-  const slots = getTimeSlots();
-  const rows = [];
-  for (let i = 0; i < slots.length; i += 3) {
-    rows.push(
-      slots.slice(i, i + 3).map((time) => ({
-        text: time,
-        callback_data: `book:time:${kind}:${time}`,
-      }))
-    );
-  }
-  return {inline_keyboard: rows};
-}
 
 async function handleStartTime(ctx, booking, lang) {
   const startAt = makeDateTime(booking.startDate, booking.startTime);
@@ -58,6 +45,7 @@ async function handleStartTime(ctx, booking, lang) {
         lang,
         labels: getCalendarLabels(lang),
         weekdays: getWeekdays(lang),
+        minDate: booking.startDate,
       }
     ),
   });
@@ -119,11 +107,17 @@ async function handleEndTime(ctx, booking, lang) {
       booking.endTime = null;
       booking.step = "select_start_date";
       return ctx.reply(t(lang, "booking_range_conflict"), {
-        reply_markup: generateCalendarKeyboard(dayjs().year(), dayjs().month() + 1, blockedDays, {
-          lang,
-          labels: getCalendarLabels(lang),
-          weekdays: getWeekdays(lang),
-        }),
+        reply_markup: generateCalendarKeyboard(
+          dayjs().year(),
+          dayjs().month() + 1,
+          blockedDays,
+          {
+            lang,
+            labels: getCalendarLabels(lang),
+            weekdays: getWeekdays(lang),
+            disablePast: true,
+          }
+        ),
       });
     }
   }
@@ -135,6 +129,77 @@ async function handleEndTime(ctx, booking, lang) {
   }
 
   return showAvailableBikes(ctx);
+}
+
+async function handleStartTimeOptional(ctx, booking, lang) {
+  const startAt = makeDateTime(booking.startDate, booking.startTime);
+  if (!startAt || !startAt.isValid()) {
+    booking.startTime = null;
+    return ctx.answerCallbackQuery({
+      text: t(lang, "booking_time_invalid"),
+      show_alert: true,
+    });
+  }
+
+  const minStart = dayjs().add(1, "hour");
+  if (startAt.isBefore(minStart)) {
+    booking.startTime = null;
+    return ctx.answerCallbackQuery({
+      text: t(lang, "booking_start_in_past"),
+      show_alert: true,
+    });
+  }
+
+  if (booking.endDate && booking.endTime) {
+    const endAt = makeDateTime(booking.endDate, booking.endTime);
+    if (endAt && endAt.isValid() && endAt.isBefore(startAt)) {
+      booking.startTime = null;
+      return ctx.answerCallbackQuery({
+        text: t(lang, "booking_end_before_start"),
+        show_alert: true,
+      });
+    }
+  }
+
+  const {formatOptionsText, getOptionsKeyboard, persistProcessOptions} = require("./book_options");
+  booking.timeSource = null;
+  if (ctx.session.optionsScope === "process") {
+    await persistProcessOptions(ctx, booking);
+  }
+  return ctx.editMessageText(formatOptionsText(booking, lang), {
+    reply_markup: getOptionsKeyboard(lang),
+  });
+}
+
+async function handleEndTimeOptional(ctx, booking, lang) {
+  const endAt = makeDateTime(booking.endDate, booking.endTime);
+  if (!endAt || !endAt.isValid()) {
+    booking.endTime = null;
+    return ctx.answerCallbackQuery({
+      text: t(lang, "booking_time_invalid"),
+      show_alert: true,
+    });
+  }
+
+  if (booking.startDate && booking.startTime) {
+    const startAt = makeDateTime(booking.startDate, booking.startTime);
+    if (startAt && startAt.isValid() && endAt.isBefore(startAt)) {
+      booking.endTime = null;
+      return ctx.answerCallbackQuery({
+        text: t(lang, "booking_end_before_start"),
+        show_alert: true,
+      });
+    }
+  }
+
+  const {formatOptionsText, getOptionsKeyboard, persistProcessOptions} = require("./book_options");
+  booking.timeSource = null;
+  if (ctx.session.optionsScope === "process") {
+    await persistProcessOptions(ctx, booking);
+  }
+  return ctx.editMessageText(formatOptionsText(booking, lang), {
+    reply_markup: getOptionsKeyboard(lang),
+  });
 }
 
 module.exports = async (ctx) => {
@@ -173,14 +238,20 @@ module.exports = async (ctx) => {
     });
   }
 
+  const isOptions = booking.timeSource === "options";
+
   if (kind === "start") {
     booking.startTime = time;
-    return handleStartTime(ctx, booking, lang);
+    return isOptions
+      ? handleStartTimeOptional(ctx, booking, lang)
+      : handleStartTime(ctx, booking, lang);
   }
 
   if (kind === "end") {
     booking.endTime = time;
-    return handleEndTime(ctx, booking, lang);
+    return isOptions
+      ? handleEndTimeOptional(ctx, booking, lang)
+      : handleEndTime(ctx, booking, lang);
   }
 };
 

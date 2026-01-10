@@ -22,7 +22,7 @@ module.exports = async (ctx) => {
       inline_keyboard: [
         [{text: t(lang, "booking_btn_date_first"), callback_data: "book:date_first"}],
         [{text: t(lang, "booking_btn_bike_first"), callback_data: "book:bike_first"}],
-        [{text: t(lang, "btn_home"), callback_data: "home"}],
+        [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
       ],
     },
   });

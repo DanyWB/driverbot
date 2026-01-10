@@ -37,6 +37,14 @@ function generateCalendarKeyboard(
   const labels = resolvedOptions.labels || getCalendarLabels(lang);
   const weekdays = resolvedOptions.weekdays || getWeekdays(lang);
   const locale = getDayjsLocale(lang);
+  const minDate = resolvedOptions.minDate
+    ? dayjs(resolvedOptions.minDate).startOf("day")
+    : null;
+  const disablePast = Boolean(resolvedOptions.disablePast);
+  const selectedDate = resolvedOptions.selectedDate
+    ? dayjs(resolvedOptions.selectedDate).format("YYYY-MM-DD")
+    : null;
+  const earliestDate = minDate || (disablePast ? dayjs().startOf("day") : null);
 
   const bookedSet = new Set(bookedDates);
   const cal = new calendar.Calendar(0); // 0 = Monday
@@ -59,7 +67,16 @@ function generateCalendarKeyboard(
       const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(
         day
       ).padStart(2, "0")}`;
-      if (bookedSet.has(dateStr)) {
+      const isPast =
+        earliestDate && dayjs(dateStr).isBefore(earliestDate, "day");
+      const isBlocked = isPast || bookedSet.has(dateStr);
+      if (selectedDate && dateStr === selectedDate) {
+        return {
+          text: `[${day}]`,
+          callback_data: isBlocked ? "noop" : `book:select_date:${dateStr}`,
+        };
+      }
+      if (isBlocked) {
         return {text: labels.blocked || "⛔", callback_data: "noop"};
       }
       return {text: String(day), callback_data: `book:select_date:${dateStr}`};

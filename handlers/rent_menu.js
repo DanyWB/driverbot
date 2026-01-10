@@ -1,6 +1,8 @@
 const db = require("../connect");
+const dayjs = require("dayjs");
 const {t, getCtxLang} = require("../utils/i18n");
 const {sendSupportMenu} = require("./support");
+const {sendAccountMenu} = require("./account_menu");
 
 function getRentMenuKeyboard(lang) {
   return {
@@ -18,7 +20,7 @@ function getRentMenuKeyboard(lang) {
         {text: t(lang, "rent_btn_settings"), callback_data: "rent:settings"},
         {text: t(lang, "rent_btn_support"), callback_data: "rent:support"},
       ],
-      [{text: t(lang, "btn_back"), callback_data: "home"}],
+      [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
     ],
   };
 }
@@ -31,9 +33,93 @@ async function sendRentMenu(ctx, langOverride) {
   });
 }
 
+async function sendDepositInfo(ctx, langOverride) {
+  const lang = langOverride || getCtxLang(ctx);
+  const user = await db("users").where({telegram_id: ctx.from.id}).first();
+  if (!user) return ctx.reply(t(lang, "not_registered"));
+
+  const rentals = await db("rentals")
+    .leftJoin("bikes", "rentals.bike_id", "bikes.id")
+    .where("rentals.user_id", user.id)
+    .whereNotIn("rentals.status", [
+      "cancelled",
+      "cancelled_by_client",
+      "completed",
+      "finished",
+      "expired",
+      "returned",
+    ])
+    .select("rentals.*", "bikes.name as bike_name")
+    .orderBy("rentals.created_at", "desc");
+
+  if (!rentals.length) {
+    return ctx.editMessageText(t(lang, "rent_deposit_empty"), {
+      reply_markup: {
+        inline_keyboard: [
+          [{text: t(lang, "btn_back"), callback_data: "rent:menu"}],
+        ],
+      },
+    });
+  }
+
+  let text = `<b>${t(lang, "rent_deposit_title")}</b>\n\n`;
+  rentals.forEach((rental) => {
+    const startLabel = rental.start_at
+      ? dayjs(rental.start_at).format("DD.MM.YYYY HH:mm")
+      : dayjs(rental.start_date).format("DD.MM.YYYY");
+    const endLabel = rental.end_at
+      ? dayjs(rental.end_at).format("DD.MM.YYYY HH:mm")
+      : dayjs(rental.end_date).format("DD.MM.YYYY");
+    const statusLabel = rental.deposit_paid
+      ? t(lang, "rent_deposit_status_paid")
+      : t(lang, "rent_deposit_status_unpaid");
+    const depositValue =
+      rental.deposit_required != null ? rental.deposit_required : "-";
+    text += `<b>${rental.bike_name || "-"}</b>\n`;
+    text += `ID: ${rental.booking_public_id || rental.id}\n`;
+    text += `${t(lang, "rent_details_dates", {
+      start: startLabel,
+      end: endLabel,
+    })}\n`;
+    text += `${t(lang, "rent_deposit_required_label")}: ${depositValue} THB\n`;
+    text += `${t(lang, "rent_deposit_status_label")}: ${statusLabel}\n`;
+    if (rental.deposit_note) {
+      text += `${t(lang, "rent_deposit_note_label")}: ${rental.deposit_note}\n`;
+    }
+    text += "\n";
+  });
+
+  return ctx.editMessageText(text, {
+    parse_mode: "HTML",
+    reply_markup: {
+      inline_keyboard: [
+        [{text: t(lang, "btn_back"), callback_data: "rent:menu"}],
+      ],
+    },
+  });
+}
+
 async function handleRentMenuAction(ctx) {
   const lang = getCtxLang(ctx);
   const action = ctx.callbackQuery?.data;
+
+  const shouldDelete =
+    action &&
+    [
+      "rent:current",
+      "rent:history",
+      "rent:contract",
+      "rent:settings",
+      "rent:support",
+      "rent:menu",
+    ].includes(action);
+  if (shouldDelete) {
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {
+      // ignore delete errors
+    }
+  }
 
   if (action === "rent:book") {
     ctx.session.booking = null;
@@ -43,43 +129,159 @@ async function handleRentMenuAction(ctx) {
   if (action === "rent:current") {
     const user = await db("users").where({telegram_id: ctx.from.id}).first();
     if (!user) return ctx.reply(t(lang, "not_registered"));
+    const excludedStatuses = [
+      "cancelled",
+      "cancelled_by_client",
+      "completed",
+      "finished",
+      "expired",
+      "returned",
+    ];
     const rentals = await db("rentals")
-      .where("user_id", user.id)
-      .andWhere((qb) =>
-        qb
-          .where("status", "active")
-          .orWhere("status", "pending")
-          .orWhere("status", "process")
-          .orWhere("status", "ready")
-      );
+      .join("bikes", "rentals.bike_id", "bikes.id")
+      .where("rentals.user_id", user.id)
+      .whereNotIn("rentals.status", excludedStatuses)
+      .select(
+        "rentals.*",
+        "bikes.name as bike_name",
+        "bikes.description as bike_desc"
+      )
+      .orderBy("rentals.created_at", "desc");
 
-    if (!rentals.length) {
-      return ctx.reply(t(lang, "rent_current_empty"), {
-        reply_markup: getRentMenuKeyboard(lang),
-      });
-    }
+    const booking = ctx.session.booking;
+    const hasDraft =
+      booking &&
+      (booking.startDate ||
+        booking.endDate ||
+        booking.selectedBikeId ||
+        booking.totalPrice);
 
-    if (!rentals.length) {
+    if (!rentals.length && !hasDraft) {
       return ctx.reply(t(lang, "rent_current_empty"), {
         reply_markup: getRentMenuKeyboard(lang),
       });
     }
 
     const keyboard = [];
-    let text = t(lang, "rent_btn_current") + ":\n\n";
-    rentals.forEach((r) => {
-      const label = `• ${t(lang, "rent_action_details")} ID ${
-        r.booking_public_id || r.id
-      }: ${r.start_date || r.start_at || "-"} - ${r.end_date || r.end_at || "-"} (${r.status})`;
-      text += `${label}\n`;
-      keyboard.push([
-        {text: t(lang, "rent_action_details"), callback_data: `rent:details:${r.id}`},
-        {text: t(lang, "rent_action_cancel"), callback_data: `rent:cancel:${r.id}`},
-      ]);
-    });
-    keyboard.push([{text: t(lang, "btn_back"), callback_data: "home"}]);
+    let text = `<b>${t(lang, "rent_current_title")}</b>\n\n`;
 
-    return ctx.reply(text, {reply_markup: {inline_keyboard: keyboard}});
+    if (hasDraft) {
+      let draftBike = null;
+      if (booking.selectedBikeId) {
+        draftBike = await db("bikes")
+          .where({id: booking.selectedBikeId})
+          .first();
+      }
+
+      let startLabel = booking.startDate
+        ? dayjs(booking.startDate).format("DD.MM.YYYY")
+        : "-";
+      let endLabel = booking.endDate
+        ? dayjs(booking.endDate).format("DD.MM.YYYY")
+        : "-";
+      if (booking.startTime) startLabel += ` ${booking.startTime}`;
+      if (booking.endTime) endLabel += ` ${booking.endTime}`;
+
+      text += `<b>${t(lang, "rent_current_draft_title")}</b>\n`;
+      if (booking.startDate && booking.endDate) {
+        text += `${t(lang, "rent_details_dates", {
+          start: startLabel,
+          end: endLabel,
+        })}\n`;
+      }
+      if (draftBike) {
+        text += `${t(lang, "rent_details_model", {
+          model: draftBike.name,
+        })}\n`;
+      }
+      if (booking.totalPrice || booking.priceUnknown) {
+        text += `${t(lang, "rent_details_price", {
+          price: booking.priceUnknown
+            ? t(lang, "booking_price_tbd")
+            : booking.totalPrice,
+        })}\n`;
+      }
+      text += `${t(lang, "rent_current_draft_hint")}\n\n`;
+
+      if (booking.startDate && booking.endDate && booking.selectedBikeId) {
+        keyboard.push([
+          {
+            text: t(lang, "rent_current_draft_continue_btn"),
+            callback_data: `book:select_bike:${booking.selectedBikeId}`,
+          },
+        ]);
+      } else if (booking.startDate && booking.endDate) {
+        keyboard.push([
+          {
+            text: t(lang, "booking_choose_bike_btn"),
+            callback_data: "book:show_available_bikes",
+          },
+        ]);
+      } else {
+        keyboard.push([{text: t(lang, "rent_btn_book"), callback_data: "rent:book"}]);
+      }
+    }
+
+    rentals.forEach((r) => {
+      const statusKey = `rent_status_${r.status}`;
+      const statusLabel = t(lang, statusKey) || r.status;
+      const startLabel = r.start_at
+        ? dayjs(r.start_at).format("DD.MM.YYYY HH:mm")
+        : dayjs(r.start_date).format("DD.MM.YYYY");
+      const endLabel = r.end_at
+        ? dayjs(r.end_at).format("DD.MM.YYYY HH:mm")
+        : dayjs(r.end_date).format("DD.MM.YYYY");
+      text += `🏍️ <b>${r.bike_name}</b>\n`;
+      text += `ID: ${r.booking_public_id || r.id}\n`;
+      text += `${t(lang, "rent_details_status", {status: statusLabel})}\n`;
+      text += `${t(lang, "rent_details_dates", {
+        start: startLabel,
+        end: endLabel,
+      })}\n`;
+      text += `${t(lang, "rent_details_price", {
+        price: r.total_price || t(lang, "booking_price_tbd"),
+      })}\n`;
+      if (r.helmets_qty || r.delivery_required) {
+        text += `${t(lang, "rent_details_helmets", {helmets: r.helmets_qty || 0})}\n`;
+        text += `${t(lang, "rent_details_delivery", {
+          delivery: r.delivery_required
+            ? t(lang, "booking_options_delivery_on")
+            : t(lang, "booking_options_delivery_off"),
+        })}\n`;
+      }
+      if (r.delivery_address) {
+        text += `${t(lang, "rent_details_address", {
+          address: r.delivery_address,
+        })}\n`;
+      }
+      if (r.comment) {
+        text += `${t(lang, "rent_details_notes", {notes: r.comment})}\n`;
+      }
+      text += "\n";
+
+      const row = [];
+      if (r.status === "process") {
+        row.push({
+          text: t(lang, "rent_action_edit"),
+          callback_data: `rent:details:${r.id}`,
+        });
+      } else {
+        row.push({
+          text: t(lang, "rent_action_details"),
+          callback_data: `rent:details:${r.id}`,
+        });
+        if (["pending", "active", "ready", "approved"].includes(r.status)) {
+          row.push({
+            text: t(lang, "rent_action_cancel"),
+            callback_data: `rent:cancel:${r.id}`,
+          });
+        }
+      }
+      keyboard.push(row);
+    });
+    keyboard.push([{text: t(lang, "btn_main_menu"), callback_data: "home"}]);
+
+    return ctx.reply(text, {parse_mode: "HTML", reply_markup: {inline_keyboard: keyboard}});
   }
 
   if (action === "rent:history") {
@@ -87,7 +289,14 @@ async function handleRentMenuAction(ctx) {
     if (!user) return ctx.reply(t(lang, "not_registered"));
     const rentals = await db("rentals")
       .where("user_id", user.id)
-      .whereIn("status", ["cancelled", "completed", "finished", "expired", "ready", "returned"]);
+      .whereIn("status", [
+        "cancelled",
+        "cancelled_by_client",
+        "completed",
+        "finished",
+        "expired",
+        "returned",
+      ]);
 
     if (!rentals.length) {
     return ctx.reply(t(lang, "rent_history_empty"), {
@@ -103,7 +312,7 @@ async function handleRentMenuAction(ctx) {
       } - ${r.end_date || "-"} (${r.status})\n`;
       keyboard.push([{text: t(lang, "rent_action_details"), callback_data: `rent:details:${r.id}`}]);
     });
-    keyboard.push([{text: t(lang, "btn_back"), callback_data: "home"}]);
+    keyboard.push([{text: t(lang, "btn_main_menu"), callback_data: "home"}]);
 
     return ctx.reply(text, {reply_markup: {inline_keyboard: keyboard}});
   }
@@ -116,29 +325,15 @@ async function handleRentMenuAction(ctx) {
   }
 
   if (action === "rent:payment") {
-    return ctx.reply(t(lang, "prices_info"), {
-      parse_mode: "HTML",
-      reply_markup: getRentMenuKeyboard(lang),
-    });
+    return sendDepositInfo(ctx, lang);
+  }
+
+  if (action === "rent:menu") {
+    return sendRentMenu(ctx, lang);
   }
 
   if (action === "rent:settings") {
-    // Redirect to account update options
-    return ctx.reply(t(lang, "account_info"), {
-      reply_markup: {
-        inline_keyboard: [
-          [{text: t(lang, "menu_update_name"), callback_data: "update:name"}],
-          [{text: t(lang, "menu_update_tel"), callback_data: "update:tel"}],
-          [
-            {
-              text: t(lang, "menu_update_passport"),
-              callback_data: "update:passport",
-            },
-          ],
-          [{text: t(lang, "btn_back"), callback_data: "home"}],
-        ],
-      },
-    });
+    return sendAccountMenu(ctx, lang);
   }
 
   if (action === "rent:support") {

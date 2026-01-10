@@ -4,7 +4,7 @@ dayjs.extend(isSameOrBefore);
 async function getBusyDatesForBike(bikeId, db) {
   const rentals = await db("rentals")
     .where("bike_id", bikeId)
-    .andWhere("status", "!=", "cancelled");
+    .whereNotIn("status", ["cancelled", "cancelled_by_client"]);
 
   const blockedDays = new Set();
 

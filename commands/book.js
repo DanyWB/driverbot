@@ -4,6 +4,18 @@ const db = require("../connect");
 
 module.exports = async (ctx) => {
   const lang = getCtxLang(ctx);
+  if (ctx.callbackQuery) {
+    try {
+      await ctx.answerCallbackQuery();
+    } catch (e) {
+      // ignore callback errors
+    }
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {
+      // ignore delete errors
+    }
+  }
   const user = await db("users").where({telegram_id: ctx.from.id}).first();
 
   if (!user || !user.name) {
@@ -18,6 +30,7 @@ module.exports = async (ctx) => {
     return ctx.reply(t(lang, "enter_phone"));
   }
 
+  ctx.session.commentReturn = null;
   ctx.session.booking = createEmptyBooking();
 
   const text = t(lang, "booking_intro");

@@ -1,4 +1,5 @@
 // knexfile.js
+require("dotenv").config();
 const DEV_CONNECTION = {
   host: process.env.PG_HOST || "127.0.0.1",
   port: Number(process.env.PG_PORT || 5432),

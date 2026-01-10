@@ -10,10 +10,11 @@ async function setUserCommands(user, ctx, langOverride) {
     {command: "start", description: t(lang, "cmd_start")},
     {command: "menu", description: t(lang, "cmd_menu")},
     {command: "book", description: t(lang, "cmd_book")},
-    {command: "add_name", description: t(lang, "cmd_add_name")},
-    {command: "add_tel", description: t(lang, "cmd_add_tel")},
-    {command: "add_passport", description: t(lang, "cmd_add_passport")},
+    {command: "language", description: t(lang, "cmd_language")},
   ];
+  if (user.is_admin) {
+    commands.push({command: "admin", description: t(lang, "cmd_admin")});
+  }
 
   await Promise.all([
     botApi.deleteMyCommands({

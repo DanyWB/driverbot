@@ -13,12 +13,22 @@ module.exports = async (ctx) => {
   if (action === "book:restart") {
     ctx.session.booking = createEmptyBooking();
     await ctx.answerCallbackQuery();
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {
+      // ignore delete errors
+    }
     return require("../commands/book")(ctx);
   }
 
   if (action === "home") {
     ctx.session.booking = null;
     await ctx.answerCallbackQuery();
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {
+      // ignore delete errors
+    }
     return require("../commands/start")(ctx);
   }
 
@@ -48,6 +58,10 @@ module.exports = async (ctx) => {
         lang,
         labels: getCalendarLabels(lang),
         weekdays: getWeekdays(lang),
+        minDate: booking.step === "select_end_date" ? booking.startDate : null,
+        disablePast: booking.step !== "select_end_date",
+        selectedDate:
+          booking.step === "select_end_date" ? booking.startDate : null,
       }
     );
 

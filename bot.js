@@ -37,7 +37,21 @@ bot.callbackQuery("book:delete_bike", require("./handlers/book_remove_bike"));
 bot.callbackQuery("book:reset_rental", require("./handlers/book_reset"));
 bot.callbackQuery(/^book:select_bike:\d+$/, require("./handlers/book_select_bike"));
 bot.callbackQuery(/^book:time:(start|end):\d{2}:\d{2}$/, require("./handlers/book_select_time"));
-bot.callbackQuery(["book:options", "book:options:helmets:+", "book:options:helmets:-", "book:options:delivery", "book:options:address", "book:options:notes", "book:options:back"], require("./handlers/book_options"));
+bot.callbackQuery(
+  [
+    "book:options",
+    "book:options:process",
+    "book:options:helmets:+",
+    "book:options:helmets:-",
+    "book:options:delivery",
+    "book:options:address",
+    "book:options:notes",
+    "book:options:time_start",
+    "book:options:time_end",
+    "book:options:back",
+  ],
+  require("./handlers/book_options")
+);
 
 bot.callbackQuery(/^book:cat:\d+$/, require("./handlers/book_select_category"));
 bot.callbackQuery("book:show_available_bikes", require("./handlers/book_show_available_bikes"));
@@ -45,7 +59,12 @@ bot.callbackQuery(/^book:select_date:\d{4}-\d{2}-\d{2}$/, require("./handlers/ca
 bot.callbackQuery(["book:calendar_prev", "book:calendar_next", "book:restart", "home"], require("./handlers/navigation"));
 bot.callbackQuery(/^lang:set:(ru|en|ua)$/, require("./handlers/language_select"));
 bot.callbackQuery(
-  ["support:call", "support:faq", "support:find", "support:back"],
+  "account:back",
+  require("./handlers/account_menu").handleAccountAction
+);
+bot.callbackQuery(/^prices:/, require("./handlers/prices").handlePricesAction);
+bot.callbackQuery(
+  /^support:(call|faq|find|back.*)$/,
   require("./handlers/support").handleSupportAction
 );
 bot.callbackQuery(
@@ -55,6 +74,7 @@ bot.callbackQuery(
 bot.callbackQuery(
   [
     "rent:book",
+    "rent:menu",
     "rent:current",
     "rent:history",
     "rent:contract",
@@ -80,7 +100,13 @@ bot.callbackQuery(
 bot.callbackQuery("update:name", async (ctx) => {
   ctx.session.step = "waiting_for_name";
   ctx.session.scenario = null;
+  ctx.session.returnToProfile = true;
   await ctx.answerCallbackQuery();
+  try {
+    await ctx.deleteMessage();
+  } catch (e) {
+    // ignore delete errors
+  }
   const lang = getCtxLang(ctx);
   return ctx.reply(t(lang, "update_name_prompt"));
 });
@@ -88,7 +114,13 @@ bot.callbackQuery("update:name", async (ctx) => {
 bot.callbackQuery("update:tel", async (ctx) => {
   ctx.session.step = "waiting_for_phone";
   ctx.session.scenario = null;
+  ctx.session.returnToProfile = true;
   await ctx.answerCallbackQuery();
+  try {
+    await ctx.deleteMessage();
+  } catch (e) {
+    // ignore delete errors
+  }
   const lang = getCtxLang(ctx);
   return ctx.reply(t(lang, "update_tel_prompt"), {
     reply_markup: {
@@ -104,14 +136,24 @@ bot.callbackQuery("update:tel", async (ctx) => {
 bot.callbackQuery("update:passport", async (ctx) => {
   ctx.session.step = "waiting_for_passport";
   ctx.session.scenario = null;
+  ctx.session.returnToProfile = true;
   await ctx.answerCallbackQuery();
+  try {
+    await ctx.deleteMessage();
+  } catch (e) {
+    // ignore delete errors
+  }
   const lang = getCtxLang(ctx);
   return ctx.reply(t(lang, "update_passport_prompt"));
 });
 
 bot.callbackQuery(
-  /^admin:rental:(approve|cancel):\d+$/,
+  /^admin:rental:(approve|cancel|cancel_skip):\d+$/,
   require("./handlers/admin_rental_action")
+);
+bot.callbackQuery(
+  /^admin:(menu|list|deposit)/,
+  require("./handlers/admin_menu").handleAdminAction
 );
 
 bot.catch((err) => {

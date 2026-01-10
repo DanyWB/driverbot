@@ -1,6 +1,7 @@
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
+const {t, normalizeLang} = require("./i18n");
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -10,8 +11,16 @@ const REMINDER_TYPES = ["start_24h", "start_1h", "end_24h", "end_1h"];
 
 function buildReminderTimes(rental) {
   const times = [];
-  const startAt = rental.start_at ? dayjs(rental.start_at) : null;
-  const endAt = rental.end_at ? dayjs(rental.end_at) : null;
+  const startAt = rental.start_at
+    ? dayjs(rental.start_at)
+    : rental.start_date
+      ? dayjs.tz(rental.start_date, TZ).hour(8).minute(0).second(0)
+      : null;
+  const endAt = rental.end_at
+    ? dayjs(rental.end_at)
+    : rental.end_date
+      ? dayjs.tz(rental.end_date, TZ).hour(8).minute(0).second(0)
+      : null;
 
   if (startAt && startAt.isValid()) {
     times.push({type: "start_24h", send_at: startAt.tz(TZ).subtract(24, "hour")});
@@ -28,7 +37,7 @@ function buildReminderTimes(rental) {
 
 async function scheduleRemindersForRental(db, rentalId) {
   const rental = await db("rentals").where({id: rentalId}).first();
-  if (!rental || !rental.start_at || !rental.end_at) return;
+  if (!rental || !rental.start_date || !rental.end_date) return;
 
   await db("reminders").where({rental_id: rentalId}).del();
 
@@ -54,9 +63,11 @@ async function sendDueReminders(bot, db) {
   const due = await db("reminders")
     .join("rentals", "reminders.rental_id", "rentals.id")
     .join("users", "rentals.user_id", "users.id")
+    .leftJoin("bikes", "rentals.bike_id", "bikes.id")
     .where("reminders.sent", false)
     .andWhere("reminders.send_at", "<=", now.toDate())
     .select(
+      "rentals.id as rental_id",
       "reminders.id as reminder_id",
       "reminders.type",
       "rentals.start_date",
@@ -64,16 +75,19 @@ async function sendDueReminders(bot, db) {
       "rentals.start_at",
       "rentals.end_at",
       "rentals.status",
-      "rentals.booking_public_id",
+      "bikes.name as bike_name",
       "users.telegram_id",
       "users.lang"
     );
 
   for (const row of due) {
-    const text = buildReminderText(row);
-    if (!text) continue;
+    const payload = buildReminderPayload(row);
+    if (!payload) continue;
     try {
-      await bot.api.sendMessage(row.telegram_id, text);
+      await bot.api.sendMessage(row.telegram_id, payload.text, {
+        parse_mode: "HTML",
+        reply_markup: payload.reply_markup,
+      });
       await db("reminders").where({id: row.reminder_id}).update({sent: true});
     } catch (e) {
       // ignore send errors to avoid crash; can be logged
@@ -81,46 +95,47 @@ async function sendDueReminders(bot, db) {
   }
 }
 
-function buildReminderText(row) {
-  const lang = (row.lang || "ru").toLowerCase();
-  const start = row.start_date
-    ? dayjs(row.start_date).tz(TZ).format("DD.MM.YYYY")
-    : "-";
-  const end = row.end_date ? dayjs(row.end_date).tz(TZ).format("DD.MM.YYYY") : "-";
-  const id = row.booking_public_id || row.reminder_id;
-  const texts = {
-    ru: {
-      start_24h: `⏰ Напоминание: аренда стартует через 24 часа\nID: ${id}\n${start} - ${end}`,
-      start_1h: `⏰ Напоминание: аренда стартует через 1 час\nID: ${id}\n${start} - ${end}`,
-      end_24h: `⏰ Напоминание: аренда завершится через 24 часа\nID: ${id}\n${start} - ${end}`,
-      end_1h: `⏰ Напоминание: аренда завершится через 1 час\nID: ${id}\n${start} - ${end}`,
-    },
-    en: {
-      start_24h: `⏰ Reminder: rental starts in 24 hours\nID: ${id}\n${start} - ${end}`,
-      start_1h: `⏰ Reminder: rental starts in 1 hour\nID: ${id}\n${start} - ${end}`,
-      end_24h: `⏰ Reminder: rental ends in 24 hours\nID: ${id}\n${start} - ${end}`,
-      end_1h: `⏰ Reminder: rental ends in 1 hour\nID: ${id}\n${start} - ${end}`,
-    },
-    ua: {
-      start_24h: `⏰ Нагадування: оренда почнеться через 24 години\nID: ${id}\n${start} - ${end}`,
-      start_1h: `⏰ Нагадування: оренда почнеться через 1 годину\nID: ${id}\n${start} - ${end}`,
-      end_24h: `⏰ Нагадування: оренда завершиться через 24 години\nID: ${id}\n${start} - ${end}`,
-      end_1h: `⏰ Нагадування: оренда завершиться через 1 годину\nID: ${id}\n${start} - ${end}`,
+function formatDateValue(dateValue, withTime) {
+  if (!dateValue) return "-";
+  const fmt = withTime ? "DD.MM.YYYY HH:mm" : "DD.MM.YYYY";
+  const formatted = dayjs(dateValue).tz(TZ);
+  return formatted.isValid() ? formatted.format(fmt) : "-";
+}
+
+function buildReminderPayload(row) {
+  const lang = normalizeLang(row.lang);
+  const hasStartTime = Boolean(row.start_at);
+  const hasEndTime = Boolean(row.end_at);
+  const start = formatDateValue(row.start_at || row.start_date, hasStartTime);
+  const end = formatDateValue(row.end_at || row.end_date, hasEndTime);
+  const model = row.bike_name || "-";
+  const statusKey = `rent_status_${row.status}`;
+  const statusLabel = t(lang, statusKey) || row.status || "-";
+
+  const titleKey = `reminder_${row.type}`;
+  const title = t(lang, titleKey);
+  if (!title || title === titleKey) return null;
+
+  const text =
+    `<b>${title}</b>\n` +
+    `${t(lang, "reminder_model_label")}: ${model}\n` +
+    `${t(lang, "reminder_period_label")}: ${start} — ${end}\n` +
+    `${t(lang, "reminder_status_label")}: ${statusLabel}`;
+
+  return {
+    text,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: t(lang, "reminder_view_details_btn"),
+            callback_data: `rent:details:${row.rental_id}`,
+          },
+        ],
+        [{text: t(lang, "reminder_view_current_btn"), callback_data: "rent:current"}],
+      ],
     },
   };
-  const dict = texts[lang] || texts.ru;
-  switch (row.type) {
-    case "start_24h":
-      return dict.start_24h;
-    case "start_1h":
-      return dict.start_1h;
-    case "end_24h":
-      return dict.end_24h;
-    case "end_1h":
-      return dict.end_1h;
-    default:
-      return null;
-  }
 }
 
 module.exports = {

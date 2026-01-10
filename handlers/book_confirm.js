@@ -43,7 +43,7 @@ module.exports = async (ctx) => {
               callback_data: "conditions:accept",
             },
           ],
-          [{text: t(lang, "btn_back"), callback_data: "home"}],
+          [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
         ],
       },
     });
@@ -122,7 +122,7 @@ module.exports = async (ctx) => {
 
   await ctx.editMessageText(t(lang, "booking_confirmed"), {
     reply_markup: {
-      inline_keyboard: [[{text: t(lang, "btn_home"), callback_data: "home"}]],
+      inline_keyboard: [[{text: t(lang, "btn_main_menu"), callback_data: "home"}]],
     },
   });
 
@@ -135,13 +135,32 @@ module.exports = async (ctx) => {
       );
       return;
     }
+    const startLabel = rental.start_at
+      ? dayjs(rental.start_at).format("DD.MM.YYYY HH:mm")
+      : dayjs(rental.start_date).format("DD.MM.YYYY");
+    const endLabel = rental.end_at
+      ? dayjs(rental.end_at).format("DD.MM.YYYY HH:mm")
+      : dayjs(rental.end_date).format("DD.MM.YYYY");
+    const priceLabel = rental.total_price
+      ? `${rental.total_price} THB`
+      : t(lang, "booking_price_tbd");
+    const depositLabel = rental.deposit_required
+      ? `${rental.deposit_required} THB`
+      : "-";
+    const docsLabel = rental.docs_missing
+      ? t(lang, "admin_docs_missing")
+      : t(lang, "admin_docs_ok");
+
     const text = t(lang, "booking_admin_new", {
       user: user.name || t(lang, "user_no_name"),
       username: user.telegram_name || "-",
+      phone: user.phone || "-",
       bike: bike.name,
-      start: dayjs(rental.start_date).format("DD.MM"),
-      end: dayjs(rental.end_date).format("DD.MM"),
-      price: rental.total_price || t(lang, "booking_price_tbd"),
+      start: startLabel,
+      end: endLabel,
+      price: priceLabel,
+      deposit: depositLabel,
+      docs: docsLabel,
       comment: rental.comment || "-",
       helmets: rental.helmets_qty || 0,
       delivery: rental.delivery_required

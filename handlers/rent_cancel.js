@@ -16,7 +16,7 @@ module.exports = async (ctx) => {
   if (!rental) return ctx.reply(t(lang, "rent_current_empty"));
 
   if (action === "cancel") {
-    if (!["process", "pending", "active", "ready"].includes(rental.status)) {
+    if (!["process", "pending", "active", "ready", "approved"].includes(rental.status)) {
       return ctx.reply(t(lang, "rent_cannot_cancel"));
     }
     return ctx.reply(
@@ -43,13 +43,30 @@ module.exports = async (ctx) => {
     // notify admin if exists
     const admin = await db("users").where({is_admin: true}).first();
     if (admin) {
-      const textAdmin = `🚨 Отмена клиентом\nID: ${rental.booking_public_id || rental.id}\nПользователь: ${user.name || "-"}\nДаты: ${rental.start_date} - ${rental.end_date}`;
-      await ctx.api.sendMessage(admin.telegram_id, textAdmin);
+      const startLabel = rental.start_at
+        ? dayjs(rental.start_at).format("DD.MM.YYYY HH:mm")
+        : dayjs(rental.start_date).format("DD.MM.YYYY");
+      const endLabel = rental.end_at
+        ? dayjs(rental.end_at).format("DD.MM.YYYY HH:mm")
+        : dayjs(rental.end_date).format("DD.MM.YYYY");
+      const textAdmin = t(lang, "admin_cancel_by_client", {
+        id: rental.booking_public_id || rental.id,
+        user: user.name || "-",
+        username: user.telegram_name || "-",
+        phone: user.phone || "-",
+        start: startLabel,
+        end: endLabel,
+      });
+      await ctx.api.sendMessage(admin.telegram_id, textAdmin, {
+        parse_mode: "HTML",
+      });
     }
 
     return ctx.editMessageText(t(lang, "rent_cancelled"), {
       reply_markup: {
-        inline_keyboard: [[{text: t(lang, "btn_back"), callback_data: "home"}]],
+        inline_keyboard: [
+          [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
+        ],
       },
     });
   }

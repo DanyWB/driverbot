@@ -11,6 +11,18 @@ const {
 
 module.exports = async (ctx) => {
   const telegramId = ctx.from.id;
+  if (ctx.callbackQuery) {
+    try {
+      await ctx.answerCallbackQuery();
+    } catch (e) {
+      // ignore callback errors
+    }
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {
+      // ignore delete errors
+    }
+  }
 
   let user = await db("users").where({telegram_id: telegramId}).first();
   let isNewUser = false;
