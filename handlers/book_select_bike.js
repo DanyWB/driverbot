@@ -135,9 +135,10 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
     .where({bike_id: bikeId, season_id: seasonId, days_type: daysType})
     .first();
 
-  const totalPrice = priceRow ? priceRow.price_per_day * days : 0;
+  const pricePerDay = priceRow ? Number(priceRow.price_per_day) : null;
+  const totalPrice = priceRow ? Math.round(pricePerDay * days) : 0;
   booking.totalPrice = totalPrice;
-  booking.pricePerDay = priceRow ? priceRow.price_per_day : null;
+  booking.pricePerDay = pricePerDay;
   booking.priceUnknown = !priceRow;
 
   return showBikeSummary(ctx, bike, booking);
@@ -188,7 +189,7 @@ function showBikeSummary(ctx, bike, bookingOverride) {
             callback_data: "book:options",
           },
         ],
-        [{text: t(lang, "btn_back"), callback_data: "book:show_available_bikes"}],
+        [{text: t(lang, "btn_back"), callback_data: "book:back_to_bikes"}],
       ],
     },
   });
