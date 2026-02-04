@@ -54,6 +54,7 @@ bot.callbackQuery(
 );
 
 bot.callbackQuery(/^book:cat:\d+$/, require("./handlers/book_select_category"));
+bot.callbackQuery("book:back_to_bikes", require("./handlers/book_back_to_bikes"));
 bot.callbackQuery("book:show_available_bikes", require("./handlers/book_show_available_bikes"));
 bot.callbackQuery(/^book:select_date:\d{4}-\d{2}-\d{2}$/, require("./handlers/calendar_handler"));
 bot.callbackQuery(["book:calendar_prev", "book:calendar_next", "book:restart", "home"], require("./handlers/navigation"));
