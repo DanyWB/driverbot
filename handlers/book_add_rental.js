@@ -25,6 +25,11 @@ module.exports = async (ctx) => {
       return ctx.reply(t(lang, "not_registered"));
     }
 
+    const bike = await db("bikes").where({id: booking.selectedBikeId}).first();
+    if (!bike || bike.is_active === false) {
+      return ctx.reply(t(lang, "booking_bike_not_found"));
+    }
+
     const startAt = makeDateTime(booking.startDate, booking.startTime);
     const endAt = makeDateTime(booking.endDate, booking.endTime);
 

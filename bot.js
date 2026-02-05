@@ -156,6 +156,8 @@ bot.callbackQuery(
   /^admin:(menu|list|deposit)/,
   require("./handlers/admin_menu").handleAdminAction
 );
+bot.callbackQuery(/^admin:bikes/, require("./handlers/admin_bikes").handleAdminBikesCallback);
+bot.callbackQuery(/^admin:bike/, require("./handlers/admin_bikes").handleAdminBikesCallback);
 
 bot.catch((err) => {
   console.error("Ошибка в обработчике бота:", err);
@@ -163,6 +165,7 @@ bot.catch((err) => {
 
 // Reminders scheduler (every minute)
 const {sendDueReminders} = require("./utils/reminders");
+const {startGoogleSheetsCalendarSync} = require("./utils/googleSheetsCalendar");
 setInterval(async () => {
   try {
     await sendDueReminders(bot, require("./connect"));
@@ -170,5 +173,7 @@ setInterval(async () => {
     // ignore scheduler errors
   }
 }, 60 * 1000);
+
+startGoogleSheetsCalendarSync(require("./connect"));
 
 module.exports = bot;

@@ -32,7 +32,8 @@ module.exports = async (ctx) => {
 
   const availableBikes = await db("bikes")
     .select("id", "name", "category_id", "emoji")
-    .whereNotIn("id", busyIds);
+    .whereNotIn("id", busyIds)
+    .andWhere({is_active: true});
 
   if (availableBikes.length === 0) {
     // create lead for operator

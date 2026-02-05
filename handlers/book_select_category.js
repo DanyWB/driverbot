@@ -15,7 +15,7 @@ composer.callbackQuery(/^book:cat:(\d+)$/, async (ctx) => {
     booking.scenario === "date_first" ? "book:show_available_bikes" : "book:start";
   let bikesQuery = db("bikes")
     .select("id", "name", "emoji")
-    .where({category_id: categoryId});
+    .where({category_id: categoryId, is_active: true});
 
   if (booking.startDate && booking.endDate) {
     const {makeDateTime} = require("../utils/timeSlots");
