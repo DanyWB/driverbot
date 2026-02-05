@@ -19,6 +19,11 @@ module.exports = async (ctx) => {
 
   if (!step) return;
 
+  if (step.startsWith("admin_bike_")) {
+    const {handleAdminBikeStep} = require("./admin_bikes");
+    return handleAdminBikeStep(ctx);
+  }
+
   if (step === "awaiting_comment" && ctx.message?.text) {
     const lang = getCtxLang(ctx);
     const user = await db("users").where({telegram_id: telegramId}).first();

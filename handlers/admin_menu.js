@@ -29,6 +29,12 @@ function getAdminMenuKeyboard(lang) {
           callback_data: "admin:list:confirmed",
         },
       ],
+      [
+        {
+          text: t(lang, "admin_menu_bikes_btn"),
+          callback_data: "admin:bikes",
+        },
+      ],
     ],
   };
 }

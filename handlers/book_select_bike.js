@@ -50,7 +50,7 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
   const booking = bookingOverride || ensureBooking(ctx);
   const lang = langOverride || getCtxLang(ctx);
   const bike = await db("bikes").where({id: bikeId}).first();
-  if (!bike) {
+  if (!bike || bike.is_active === false) {
     return ctx.editMessageText(t(lang, "booking_bike_not_found"));
   }
 
@@ -135,8 +135,10 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
     .where({bike_id: bikeId, season_id: seasonId, days_type: daysType})
     .first();
 
+  const {roundTotal} = require("../utils/pricingProfiles");
   const pricePerDay = priceRow ? Number(priceRow.price_per_day) : null;
-  const totalPrice = priceRow ? Math.round(pricePerDay * days) : 0;
+  const rawTotal = priceRow ? pricePerDay * days : 0;
+  const totalPrice = priceRow ? roundTotal(rawTotal, days) : 0;
   booking.totalPrice = totalPrice;
   booking.pricePerDay = pricePerDay;
   booking.priceUnknown = !priceRow;
