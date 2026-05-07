@@ -1,7 +1,7 @@
 module.exports = {
   lang_prompt: "🌍 Оберіть мову / Choose your language / Выберите язык",
   lang_saved: "✅ Язык сохранён.",
-  lang_unsupported: "Неподдерживаемый язык(",
+  lang_unsupported: "Неподдерживаемый язык.",
   lang_save_error: "Не удалось сохранить язык. Попробуйте позже.",
 
   cmd_start: "🏠 Главное меню",
