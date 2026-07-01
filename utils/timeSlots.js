@@ -1,4 +1,10 @@
 const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TZ = process.env.BOOKING_TZ || "Asia/Bangkok";
 
 const DEFAULT_SLOTS = [
   "09:00",
@@ -22,7 +28,7 @@ function getTimeSlots() {
 function makeDateTime(dateStr, timeStr) {
   if (!dateStr || !timeStr) return null;
   const iso = `${dateStr}T${timeStr}:00`;
-  const dt = dayjs(iso);
+  const dt = dayjs.tz(iso, TZ);
   return dt.isValid() ? dt : null;
 }
 

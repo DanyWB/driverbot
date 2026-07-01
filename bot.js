@@ -31,6 +31,7 @@ bot.callbackQuery("book:start", require("./commands/book"));
 bot.callbackQuery("book:comment", require("./handlers/book_add_comment"));
 bot.callbackQuery(/^book:(date_first|bike_first)$/, require("./handlers/book_action"));
 bot.callbackQuery("book:add_rental", require("./handlers/book_add_rental"));
+bot.callbackQuery("book:draft", require("./handlers/book_draft"));
 bot.callbackQuery("book:confirm_rental", require("./handlers/book_confirm"));
 bot.callbackQuery(/^book:confirm_remove:\d+$/, require("./handlers/book_confirm_remove"));
 bot.callbackQuery("book:delete_bike", require("./handlers/book_remove_bike"));

@@ -1,8 +1,14 @@
 const db = require("../connect");
 const dayjs = require("dayjs");
 const {t, getCtxLang} = require("../utils/i18n");
+const {escapeHtml, tHtml} = require("../utils/html");
 const {sendSupportMenu} = require("./support");
 const {sendAccountMenu} = require("./account_menu");
+const {
+  CURRENT_RENTAL_STATUSES,
+  HISTORY_RENTAL_STATUSES,
+  USER_CANCELLABLE_RENTAL_STATUSES,
+} = require("../utils/rentalStatus");
 
 function getRentMenuKeyboard(lang) {
   return {
@@ -41,14 +47,7 @@ async function sendDepositInfo(ctx, langOverride) {
   const rentals = await db("rentals")
     .leftJoin("bikes", "rentals.bike_id", "bikes.id")
     .where("rentals.user_id", user.id)
-    .whereNotIn("rentals.status", [
-      "cancelled",
-      "cancelled_by_client",
-      "completed",
-      "finished",
-      "expired",
-      "returned",
-    ])
+    .whereIn("rentals.status", CURRENT_RENTAL_STATUSES)
     .select("rentals.*", "bikes.name as bike_name")
     .orderBy("rentals.created_at", "desc");
 
@@ -75,16 +74,16 @@ async function sendDepositInfo(ctx, langOverride) {
       : t(lang, "rent_deposit_status_unpaid");
     const depositValue =
       rental.deposit_required != null ? rental.deposit_required : "-";
-    text += `<b>${rental.bike_name || "-"}</b>\n`;
-    text += `ID: ${rental.booking_public_id || rental.id}\n`;
-    text += `${t(lang, "rent_details_dates", {
+    text += `<b>${escapeHtml(rental.bike_name || "-")}</b>\n`;
+    text += `ID: ${escapeHtml(rental.booking_public_id || rental.id)}\n`;
+    text += `${tHtml(lang, "rent_details_dates", {
       start: startLabel,
       end: endLabel,
     })}\n`;
-    text += `${t(lang, "rent_deposit_required_label")}: ${depositValue} THB\n`;
-    text += `${t(lang, "rent_deposit_status_label")}: ${statusLabel}\n`;
+    text += `${t(lang, "rent_deposit_required_label")}: ${escapeHtml(depositValue)} THB\n`;
+    text += `${t(lang, "rent_deposit_status_label")}: ${escapeHtml(statusLabel)}\n`;
     if (rental.deposit_note) {
-      text += `${t(lang, "rent_deposit_note_label")}: ${rental.deposit_note}\n`;
+      text += `${t(lang, "rent_deposit_note_label")}: ${escapeHtml(rental.deposit_note)}\n`;
     }
     text += "\n";
   });
@@ -129,18 +128,10 @@ async function handleRentMenuAction(ctx) {
   if (action === "rent:current") {
     const user = await db("users").where({telegram_id: ctx.from.id}).first();
     if (!user) return ctx.reply(t(lang, "not_registered"));
-    const excludedStatuses = [
-      "cancelled",
-      "cancelled_by_client",
-      "completed",
-      "finished",
-      "expired",
-      "returned",
-    ];
     const rentals = await db("rentals")
       .join("bikes", "rentals.bike_id", "bikes.id")
       .where("rentals.user_id", user.id)
-      .whereNotIn("rentals.status", excludedStatuses)
+      .whereIn("rentals.status", CURRENT_RENTAL_STATUSES)
       .select(
         "rentals.*",
         "bikes.name as bike_name",
@@ -184,18 +175,18 @@ async function handleRentMenuAction(ctx) {
 
       text += `<b>${t(lang, "rent_current_draft_title")}</b>\n`;
       if (booking.startDate && booking.endDate) {
-        text += `${t(lang, "rent_details_dates", {
+        text += `${tHtml(lang, "rent_details_dates", {
           start: startLabel,
           end: endLabel,
         })}\n`;
       }
       if (draftBike) {
-        text += `${t(lang, "rent_details_model", {
+        text += `${tHtml(lang, "rent_details_model", {
           model: draftBike.name,
         })}\n`;
       }
       if (booking.totalPrice || booking.priceUnknown) {
-        text += `${t(lang, "rent_details_price", {
+        text += `${tHtml(lang, "rent_details_price", {
           price: booking.priceUnknown
             ? t(lang, "booking_price_tbd")
             : booking.totalPrice,
@@ -231,31 +222,31 @@ async function handleRentMenuAction(ctx) {
       const endLabel = r.end_at
         ? dayjs(r.end_at).format("DD.MM.YYYY HH:mm")
         : dayjs(r.end_date).format("DD.MM.YYYY");
-      text += `🏍️ <b>${r.bike_name}</b>\n`;
-      text += `ID: ${r.booking_public_id || r.id}\n`;
-      text += `${t(lang, "rent_details_status", {status: statusLabel})}\n`;
-      text += `${t(lang, "rent_details_dates", {
+      text += `🏍️ <b>${escapeHtml(r.bike_name)}</b>\n`;
+      text += `ID: ${escapeHtml(r.booking_public_id || r.id)}\n`;
+      text += `${tHtml(lang, "rent_details_status", {status: statusLabel})}\n`;
+      text += `${tHtml(lang, "rent_details_dates", {
         start: startLabel,
         end: endLabel,
       })}\n`;
-      text += `${t(lang, "rent_details_price", {
+      text += `${tHtml(lang, "rent_details_price", {
         price: r.total_price || t(lang, "booking_price_tbd"),
       })}\n`;
       if (r.helmets_qty || r.delivery_required) {
-        text += `${t(lang, "rent_details_helmets", {helmets: r.helmets_qty || 0})}\n`;
-        text += `${t(lang, "rent_details_delivery", {
+        text += `${tHtml(lang, "rent_details_helmets", {helmets: r.helmets_qty || 0})}\n`;
+        text += `${tHtml(lang, "rent_details_delivery", {
           delivery: r.delivery_required
             ? t(lang, "booking_options_delivery_on")
             : t(lang, "booking_options_delivery_off"),
         })}\n`;
       }
       if (r.delivery_address) {
-        text += `${t(lang, "rent_details_address", {
+        text += `${tHtml(lang, "rent_details_address", {
           address: r.delivery_address,
         })}\n`;
       }
       if (r.comment) {
-        text += `${t(lang, "rent_details_notes", {notes: r.comment})}\n`;
+        text += `${tHtml(lang, "rent_details_notes", {notes: r.comment})}\n`;
       }
       text += "\n";
 
@@ -270,7 +261,7 @@ async function handleRentMenuAction(ctx) {
           text: t(lang, "rent_action_details"),
           callback_data: `rent:details:${r.id}`,
         });
-        if (["pending", "active", "ready", "approved"].includes(r.status)) {
+        if (USER_CANCELLABLE_RENTAL_STATUSES.includes(r.status)) {
           row.push({
             text: t(lang, "rent_action_cancel"),
             callback_data: `rent:cancel:${r.id}`,
@@ -290,14 +281,7 @@ async function handleRentMenuAction(ctx) {
     const rentals = await db("rentals")
       .leftJoin("bikes", "rentals.bike_id", "bikes.id")
       .where("rentals.user_id", user.id)
-      .whereIn("status", [
-        "cancelled",
-        "cancelled_by_client",
-        "completed",
-        "finished",
-        "expired",
-        "returned",
-      ])
+      .whereIn("status", HISTORY_RENTAL_STATUSES)
       .select("rentals.*", "bikes.name as bike_name")
       .orderBy("rentals.created_at", "desc");
 
@@ -322,16 +306,16 @@ async function handleRentMenuAction(ctx) {
         : r.end_date
         ? dayjs(r.end_date).format("DD.MM.YYYY")
         : "-";
-      text += `🛵 <b>${r.bike_name || "-"}</b>\n`;
-      text += `ID: ${r.booking_public_id || r.id}\n`;
-      text += `${t(lang, "rent_details_dates", {
+      text += `🛵 <b>${escapeHtml(r.bike_name || "-")}</b>\n`;
+      text += `ID: ${escapeHtml(r.booking_public_id || r.id)}\n`;
+      text += `${tHtml(lang, "rent_details_dates", {
         start: startLabel,
         end: endLabel,
       })}\n`;
-      text += `${t(lang, "rent_details_price", {
+      text += `${tHtml(lang, "rent_details_price", {
         price: r.total_price || t(lang, "booking_price_tbd"),
       })}\n`;
-      text += `${t(lang, "rent_details_status", {status: statusLabel})}\n\n`;
+      text += `${tHtml(lang, "rent_details_status", {status: statusLabel})}\n\n`;
       keyboard.push([{text: t(lang, "rent_action_details"), callback_data: `rent:details:${r.id}`}]);
     });
     keyboard.push([{text: t(lang, "btn_main_menu"), callback_data: "home"}]);

@@ -1,5 +1,6 @@
 const db = require("../connect");
 const {t, getCtxLang} = require("../utils/i18n");
+const {escapeHtml, tHtml} = require("../utils/html");
 
 function normalizeMeta(meta) {
   if (!meta) return {};
@@ -23,7 +24,7 @@ function formatAccountText(user, lang) {
   let passportValue = t(lang, "account_passport_missing");
 
   if (passportNumber) {
-    passportValue = t(lang, "account_passport_number_value", {
+    passportValue = tHtml(lang, "account_passport_number_value", {
       number: passportNumber,
     });
   } else if (hasPassportPhoto) {
@@ -32,8 +33,8 @@ function formatAccountText(user, lang) {
 
   return [
     `<b>${t(lang, "account_profile_title")}</b>`,
-    `${t(lang, "account_name_label")}: ${name}`,
-    `${t(lang, "account_phone_label")}: ${phone}`,
+    `${t(lang, "account_name_label")}: ${escapeHtml(name)}`,
+    `${t(lang, "account_phone_label")}: ${escapeHtml(phone)}`,
     `${t(lang, "account_passport_label")}: ${passportValue}`,
     "",
     t(lang, "account_profile_hint"),

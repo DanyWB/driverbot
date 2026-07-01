@@ -1,6 +1,7 @@
 const fs = require("fs");
 const dayjs = require("dayjs");
 const {google} = require("googleapis");
+const {CALENDAR_RENTAL_STATUSES} = require("./rentalStatus");
 
 const DEFAULT_DAYS_AHEAD = 90;
 const DEFAULT_SHEET_NAME = "Calendar";
@@ -106,7 +107,6 @@ function buildCalendarValues({bikes, dates, updatedAt}) {
   const updatedText = `Updated: ${updatedAt.format("YYYY-MM-DD HH:mm")}`;
 
   const legendStatuses = [
-    "process",
     "pending",
     "approved",
     "active",
@@ -351,7 +351,7 @@ async function buildStatusGrid(db, bikes, startDate, endDate) {
 
   const rentals = await db("rentals")
     .select("bike_id", "start_date", "end_date", "status")
-    .whereNotIn("status", ["cancelled", "cancelled_by_client"])
+    .whereIn("status", CALENDAR_RENTAL_STATUSES)
     .andWhere("end_date", ">=", startDate.format("YYYY-MM-DD"))
     .andWhere("start_date", "<=", endDate.format("YYYY-MM-DD"));
 

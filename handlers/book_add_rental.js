@@ -1,8 +1,6 @@
 const db = require("../connect");
 const {t, getCtxLang} = require("../utils/i18n");
-const {generateBookingId} = require("../utils/bookingId");
-const {makeDateTime} = require("../utils/timeSlots");
-const {hasOverlap} = require("../utils/overlap");
+const {createDraftRental} = require("../services/rentalService");
 
 module.exports = async (ctx) => {
   const booking = ctx.session.booking;
@@ -14,7 +12,7 @@ module.exports = async (ctx) => {
     !booking.startDate ||
     !booking.endDate ||
     !booking.selectedBikeId ||
-    !booking.totalPrice
+    (!booking.priceUnknown && booking.totalPrice == null)
   ) {
     return ctx.answerCallbackQuery(t(lang, "booking_not_enough_data"));
   }
@@ -25,55 +23,7 @@ module.exports = async (ctx) => {
       return ctx.reply(t(lang, "not_registered"));
     }
 
-    const bike = await db("bikes").where({id: booking.selectedBikeId}).first();
-    if (!bike || bike.is_active === false) {
-      return ctx.reply(t(lang, "booking_bike_not_found"));
-    }
-
-    const startAt = makeDateTime(booking.startDate, booking.startTime);
-    const endAt = makeDateTime(booking.endDate, booking.endTime);
-
-    const existingRental = await db("rentals")
-      .where({
-        user_id: user.id,
-        bike_id: booking.selectedBikeId,
-        status: "process",
-      })
-      .first();
-
-    if (!existingRental) {
-      await db.transaction(async (trx) => {
-        const overlap = await hasOverlap(
-          trx,
-          booking.selectedBikeId,
-          startAt ? startAt.toISOString() : null,
-          endAt ? endAt.toISOString() : null,
-          booking.startDate,
-          booking.endDate
-        );
-        if (overlap) {
-          throw new Error("overlap_conflict");
-        }
-
-        await trx("rentals").insert({
-          user_id: user.id,
-          bike_id: booking.selectedBikeId,
-          start_date: booking.startDate,
-          end_date: booking.endDate,
-          start_at: startAt ? startAt.toISOString() : null,
-          end_at: endAt ? endAt.toISOString() : null,
-          total_price: booking.totalPrice,
-          status: "process",
-          docs_missing: !user.passport_photo_file_id && !user.meta?.passport_number,
-          helmets_qty: booking.helmets || 0,
-          delivery_required: Boolean(booking.deliveryRequired),
-          delivery_address: booking.deliveryAddress || null,
-          comment: booking.notes || null,
-          booking_public_id: generateBookingId(),
-          deposit_required: booking.deposit || null,
-        });
-      });
-    }
+    await createDraftRental(db, {user, booking});
 
     const {buildDraftMenuPayload} = require("./booking_draft_menu");
     const payload = await buildDraftMenuPayload(ctx, {lang, user, backAction: "home"});
@@ -90,7 +40,10 @@ module.exports = async (ctx) => {
       reply_markup: payload.reply_markup,
     });
   } catch (error) {
-    if (error.message === "overlap_conflict") {
+    if (error.code === "bike_not_found") {
+      return ctx.reply(t(lang, "booking_bike_not_found"));
+    }
+    if (error.code === "overlap_conflict") {
       return ctx.reply(t(lang, "booking_bike_busy", {name: booking.selectedBikeId || ""}));
     }
     console.error("Ошибка при добавлении аренды:", error);

@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "migrate": "knex migrate:latest"
+    "migrate": "knex migrate:latest",
+    "check:data": "node scripts/check-data.js",
+    "check:rental-service": "node scripts/check-rental-service.js"
   },
   "dependencies": {
     "dayjs": "^1.11.13",

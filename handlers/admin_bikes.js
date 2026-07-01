@@ -9,6 +9,7 @@ const {
   ROUNDING_STEP,
   ROUNDING_MIN_DAYS,
 } = require("../utils/pricingProfiles");
+const {VEHICLE_TYPE, normalizeVehicleType} = require("../utils/vehicleTypes");
 
 let hasBikeIdColumnCache = null;
 
@@ -86,7 +87,8 @@ function clearAdminBikeSession(ctx) {
 
 async function renderBikeList(ctx, lang, actionPrefix) {
   const bikes = await db("bikes")
-    .select("id", "name", "is_active")
+    .select("id", "name", "is_active", "vehicle_type")
+    .orderBy("vehicle_type")
     .orderBy("category_id")
     .orderBy("name");
 
@@ -100,7 +102,7 @@ async function renderBikeList(ctx, lang, actionPrefix) {
 
   const keyboard = bikes.map((bike) => [
     {
-      text: `${bike.is_active ? "[on]" : "[off]"} ${bike.name}`,
+      text: `${bike.is_active ? "[on]" : "[off]"} [${normalizeVehicleType(bike.vehicle_type)}] ${bike.name}`,
       callback_data: `${actionPrefix}:${bike.id}`,
     },
   ]);
@@ -122,6 +124,7 @@ function buildBikeEditMenu(lang, bike) {
 
   const text =
     `${t(lang, "admin_bike_edit_title")}\n` +
+    `Type: ${normalizeVehicleType(bike.vehicle_type)}\n` +
     `${t(lang, "admin_bike_label_name")}: ${bike.name}\n` +
     `${t(lang, "admin_bike_label_status")}: ${statusLabel}`;
 
@@ -312,6 +315,9 @@ async function createBikeFromSession(ctx, lang) {
       category_id: data.category_id,
       description: data.description || null,
       emoji: data.emoji || null,
+      vehicle_type: normalizeVehicleType(data.vehicle_type || VEHICLE_TYPE.BIKE),
+      inventory_code: data.inventory_code || null,
+      sort_order: Number.isFinite(Number(data.sort_order)) ? Number(data.sort_order) : 0,
       is_active: true,
       pricing_profile: data.pricing_profile || null,
     };

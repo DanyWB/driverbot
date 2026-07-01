@@ -29,7 +29,7 @@ module.exports = async (ctx) => {
     },
   ]);
 
-  keyboard.push([{text: t(lang, "btn_back"), callback_data: "book:add_rental"}]);
+  keyboard.push([{text: t(lang, "btn_back"), callback_data: "book:draft"}]);
 
   return ctx.reply(t(lang, "booking_delete_prompt"), {
     reply_markup: {

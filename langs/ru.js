@@ -266,6 +266,7 @@ module.exports = {
   calendar_no_scenario: "Ошибка: нет активного сценария бронирования.",
 
   admin_rental_not_found: "Аренда не найдена.",
+  admin_rental_status_changed: "Заявка уже обработана или находится в другом статусе.",
   admin_status_approved: "подтверждена",
   admin_status_cancelled: "отклонена",
   admin_request_status: "Заявка #{id} {status}.",

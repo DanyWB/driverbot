@@ -3,6 +3,10 @@ const composer = new Composer();
 const db = require("../connect");
 const {t, getCtxLang} = require("../utils/i18n");
 const {DEFAULT_BIKE_EMOJI} = require("../utils/constants");
+const {
+  listActiveVehicles,
+  listAvailableVehicles,
+} = require("../services/vehicleService");
 
 composer.callbackQuery(/^book:cat:(\d+)$/, async (ctx) => {
   const categoryId = Number(ctx.match[1]);
@@ -13,30 +17,19 @@ composer.callbackQuery(/^book:cat:(\d+)$/, async (ctx) => {
   const booking = ctx.session.booking;
   const backTarget =
     booking.scenario === "date_first" ? "book:show_available_bikes" : "book:start";
-  let bikesQuery = db("bikes")
-    .select("id", "name", "emoji")
-    .where({category_id: categoryId, is_active: true});
+  let bikes;
 
   if (booking.startDate && booking.endDate) {
-    const {makeDateTime} = require("../utils/timeSlots");
-    const {applyOverlapCondition} = require("../utils/overlap");
-    const startAt = makeDateTime(booking.startDate, booking.startTime)?.toISOString();
-    const endAt = makeDateTime(booking.endDate, booking.endTime)?.toISOString();
-
-    const busyBikes = await db("rentals")
-      .select("bike_id")
-      .whereNotIn("status", ["cancelled", "cancelled_by_client"])
-      .andWhere((builder) => {
-        applyOverlapCondition(builder, startAt, endAt, booking.startDate, booking.endDate);
-      });
-
-    const busyIds = busyBikes.map((b) => b.bike_id);
-    if (busyIds.length) {
-      bikesQuery = bikesQuery.whereNotIn("id", busyIds);
-    }
+    bikes = await listAvailableVehicles(db, {
+      categoryId,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+    });
+  } else {
+    bikes = await listActiveVehicles(db, {categoryId});
   }
-
-  const bikes = await bikesQuery;
 
   if (!bikes.length) {
     return ctx.editMessageText(t(lang, "booking_no_bikes_in_category"), {
