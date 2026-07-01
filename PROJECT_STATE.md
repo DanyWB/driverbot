@@ -447,3 +447,27 @@ node -e "const db=require('./connect');(async()=>{const rows=await db('bikes').l
 - Перед релизом проверять, что нет активных байков без полного набора цен.
 - Если используется локальный боевой `BOT_TOKEN`, не запускать параллельно серверную копию бота, иначе Telegram вернёт `409 Conflict`.
 
+## Актуализация после стабилизации 2026-07-01
+
+Checkpoint-коммит: `06c273b Stabilize rental flow before admin update`.
+
+Состояние после стабилизационной пачки:
+
+- Миграции применены до `024_add_vehicle_type_to_bikes.js`.
+- Таблица `bikes` остается историческим storage-именем, но теперь имеет `vehicle_type` (`bike`/`car`), `inventory_code`, `sort_order`.
+- Добавлены DB-инварианты: уникальный `booking_public_id`, уникальные price keys, CHECK по rental statuses, CHECK по обязательным диапазонам дат/времени, CHECK по `vehicle_type`.
+- Rental route вынесен в `services/rentalService.js`.
+- Inventory abstraction добавлена в `services/vehicleService.js`.
+- Статусы централизованы в `utils/rentalStatus.js`.
+- HTML escaping централизован в `utils/html.js`.
+- Добавлены проверки `check:data`, `check:rental-service`, `check:syntax`, `check:migrations`, `check:bot-load`, `preflight`.
+- Telegram handlers бронирования теперь в основном являются адаптерами к service layer.
+
+Базовые команды перед следующей задачей:
+
+```powershell
+npm run preflight
+npm run check:data
+```
+
+`npm run preflight` допускает известный content warning по `vehicle_id=6` без цен. `npm run check:data` остается строгой релизной проверкой и падает, пока новый список техники/цен не загружен или старый байк не деактивирован.

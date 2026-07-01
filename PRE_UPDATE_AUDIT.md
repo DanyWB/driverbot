@@ -503,3 +503,22 @@ node --test
 - Документация добавлена в Git.
 - Telegram handlers больше не являются единственным местом бизнес-логики для новых admin actions.
 
+## Фактический статус после стабилизации
+
+На 2026-07-01 большая часть P0-подготовки выполнена:
+
+- `process -> pending -> approved` вынесен в `services/rentalService.js`.
+- Admin approve/cancel и user cancel делают conditional status transitions.
+- Reminders создаются на approve и удаляются при cancel.
+- Availability использует централизованные blocking statuses.
+- Date-only и timed overlap приведены к единой проверке в `utils/overlap.js`.
+- Добавлены DB constraints и индексы в миграциях `022`, `023`, `024`.
+- Добавлен `vehicle_type` для будущих машин без переименования текущих таблиц.
+- Добавлены `check:data`, `check:rental-service` и общий `npm run preflight`.
+
+Оставшиеся подготовительные решения до анализа новых задач:
+
+- Не импортировать новый список техники до понимания нужной финальной схемы.
+- Решить, нужна ли отдельная pricing snapshot-модель для новых формул цен.
+- Решить, будет ли новая web-админка использовать текущую PostgreSQL-схему напрямую или через отдельный API слой.
+- Перед релизом убрать warning по активному `vehicle_id=6` без цен через новый инвентарь/цены или деактивацию.
