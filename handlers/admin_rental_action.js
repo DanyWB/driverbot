@@ -1,7 +1,36 @@
 const db = require("../connect");
 const dayjs = require("dayjs");
 const {t, getCtxLang} = require("../utils/i18n");
-const {deleteRemindersForRental} = require("../utils/reminders");
+const {tHtml} = require("../utils/html");
+const {approveRental, cancelRentalByAdmin} = require("../services/rentalService");
+const {
+  ADMIN_CANCELLABLE_RENTAL_STATUSES,
+} = require("../utils/rentalStatus");
+
+async function safeAnswer(ctx, text, showAlert = false) {
+  if (!ctx.callbackQuery) return;
+  try {
+    if (text) {
+      await ctx.answerCallbackQuery({text, show_alert: showAlert});
+      return;
+    }
+    await ctx.answerCallbackQuery();
+  } catch (e) {
+    // ignore expired or invalid callback queries
+  }
+}
+
+async function ensureAdmin(ctx, lang) {
+  const user = await db("users").where({telegram_id: ctx.from.id}).first();
+  if (!user || !user.is_admin) {
+    await safeAnswer(ctx, t(lang, "admin_not_allowed"), true);
+    if (!ctx.callbackQuery) {
+      await ctx.reply(t(lang, "admin_not_allowed"));
+    }
+    return null;
+  }
+  return user;
+}
 
 async function notifyUserApproval(ctx, rental) {
   if (!rental.user_id) return;
@@ -17,7 +46,7 @@ async function notifyUserApproval(ctx, rental) {
   const startLabel = start ? dayjs(start).format("DD.MM.YYYY HH:mm") : "-";
   const endLabel = end ? dayjs(end).format("DD.MM.YYYY HH:mm") : "-";
   const statusLabel = t(userLang, "rent_status_approved") || "approved";
-  const text = t(userLang, "user_rental_approved", {
+  const text = tHtml(userLang, "user_rental_approved", {
     id: rental.booking_public_id || rental.id,
     start: startLabel,
     end: endLabel,
@@ -50,7 +79,7 @@ async function notifyUserDecline(ctx, rental, reason) {
     reason && reason.trim()
       ? reason.trim()
       : t(userLang, "user_decline_reason_default");
-  const text = t(userLang, "user_rental_declined", {
+  const text = tHtml(userLang, "user_rental_declined", {
     id: rental.booking_public_id || rental.id,
     reason: reasonText,
   });
@@ -68,17 +97,20 @@ async function notifyUserDecline(ctx, rental, reason) {
 
 async function finalizeDecline(ctx, rentalId, reason) {
   const lang = getCtxLang(ctx);
-  const rental = await db("rentals").where({id: rentalId}).first();
-  if (!rental) {
+  const admin = await ensureAdmin(ctx, lang);
+  if (!admin) return;
+
+  const result = await cancelRentalByAdmin(db, {rentalId});
+  if (result.status === "not_found") {
     await ctx.reply(t(lang, "admin_rental_not_found"));
     return;
   }
+  if (result.status !== "cancelled") {
+    await ctx.reply(t(lang, "admin_rental_status_changed"));
+    return;
+  }
 
-  await db("rentals")
-    .where({id: rentalId})
-    .update({status: "cancelled", updated_at: dayjs().toISOString()});
-
-  await deleteRemindersForRental(db, rentalId);
+  const rental = result.rental;
   await notifyUserDecline(ctx, rental, reason);
 
   const reasonText =
@@ -99,13 +131,20 @@ module.exports = async (ctx) => {
   const rentalId = Number(rentalIdRaw);
   const lang = getCtxLang(ctx);
 
+  const admin = await ensureAdmin(ctx, lang);
+  if (!admin) return;
+
   const rental = await db("rentals").where({id: rentalId}).first();
   if (!rental) return ctx.reply(t(lang, "admin_rental_not_found"));
 
   if (action === "cancel") {
+    await safeAnswer(ctx);
+    if (!ADMIN_CANCELLABLE_RENTAL_STATUSES.includes(rental.status)) {
+      return ctx.reply(t(lang, "admin_rental_status_changed"));
+    }
     ctx.session.step = "admin_decline_reason";
     ctx.session.adminDeclineRentalId = rentalId;
-    await ctx.editMessageReplyMarkup({inline_keyboard: []});
+    await ctx.editMessageReplyMarkup({reply_markup: {inline_keyboard: []}});
     return ctx.reply(
       t(lang, "admin_decline_prompt", {id: rental.booking_public_id || rental.id}),
       {
@@ -124,24 +163,42 @@ module.exports = async (ctx) => {
   }
 
   if (action === "cancel_skip") {
+    await safeAnswer(ctx);
     ctx.session.step = null;
     ctx.session.adminDeclineRentalId = null;
-    await ctx.editMessageReplyMarkup({inline_keyboard: []});
+    await ctx.editMessageReplyMarkup({reply_markup: {inline_keyboard: []}});
     return finalizeDecline(ctx, rentalId, "");
   }
 
   if (action === "approve") {
-    await db("rentals").where({id: rentalId}).update({status: "approved"});
+    await safeAnswer(ctx);
 
-    await ctx.editMessageReplyMarkup({inline_keyboard: []});
+    let result;
+    try {
+      result = await approveRental(db, {rentalId});
+    } catch (error) {
+      if (error.code === "overlap_conflict") {
+        return ctx.reply(t(lang, "booking_bike_busy", {name: ""}));
+      }
+      throw error;
+    }
+
+    if (result.status === "not_found") {
+      return ctx.reply(t(lang, "admin_rental_not_found"));
+    }
+    if (result.status !== "approved") {
+      return ctx.reply(t(lang, "admin_rental_status_changed"));
+    }
+
+    await ctx.editMessageReplyMarkup({reply_markup: {inline_keyboard: []}});
     await ctx.editMessageText(
       t(lang, "admin_request_status", {
-        id: rentalId,
+        id: rental.booking_public_id || rentalId,
         status: t(lang, "admin_status_approved"),
       })
     );
 
-    await notifyUserApproval(ctx, rental);
+    await notifyUserApproval(ctx, result.rental);
   }
 };
 

@@ -268,6 +268,7 @@ module.exports = {
   calendar_no_scenario: "Error: no active booking flow.",
 
   admin_rental_not_found: "Rental not found.",
+  admin_rental_status_changed: "The request has already been handled or has another status.",
   admin_status_approved: "approved",
   admin_status_cancelled: "cancelled",
   admin_request_status: "Request #{id} {status}.",

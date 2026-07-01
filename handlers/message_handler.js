@@ -44,15 +44,15 @@ module.exports = async (ctx) => {
     if (commentReturn === "rent:current") {
       buttonText = t(lang, "rent_current_back_btn");
       callbackData = "rent:current";
-    } else if (commentReturn === "book:add_rental") {
+    } else if (commentReturn === "book:draft") {
       buttonText = t(lang, "booking_add_bike_to_rental_btn");
-      callbackData = "book:add_rental";
+      callbackData = "book:draft";
     } else {
       const hasBooking = Boolean(ctx.session.booking);
       buttonText = hasBooking
         ? t(lang, "booking_add_bike_to_rental_btn")
         : t(lang, "rent_btn_current");
-      callbackData = hasBooking ? "book:add_rental" : "rent:current";
+      callbackData = hasBooking ? "book:draft" : "rent:current";
     }
 
     ctx.session.commentReturn = null;

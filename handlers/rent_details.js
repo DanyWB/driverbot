@@ -1,6 +1,8 @@
 const db = require("../connect");
 const dayjs = require("dayjs");
 const {t, getCtxLang} = require("../utils/i18n");
+const {escapeHtml, tHtml} = require("../utils/html");
+const {USER_CANCELLABLE_RENTAL_STATUSES} = require("../utils/rentalStatus");
 
 module.exports = async (ctx) => {
   const data = ctx.callbackQuery?.data || "";
@@ -55,43 +57,43 @@ module.exports = async (ctx) => {
 
   const text = [
     `<b>${t(lang, "rent_details_title")}</b>`,
-    `ID: ${rental.booking_public_id || rental.id}`,
-    `${t(lang, "rent_details_status", {status: statusLabel})}`,
-    `${t(lang, "rent_details_dates", {
+    `ID: ${escapeHtml(rental.booking_public_id || rental.id)}`,
+    `${tHtml(lang, "rent_details_status", {status: statusLabel})}`,
+    `${tHtml(lang, "rent_details_dates", {
       start: startLabel,
       end: endLabel,
     })}`,
-    `${t(lang, "rent_details_model", {model: rental.bike_name})}`,
+    `${tHtml(lang, "rent_details_model", {model: rental.bike_name})}`,
     rental.bike_desc
-      ? `${t(lang, "rent_details_notes", {notes: rental.bike_desc})}`
+      ? `${tHtml(lang, "rent_details_notes", {notes: rental.bike_desc})}`
       : "",
-    `${t(lang, "rent_details_helmets", {helmets: rental.helmets_qty || 0})}`,
-    `${t(lang, "rent_details_delivery", {
+    `${tHtml(lang, "rent_details_helmets", {helmets: rental.helmets_qty || 0})}`,
+    `${tHtml(lang, "rent_details_delivery", {
       delivery: rental.delivery_required
         ? t(lang, "booking_options_delivery_on")
         : t(lang, "booking_options_delivery_off"),
     })}`,
     rental.delivery_address
-      ? `${t(lang, "rent_details_address", {address: rental.delivery_address})}`
+      ? `${tHtml(lang, "rent_details_address", {address: rental.delivery_address})}`
       : "",
     rental.comment
-      ? `${t(lang, "rent_details_notes", {notes: rental.comment})}`
+      ? `${tHtml(lang, "rent_details_notes", {notes: rental.comment})}`
       : "",
-    `${t(lang, "rent_details_price", {
+    `${tHtml(lang, "rent_details_price", {
       price: rental.total_price || t(lang, "booking_price_tbd"),
     })}`,
-    `${t(lang, "rent_details_deposit", {
+    `${tHtml(lang, "rent_details_deposit", {
       deposit: rental.deposit_required || "-",
     })}`,
     rental.contract_file_id
-      ? `${t(lang, "rent_details_contract", {contract: rental.contract_file_id})}`
+      ? `${tHtml(lang, "rent_details_contract", {contract: rental.contract_file_id})}`
       : "",
   ]
     .filter(Boolean)
     .join("\n");
 
   const inline_keyboard = [];
-  if (["process", "pending", "active", "ready", "approved"].includes(rental.status)) {
+  if (USER_CANCELLABLE_RENTAL_STATUSES.includes(rental.status)) {
     inline_keyboard.push([
       {text: t(lang, "rent_action_cancel"), callback_data: `rent:cancel:${rentalId}`},
     ]);

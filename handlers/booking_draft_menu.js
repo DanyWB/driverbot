@@ -1,6 +1,7 @@
 const db = require("../connect");
 const dayjs = require("dayjs");
 const {t, getCtxLang} = require("../utils/i18n");
+const {escapeHtml, tHtml} = require("../utils/html");
 
 async function buildDraftMenuPayload(ctx, options = {}) {
   const lang = options.lang || getCtxLang(ctx);
@@ -13,7 +14,7 @@ async function buildDraftMenuPayload(ctx, options = {}) {
       ? t(lang, "btn_main_menu")
       : t(lang, "btn_back"));
   ctx.session.commentReturn =
-    backAction === "rent:current" ? "rent:current" : "book:add_rental";
+    backAction === "rent:current" ? "rent:current" : "book:draft";
 
   const user =
     options.user || (await db("users").where({telegram_id: ctx.from.id}).first());
@@ -64,7 +65,7 @@ async function buildDraftMenuPayload(ctx, options = {}) {
       ? dayjs(rental.end_at).format("DD.MM.YYYY HH:mm")
       : dayjs(rental.end_date).format("DD.MM.YYYY");
 
-    text += t(lang, "booking_item", {
+    text += tHtml(lang, "booking_item", {
       name: rental.name,
       start: startLabel,
       end: endLabel,
@@ -85,10 +86,10 @@ async function buildDraftMenuPayload(ctx, options = {}) {
           : t(lang, "booking_options_delivery_off")
       }`;
       if (rental.delivery_address) {
-        text += `; 🏠 ${rental.delivery_address}`;
+        text += `; 🏠 ${escapeHtml(rental.delivery_address)}`;
       }
       if (rental.comment) {
-        text += `\n✏️ ${rental.comment}`;
+        text += `\n✏️ ${escapeHtml(rental.comment)}`;
       }
       text += "\n\n";
     }

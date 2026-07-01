@@ -1,6 +1,9 @@
 const db = require("../connect");
 const {t, getCtxLang} = require("../utils/i18n");
+const {tHtml} = require("../utils/html");
 const dayjs = require("dayjs");
+const {USER_CANCELLABLE_RENTAL_STATUSES} = require("../utils/rentalStatus");
+const {cancelRentalByUser} = require("../services/rentalService");
 
 module.exports = async (ctx) => {
   const data = ctx.callbackQuery?.data || "";
@@ -16,7 +19,7 @@ module.exports = async (ctx) => {
   if (!rental) return ctx.reply(t(lang, "rent_current_empty"));
 
   if (action === "cancel") {
-    if (!["process", "pending", "active", "ready", "approved"].includes(rental.status)) {
+    if (!USER_CANCELLABLE_RENTAL_STATUSES.includes(rental.status)) {
       return ctx.reply(t(lang, "rent_cannot_cancel"));
     }
     return ctx.reply(
@@ -33,24 +36,24 @@ module.exports = async (ctx) => {
   }
 
   if (action === "cancel_confirm") {
-    await db("rentals")
-      .where({id: rentalId, user_id: user.id})
-      .update({status: "cancelled_by_client", updated_at: dayjs().toISOString()});
+    const result = await cancelRentalByUser(db, {rentalId, userId: user.id});
+    if (result.status !== "cancelled") {
+      return ctx.reply(t(lang, "rent_cannot_cancel"));
+    }
 
-    const {deleteRemindersForRental} = require("../utils/reminders");
-    await deleteRemindersForRental(db, rentalId);
+    const cancelledRental = result.rental;
 
     // notify admin if exists
     const admin = await db("users").where({is_admin: true}).first();
     if (admin) {
-      const startLabel = rental.start_at
-        ? dayjs(rental.start_at).format("DD.MM.YYYY HH:mm")
-        : dayjs(rental.start_date).format("DD.MM.YYYY");
-      const endLabel = rental.end_at
-        ? dayjs(rental.end_at).format("DD.MM.YYYY HH:mm")
-        : dayjs(rental.end_date).format("DD.MM.YYYY");
-      const textAdmin = t(lang, "admin_cancel_by_client", {
-        id: rental.booking_public_id || rental.id,
+      const startLabel = cancelledRental.start_at
+        ? dayjs(cancelledRental.start_at).format("DD.MM.YYYY HH:mm")
+        : dayjs(cancelledRental.start_date).format("DD.MM.YYYY");
+      const endLabel = cancelledRental.end_at
+        ? dayjs(cancelledRental.end_at).format("DD.MM.YYYY HH:mm")
+        : dayjs(cancelledRental.end_date).format("DD.MM.YYYY");
+      const textAdmin = tHtml(lang, "admin_cancel_by_client", {
+        id: cancelledRental.booking_public_id || cancelledRental.id,
         user: user.name || "-",
         username: user.telegram_name || "-",
         phone: user.phone || "-",

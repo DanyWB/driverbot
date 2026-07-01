@@ -4,6 +4,12 @@ const {generateCalendarKeyboard} = require("../utils/calendar");
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const {ensureBooking} = require("../services/bookingService");
 const {t, getCtxLang, getCalendarLabels, getWeekdays} = require("../utils/i18n");
+const {tHtml} = require("../utils/html");
+const {
+  calculateBikePricing,
+  findOverlappingRental,
+  getBookingDateTimes,
+} = require("../services/rentalService");
 
 module.exports = async (ctx) => {
   const data = ctx.callbackQuery?.data;
@@ -54,18 +60,14 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
     return ctx.editMessageText(t(lang, "booking_bike_not_found"));
   }
 
-  const {makeDateTime} = require("../utils/timeSlots");
-  const {applyOverlapCondition} = require("../utils/overlap");
-  const startAt = makeDateTime(booking.startDate, booking.startTime)?.toISOString();
-  const endAt = makeDateTime(booking.endDate, booking.endTime)?.toISOString();
-
-  const conflict = await db("rentals")
-    .where("bike_id", bikeId)
-    .whereNotIn("status", ["cancelled", "cancelled_by_client"])
-    .andWhere((qb) =>
-      applyOverlapCondition(qb, startAt, endAt, booking.startDate, booking.endDate)
-    )
-    .first();
+  const {startAtIso, endAtIso} = getBookingDateTimes(booking);
+  const conflict = await findOverlappingRental(db, {
+    bikeId,
+    startAt: startAtIso,
+    endAt: endAtIso,
+    startDate: booking.startDate,
+    endDate: booking.endDate,
+  });
 
   if (conflict) {
     booking.startDate = null;
@@ -98,50 +100,25 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
     });
   }
 
-  // Dates for pricing calculation (time is optional)
-  const start = startAt ? dayjs(startAt) : dayjs(booking.startDate);
-  const end = endAt ? dayjs(endAt) : dayjs(booking.endDate);
-
-  const month = start.month() + 1;
-  const seasons = await db("seasons").select("id", "months");
-  const matchingSeason = seasons.find((season) =>
-    season.months.includes(month)
-  );
-
-  if (!matchingSeason) {
-    return ctx.editMessageText(t(lang, "booking_season_not_found"));
+  let pricing;
+  try {
+    pricing = await calculateBikePricing(db, {
+      bikeId,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+    });
+  } catch (error) {
+    if (error.code === "season_not_found") {
+      return ctx.editMessageText(t(lang, "booking_season_not_found"));
+    }
+    throw error;
   }
 
-  const seasonId = matchingSeason.id;
-
-  const days = end.diff(start, "day") + 1;
-
-  let daysType = "1d";
-  if (start.date() === end.date() && end.diff(start, "month") === 1) {
-    daysType = "month";
-  } else if (days >= 1 && days <= 6) {
-    daysType = "1d";
-  } else if (days >= 7 && days <= 13) {
-    daysType = "7d";
-  } else if (days >= 14 && days <= 20) {
-    daysType = "14d";
-  } else if (days >= 21 && days <= 29) {
-    daysType = "21d";
-  } else {
-    daysType = "month";
-  }
-
-  const priceRow = await db("bike_prices")
-    .where({bike_id: bikeId, season_id: seasonId, days_type: daysType})
-    .first();
-
-  const {roundTotal} = require("../utils/pricingProfiles");
-  const pricePerDay = priceRow ? Number(priceRow.price_per_day) : null;
-  const rawTotal = priceRow ? pricePerDay * days : 0;
-  const totalPrice = priceRow ? roundTotal(rawTotal, days) : 0;
-  booking.totalPrice = totalPrice;
-  booking.pricePerDay = pricePerDay;
-  booking.priceUnknown = !priceRow;
+  booking.totalPrice = pricing.totalPrice;
+  booking.pricePerDay = pricing.pricePerDay;
+  booking.priceUnknown = pricing.priceUnknown;
 
   return showBikeSummary(ctx, bike, booking);
 }
@@ -162,7 +139,7 @@ function showBikeSummary(ctx, bike, bookingOverride) {
       ? dayjs(booking.endDate).diff(dayjs(booking.startDate), "day") + 1
       : 0;
 
-  const text = t(lang, "booking_bike_summary", {
+  const text = tHtml(lang, "booking_bike_summary", {
     name: bike.name,
     start: startLabel,
     end: endLabel,

@@ -1,6 +1,8 @@
 const db = require("../connect");
 const dayjs = require("dayjs");
 const {t, getCtxLang} = require("../utils/i18n");
+const {tHtml} = require("../utils/html");
+const {listAvailableVehicles} = require("../services/vehicleService");
 
 module.exports = async (ctx) => {
   const booking = ctx.session.booking;
@@ -16,24 +18,12 @@ module.exports = async (ctx) => {
   }
 
   const {startDate, endDate} = booking;
-  const {makeDateTime} = require("../utils/timeSlots");
-  const {applyOverlapCondition} = require("../utils/overlap");
-  const startAt = makeDateTime(startDate, booking.startTime)?.toISOString();
-  const endAt = makeDateTime(endDate, booking.endTime)?.toISOString();
-
-  const busyBikes = await db("rentals")
-    .select("bike_id")
-    .whereNotIn("status", ["cancelled", "cancelled_by_client"])
-    .andWhere((builder) => {
-      applyOverlapCondition(builder, startAt, endAt, startDate, endDate);
-    });
-
-  const busyIds = busyBikes.map((b) => b.bike_id);
-
-  const availableBikes = await db("bikes")
-    .select("id", "name", "category_id", "emoji")
-    .whereNotIn("id", busyIds)
-    .andWhere({is_active: true});
+  const availableBikes = await listAvailableVehicles(db, {
+    startDate,
+    endDate,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+  });
 
   if (availableBikes.length === 0) {
     // create lead for operator
@@ -53,7 +43,7 @@ module.exports = async (ctx) => {
         const admin = await db("users").where({is_admin: true}).first();
         if (admin) {
           const catName = category?.name || "-";
-          const textAdmin = t(lang, "admin_no_availability_lead", {
+          const textAdmin = tHtml(lang, "admin_no_availability_lead", {
             start: dayjs(startDate).format("DD.MM.YYYY"),
             end: dayjs(endDate).format("DD.MM.YYYY"),
             user: user.name || t(lang, "user_no_name"),

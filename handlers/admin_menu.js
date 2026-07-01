@@ -1,12 +1,8 @@
 const db = require("../connect");
 const dayjs = require("dayjs");
 const {t, getCtxLang} = require("../utils/i18n");
-
-const LIST_STATUS = {
-  active: ["pending", "approved", "active", "ready"],
-  pending: ["pending"],
-  confirmed: ["approved", "active", "ready"],
-};
+const {escapeHtml} = require("../utils/html");
+const {ADMIN_LIST_STATUSES} = require("../utils/rentalStatus");
 
 function getAdminMenuKeyboard(lang) {
   return {
@@ -93,7 +89,7 @@ async function handleAdminAction(ctx) {
   if (listMatch) {
     await safeAnswer(ctx);
     const type = listMatch[1];
-    const statuses = LIST_STATUS[type] || [];
+    const statuses = ADMIN_LIST_STATUSES[type] || [];
 
     const rentals = await db("rentals")
       .leftJoin("users", "rentals.user_id", "users.id")
@@ -126,10 +122,10 @@ async function handleAdminAction(ctx) {
       const idLabel = rental.booking_public_id || rental.id;
       const statusLabel = t(lang, `rent_status_${rental.status}`) || rental.status;
       const {startLabel, endLabel} = formatRentalDates(rental);
-      const userName = rental.user_name || t(lang, "user_no_name");
-      const username = rental.username ? `@${rental.username}` : "-";
-      const phone = rental.phone || "-";
-      const bikeName = rental.bike_name || "-";
+      const userName = escapeHtml(rental.user_name || t(lang, "user_no_name"));
+      const username = rental.username ? `@${escapeHtml(rental.username)}` : "-";
+      const phone = escapeHtml(rental.phone || "-");
+      const bikeName = escapeHtml(rental.bike_name || "-");
 
       text += `#${idLabel} • ${bikeName}\n`;
       text += `${t(lang, "admin_list_client")}: ${userName} (${username})\n`;

@@ -1,10 +1,11 @@
 const dayjs = require("dayjs");
 const isSameOrBefore = require("dayjs/plugin/isSameOrBefore");
+const {BLOCKING_RENTAL_STATUSES} = require("./rentalStatus");
 dayjs.extend(isSameOrBefore);
 async function getBusyDatesForBike(bikeId, db) {
   const rentals = await db("rentals")
     .where("bike_id", bikeId)
-    .whereNotIn("status", ["cancelled", "cancelled_by_client"]);
+    .whereIn("status", BLOCKING_RENTAL_STATUSES);
 
   const blockedDays = new Set();
 
