@@ -6,7 +6,13 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "migrate": "knex migrate:latest",
+    "check": "npm run preflight",
+    "preflight": "node scripts/preflight.js",
+    "check:syntax": "node scripts/check-syntax.js",
+    "check:migrations": "node scripts/check-migrations.js",
+    "check:bot-load": "node scripts/check-bot-load.js",
     "check:data": "node scripts/check-data.js",
+    "check:data:preflight": "node scripts/check-data.js --allow-content-warnings",
     "check:rental-service": "node scripts/check-rental-service.js"
   },
   "dependencies": {

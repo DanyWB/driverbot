@@ -254,3 +254,27 @@ GOOGLE_SHEETS_SERVICE_ACCOUNT_PATH=C:\path\to\service-account.json
 ```env
 GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 ```
+
+## Preflight перед работой
+
+Перед новой задачей или перед переносом изменений на сервер запусти:
+
+```powershell
+npm run preflight
+```
+
+Команда выполняет:
+
+- `check:syntax` - синтаксис всех JS-файлов без `node_modules`;
+- `check:migrations` - отсутствие pending migrations;
+- `check:bot-load` - smoke-check загрузки `bot.js`;
+- `check:rental-service` - rollback-интеграционный сценарий бронирования;
+- `check:data:preflight` - аудит данных с допустимыми контентными warning.
+
+Строгая проверка данных для релиза:
+
+```powershell
+npm run check:data
+```
+
+Сейчас строгий `check:data` ожидаемо падает на старом активном `vehicle_id=6` без матрицы цен. Это не исправляем до нового списка техники; в `npm run preflight` этот пункт считается warning, а не blocker.

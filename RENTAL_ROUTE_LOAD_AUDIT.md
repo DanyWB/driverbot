@@ -569,3 +569,25 @@ Web-админка должна вызывать те же service functions.
 
 После этого уже безопаснее начинать вынос админки и переработку pricing.
 
+## Статус выполнения после стабилизации
+
+Выполнено:
+
+- `rentalStatus.js` добавлен.
+- `book_confirm` переведен на `process -> pending`.
+- `admin_rental_action` защищен admin-check и status-check.
+- `book_add_rental` стал транзакционным и идемпотентным через advisory lock.
+- `book:draft` добавлен как отдельный callback для возврата к черновику.
+- HTML escaping добавлен в route аренды.
+- `rentalService` закрывает create draft, confirm, approve, admin/user cancel.
+- `vehicleService` закрывает availability и pricing lookup поверх текущих `bikes/bike_prices`.
+- `check:rental-service` прогоняет rollback-сценарий: duplicate add, confirm, approve, overlap, user cancel, admin cancel, reminders cleanup.
+- `npm run preflight` объединяет критичные проверки.
+
+Остаточные риски:
+
+- `check:data` строго падает на старом активном `vehicle_id=6` без цен; до нового списка техники это считается допустимым content warning только в preflight.
+- Нет outbox для Telegram notifications.
+- Reminders scheduler все еще не защищен от multi-instance duplicates.
+- Options update для draft еще не вынесен в service и не пересчитывает цену при изменении времени.
+- No availability lead пока без dedupe/cooldown.

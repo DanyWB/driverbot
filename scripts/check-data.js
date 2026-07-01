@@ -7,20 +7,22 @@ const {
 const {KNOWN_VEHICLE_TYPES} = require("../utils/vehicleTypes");
 
 const REQUIRED_PRICE_ROWS_PER_BIKE = 15;
+const allowContentWarnings = process.argv.includes("--allow-content-warnings");
 
 function toNumber(value) {
   return Number(value || 0);
 }
 
-function printRows(title, rows, formatRow) {
+function printRows(title, rows, formatRow, options = {}) {
+  const severity = options.severity || "fail";
   if (!rows.length) {
     console.log(`[ok] ${title}`);
     return false;
   }
 
-  console.log(`[fail] ${title}`);
+  console.log(`[${severity}] ${title}`);
   rows.forEach((row) => console.log(`  - ${formatRow(row)}`));
-  return true;
+  return severity === "fail";
 }
 
 async function main() {
@@ -126,6 +128,7 @@ async function main() {
         prices: toNumber(row.prices),
       })),
       (row) => `vehicle_id=${row.id}, type=${row.vehicle_type}, name="${row.name}", prices=${row.prices}/${REQUIRED_PRICE_ROWS_PER_BIKE}`,
+      {severity: allowContentWarnings ? "warn" : "fail"},
     ) || hasFailures;
 
   const activeRentalsWithoutPublicId = await db("rentals")
@@ -190,6 +193,11 @@ async function main() {
   if (hasFailures) {
     console.error("Data checks failed.");
     process.exitCode = 1;
+    return;
+  }
+
+  if (allowContentWarnings && incompleteActiveBikePrices.length) {
+    console.log("Data checks passed with content warnings.");
     return;
   }
 
