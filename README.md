@@ -12,6 +12,7 @@ behavioral baseline until it is switched to the Laravel API.
 - `ARCHITECTURE.md` - approved system boundaries and technical decisions.
 - `IMPLEMENTATION_ROADMAP.md` - staged implementation plan and acceptance gates.
 - `STAGE_4_BOOKING_CORE.md` - implemented booking and availability invariants.
+- `STAGE_5_BOOKINGS_ADMIN.md` - implemented booking administration workflows and UI.
 
 ## Local infrastructure
 

@@ -7,6 +7,7 @@ use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Customers\Enums\IdentityProvider;
 use App\Models\AuditLog;
 use App\Models\Booking;
+use App\Models\BookingPriceSnapshot;
 use App\Models\BookingStatusHistory;
 use App\Models\CustomerIdentity;
 use App\Models\NotificationOutbox;
@@ -70,6 +71,7 @@ class BookingEventRecorder
         array $newValues,
         ?string $requestId = null,
     ): void {
+        $snapshot = $booking->priceSnapshots()->first();
         $audit = AuditLog::query()->create([
             ...$this->auditActor($actor),
             'subject_type' => Booking::class,
@@ -83,7 +85,23 @@ class BookingEventRecorder
         $this->enqueueCustomer($booking, 'booking.dates_changed', "booking:{$booking->public_id}:dates:{$audit->id}", [
             'old_dates' => $oldValues,
             'new_dates' => $newValues,
+            'final_total' => $snapshot instanceof BookingPriceSnapshot ? (int) $snapshot->final_total : null,
+            'currency' => $snapshot instanceof BookingPriceSnapshot ? (string) $snapshot->currency : null,
         ]);
+    }
+
+    public function recordPriceChanged(Booking $booking, BookingPriceSnapshot $snapshot): void
+    {
+        $this->enqueueCustomer(
+            $booking,
+            'booking.price_changed',
+            "booking:{$booking->public_id}:price:{$snapshot->id}",
+            [
+                'snapshot_version' => (int) $snapshot->version,
+                'final_total' => (int) $snapshot->final_total,
+                'currency' => (string) $snapshot->currency,
+            ],
+        );
     }
 
     /** @return array<string, mixed> */

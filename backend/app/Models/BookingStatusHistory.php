@@ -16,10 +16,30 @@ class BookingStatusHistory extends Model
 
     protected $table = 'booking_status_history';
 
+    /** @return array<string, mixed>|null */
+    public function contextValues(): ?array
+    {
+        $value = $this->getAttribute('context');
+
+        return is_array($value) ? $value : null;
+    }
+
     /** @return BelongsTo<Booking, $this> */
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function actorAdmin(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'actor_admin_id');
+    }
+
+    /** @return BelongsTo<Customer, $this> */
+    public function actorCustomer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'actor_customer_id');
     }
 
     /** @return array<string, string> */

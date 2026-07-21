@@ -17,11 +17,12 @@ Telegram-бота как клиентского интерфейса.
 - Будущий клиентский сайт будет использовать те же Laravel-сервисы; его разработка
   не входит в текущий релиз, но архитектурная готовность входит.
 
-Текущий статус реализации: этапы 0 и 1 roadmap закрыты. Создан Laravel 13 backend с
-Vue 3/TypeScript/Inertia, закрытой регистрацией, admin-командой, PostgreSQL, Redis,
-health endpoints, очередью, scheduler и CI-проверками. Legacy-бот механически перенесен
-в `bot/` и проходит прежний preflight. Следующий этап - новая доменная схема данных и
-базовые модели в Laravel без импорта техники и старых броней.
+Текущий статус реализации: этапы 0-5 roadmap закрыты. Созданы Laravel foundation,
+целевая доменная схема, импорт техники и цен, транзакционный booking/availability core
+и основная web-админка бронирований. Администратор уже может создать бронь без
+Telegram, проверить цену и доступность, выполнить статусные действия, изменить даты
+или финальную цену и увидеть историю. Legacy-бот пока остается на старой БД до этапа
+Bot API. Следующий этап - timeline/шахматка занятости.
 
 Открытый production risk: legacy `googleapis@133` оставляет 7 moderate findings в
 транзитивном `uuid`. High advisory старого dependency tree устранен совместимым
@@ -39,6 +40,10 @@ health endpoints, очередью, scheduler и CI-проверками. Legacy
 - `IMPLEMENTATION_ROADMAP.md` - порядок реализации, оценки этапов и acceptance gates.
 - `DEVELOPMENT_BASELINE.md` - проверенное окружение и acceptance gate этапа 0.
 - `STAGE_1_FOUNDATION.md` - фактический результат и acceptance gate этапа 1.
+- `STAGE_2_DOMAIN_SCHEMA.md` - целевая схема PostgreSQL и доменные модели.
+- `STAGE_3_PRICING_IMPORT.md` - импорт техники, тарифы и расчет цены.
+- `STAGE_4_BOOKING_CORE.md` - booking/availability invariants и конкурентность.
+- `STAGE_5_BOOKINGS_ADMIN.md` - реализованные административные сценарии бронирований.
 
 Ключевые подтвержденные решения:
 

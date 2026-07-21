@@ -17,8 +17,8 @@ class PricingService
 {
     public function quote(Vehicle $vehicle, RentalPeriod $period, bool $requireBookable = true): PriceQuote
     {
-        if ($requireBookable && (! $vehicle->is_active || ! $vehicle->is_visible_for_booking)) {
-            throw new PricingException('vehicle_hidden', 'Vehicle is not available for customer booking.', [
+        if (! $vehicle->is_active || ($requireBookable && ! $vehicle->is_visible_for_booking)) {
+            throw new PricingException('vehicle_hidden', 'Vehicle is not available for booking.', [
                 'vehicle_id' => $vehicle->id,
             ]);
         }
