@@ -47,6 +47,12 @@ class Booking extends Model
         return $this->hasMany(BookingPriceSnapshot::class)->orderByDesc('version');
     }
 
+    /** @return HasOne<BookingPriceSnapshot, $this> */
+    public function latestPriceSnapshot(): HasOne
+    {
+        return $this->hasOne(BookingPriceSnapshot::class)->ofMany('version', 'max');
+    }
+
     /** @return HasOne<VehicleOccupancy, $this> */
     public function occupancy(): HasOne
     {
@@ -57,6 +63,23 @@ class Booking extends Model
     public function statusHistory(): HasMany
     {
         return $this->hasMany(BookingStatusHistory::class)->orderBy('created_at');
+    }
+
+    /** @return HasMany<CustomerDocument, $this> */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(CustomerDocument::class);
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function createdByAdmin(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_admin_id');
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'public_id';
     }
 
     public function bookingStatus(): BookingStatus

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Pricing\Services;
 
+use App\Domain\Bookings\Services\BookingEventRecorder;
 use App\Domain\Pricing\Data\PriceQuote;
 use App\Domain\Pricing\Enums\PricingSource;
 use App\Domain\Pricing\Exceptions\PricingException;
@@ -15,6 +16,8 @@ use InvalidArgumentException;
 
 class BookingPriceSnapshotService
 {
+    public function __construct(private readonly BookingEventRecorder $bookingEvents) {}
+
     public function createAutomatic(Booking $booking, PriceQuote $quote, ?string $requestId = null): BookingPriceSnapshot
     {
         if ($booking->vehicle_id !== $quote->vehicleId) {
@@ -106,6 +109,7 @@ class BookingPriceSnapshotService
                 previous: $previous,
                 admin: $admin,
             );
+            $this->bookingEvents->recordPriceChanged($lockedBooking, $snapshot);
 
             return $snapshot;
         });

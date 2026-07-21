@@ -109,6 +109,23 @@ class PricingServiceTest extends TestCase
         $this->assertSame(300, $quote->finalTotal);
     }
 
+    public function test_inactive_vehicle_cannot_be_previewed_or_booked_by_admin(): void
+    {
+        $this->price(PricingSeasonKey::Low, PricingTier::OneDay, 300);
+        $this->vehicle->update(['is_active' => false]);
+
+        try {
+            app(PricingService::class)->quote(
+                $this->vehicle->fresh(),
+                RentalPeriod::fromStrings('2026-06-01', '2026-06-01'),
+                requireBookable: false,
+            );
+            $this->fail('An inactive vehicle was accepted for an admin quote.');
+        } catch (PricingException $exception) {
+            $this->assertSame('vehicle_hidden', $exception->errorCode);
+        }
+    }
+
     private function price(PricingSeasonKey $seasonKey, PricingTier $tier, int $packageTotal): void
     {
         $season = PricingSeason::query()->where('key', $seasonKey->value)->firstOrFail();

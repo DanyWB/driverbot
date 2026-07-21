@@ -11,6 +11,25 @@ use Illuminate\Database\QueryException;
 
 class BookingAvailabilityService
 {
+    public function isAvailable(
+        Vehicle $vehicle,
+        string $startsOn,
+        string $endsOn,
+        ?int $excludeBookingId = null,
+    ): bool {
+        try {
+            $this->assertAvailable($vehicle, $startsOn, $endsOn, $excludeBookingId);
+
+            return true;
+        } catch (BookingException $exception) {
+            if ($exception->errorCode === 'vehicle_unavailable') {
+                return false;
+            }
+
+            throw $exception;
+        }
+    }
+
     public function lockVehicle(int $vehicleId): Vehicle
     {
         $vehicle = Vehicle::query()->lockForUpdate()->find($vehicleId);
