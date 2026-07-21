@@ -11,6 +11,7 @@ behavioral baseline until it is switched to the Laravel API.
 - `scripts/` - shared local environment and setup commands.
 - `ARCHITECTURE.md` - approved system boundaries and technical decisions.
 - `IMPLEMENTATION_ROADMAP.md` - staged implementation plan and acceptance gates.
+- `STAGE_4_BOOKING_CORE.md` - implemented booking and availability invariants.
 
 ## Local infrastructure
 

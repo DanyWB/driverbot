@@ -14,6 +14,8 @@ class BookingStatusHistory extends Model
 {
     public $timestamps = false;
 
+    protected $table = 'booking_status_history';
+
     /** @return BelongsTo<Booking, $this> */
     public function booking(): BelongsTo
     {

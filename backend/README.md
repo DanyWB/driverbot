@@ -97,3 +97,18 @@ php artisan pricing:quote click-blue-125-2019-A 2027-03-17 2027-04-15
 
 Every applied import stores its source filename, SHA-256 and summary in
 `data_import_runs`.
+
+## Booking operations
+
+Booking state changes, availability, repricing and maintenance are implemented in
+the Laravel domain services documented in `../STAGE_4_BOOKING_CORE.md`.
+
+Expire overdue pending bookings manually or inspect the scheduled task:
+
+```powershell
+php artisan bookings:expire-pending
+php artisan schedule:list
+```
+
+Set `MANAGER_TELEGRAM_USERNAME` before exposing late client cancellation through a
+customer channel.
