@@ -48,6 +48,8 @@ class CreateAdminUser extends Command
             'email' => $email,
             'email_verified_at' => now(),
             'password' => $password,
+            'role' => 'full_admin',
+            'is_active' => true,
         ])->save();
 
         $this->info("Administrator {$email} is ready.");

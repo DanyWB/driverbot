@@ -10,6 +10,6 @@ Artisan::command('inspire', function () {
 
 Schedule::command('queue:prune-failed --hours=168')
     ->dailyAt('03:00')
-    ->timezone(config('app.timezone'))
+    ->timezone(config('business.timezone'))
     ->withoutOverlapping()
     ->onOneServer();

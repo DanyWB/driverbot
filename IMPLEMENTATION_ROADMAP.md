@@ -89,6 +89,9 @@ Acceptance gate:
 
 Оценка: 8-10 часов.
 
+Статус: выполнен 2026-07-21. Фактический результат и проверки описаны в
+`STAGE_2_DOMAIN_SCHEMA.md`.
+
 Работы:
 
 - миграции `customers`, contacts и identities;
