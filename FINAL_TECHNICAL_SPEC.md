@@ -40,6 +40,11 @@ Telegram-бот остается клиентским интерфейсом. We
 Laravel Scheduler / Queue
   -> автоотмена, уведомления, напоминания
   -> Telegram Bot API
+
+Будущий клиентский сайт
+  -> Laravel public routes или /api/v1/public
+  -> те же Laravel Services
+  -> PostgreSQL
 ```
 
 ### 2.1. Почему так
@@ -51,7 +56,11 @@ Laravel сразу увеличит сроки и риск регрессий.
 
 - Node.js бот отвечает за Telegram UI и шаги диалога.
 - Laravel отвечает за бизнес-логику и данные.
-- Web-админка работает с теми же Laravel-сервисами, что и бот.
+- Web-админка на Vue 3 + TypeScript + Inertia работает с теми же Laravel-сервисами,
+  что и бот.
+- Клиент не зависит от Telegram: внешние identities и контакты привязываются к общей
+  сущности Customer.
+- Будущий сайт вызывает те же booking, availability и pricing use cases.
 
 Так не будет двух разных реализаций бронирования: одна для бота, другая для админки.
 
@@ -135,21 +144,43 @@ Laravel становится главным backend.
 - жесткие отдельные поля для всех характеристик машин.
 - автоматический импорт старых броней из Excel как боевых данных.
 
+При этом архитектурная готовность к публичному сайту входит: channel-independent
+Customer, источник `website`, reusable use cases, публично пригодный каталог и
+зарезервированный versioned API.
+
 ## 6. Сущности и данные
 
-### 6.1. Users / Clients
+### 6.1. Customers / Contacts / Identities
 
-Клиент:
+Клиент не должен определяться через Telegram ID.
+
+`customers`:
 
 - ID;
-- Telegram ID;
-- Telegram username;
 - имя;
-- телефон;
 - язык;
-- документы, если загружены;
+- внутренняя заметка;
 - дата создания;
 - дата обновления.
+
+`customer_contacts`:
+
+- customer_id;
+- type: `phone`, `email`, `whatsapp`, `telegram_username`;
+- value и normalized_value;
+- is_primary;
+- verified_at, если применимо.
+
+`customer_identities`:
+
+- customer_id;
+- provider: `telegram`, `web`;
+- external_id;
+- metadata;
+- уникальная пара provider/external_id.
+
+Такая схема позволяет одному клиенту бронировать через Telegram, администратора и
+будущий сайт без создания трех несвязанных профилей.
 
 Админ:
 
@@ -165,8 +196,8 @@ Laravel становится главным backend.
 
 ### 6.2. Vehicles
 
-Доменная сущность должна называться `Vehicle`, даже если на уровне старой базы
-физическая таблица временно остается `bikes`.
+Доменная сущность и новая таблица называются `Vehicle` / `vehicles`. Старую таблицу
+`bikes` Laravel не использует после cutover.
 
 Поля:
 
@@ -241,14 +272,15 @@ Laravel становится главным backend.
 
 - ID;
 - public_id;
-- client_id;
+- customer_id;
 - vehicle_id;
 - start_date;
 - end_date;
 - start_time, если указано;
 - end_time, если нужно;
 - status;
-- source: `bot`, `admin`;
+- source: `telegram`, `admin_phone`, `admin_whatsapp`, `admin_instagram`,
+  `admin_manual`, `website`;
 - client_comment;
 - admin_note;
 - cancellation_reason;
@@ -263,8 +295,8 @@ Laravel становится главным backend.
 - expired_at;
 - no_show_at.
 
-Для совместимости со старым проектом сущность может временно мапиться на таблицу
-`rentals`, но Laravel-код должен использовать доменную терминологию `Booking`.
+Новая таблица называется `bookings`. Старая `rentals` остается только в legacy-базе
+до завершения cutover и не является частью новой доменной модели.
 
 ### 6.6. Price Snapshot
 
@@ -291,7 +323,7 @@ Laravel становится главным backend.
 
 - ID;
 - booking_id, если документ относится к конкретной брони;
-- client_id;
+- customer_id;
 - type: passport/photo/other;
 - file_path;
 - original_filename;
@@ -812,12 +844,13 @@ Excel-лист занятости.
 - admin_note;
 - created_at.
 
-Открытый вопрос: заказчик должен дать пример текущей Excel-таблицы или список
-обязательных колонок.
+Состав CSV основан на уже разобранном Excel и списке полей этого раздела. Дополнительные
+колонки можно добавить как приемочную правку без изменения архитектуры.
 
 ## 15. API между ботом и Laravel
 
-Финальный контракт можно уточнить при разработке, но граница должна быть такой.
+Контракт фиксируется в OpenAPI и версионируется. Базовый путь bot API:
+`/api/v1/bot`.
 
 ### 15.1. Auth
 
@@ -828,40 +861,43 @@ Excel-лист занятости.
 - токен хранится в `.env` бота;
 - Laravel проверяет токен на bot API routes;
 - API routes недоступны публично без токена;
-- желательно rate limit.
+- обязательны rate limit, HTTPS и возможность ротации токена.
 
 ### 15.2. Основные endpoints
 
 Vehicles:
 
 ```text
-GET /api/bot/vehicles
-GET /api/bot/vehicles/available?type=&category_id=&start_date=&end_date=
-GET /api/bot/vehicles/{id}
+GET /api/v1/bot/vehicles
+GET /api/v1/bot/vehicles/available?type=&category_id=&start_date=&end_date=
+GET /api/v1/bot/vehicles/{id}
 ```
 
 Pricing:
 
 ```text
-POST /api/bot/quotes
+POST /api/v1/bot/quotes
 ```
 
 Bookings:
 
 ```text
-POST /api/bot/bookings
-GET /api/bot/users/{telegram_id}/bookings
-GET /api/bot/bookings/{public_id}
-POST /api/bot/bookings/{public_id}/cancel
-POST /api/bot/bookings/{public_id}/documents
+POST /api/v1/bot/bookings
+GET /api/v1/bot/customers/me/bookings
+GET /api/v1/bot/bookings/{public_id}
+POST /api/v1/bot/bookings/{public_id}/cancel
+POST /api/v1/bot/bookings/{public_id}/documents
 ```
 
-Users:
+Customers:
 
 ```text
-POST /api/bot/users/sync
-PATCH /api/bot/users/{telegram_id}
+POST /api/v1/bot/customers/sync
+PATCH /api/v1/bot/customers/me
 ```
+
+Все mutation endpoints принимают `Idempotency-Key`. Повтор Telegram update или
+сетевой retry не должен создавать повторную бронь либо повторять статусный переход.
 
 ### 15.3. Поведение API
 
@@ -935,16 +971,15 @@ S3 не делаем в первом релизе, но Laravel Storage нужн
 - проверять пересечения только по блокирующим статусам;
 - исключать текущую бронь при изменении дат;
 - добавить индексы по `vehicle_id`, `status`, `start_date`, `end_date`;
-- по возможности добавить DB-level защиту от пересечений для blocking statuses.
+- добавить обязательную DB-level защиту от пересечений blocking intervals.
 
-Минимально допустимо:
+Принятое решение:
 
-- transaction + service-level availability check + индексы + тесты гонок.
-
-Лучше:
-
-- PostgreSQL exclusion constraint или advisory lock на vehicle/date operation, если
-схема и сроки позволяют.
+- единая таблица `vehicle_occupancies` для броней и maintenance;
+- transaction + `FOR UPDATE` для строки техники;
+- PostgreSQL exclusion constraint по vehicle/date range;
+- concurrency test с двумя параллельными запросами;
+- конфликт возвращается как `409 VEHICLE_UNAVAILABLE`.
 
 ## 19. Миграция с текущего проекта
 
@@ -959,16 +994,15 @@ S3 не делаем в первом релизе, но Laravel Storage нужн
 - часть admin fields;
 - `vehicle_type` в `bikes`.
 
-Рекомендуемый путь:
+Принятый путь:
 
-1. Не ломать существующую БД до финального дизайна.
-2. В Laravel завести модель `Vehicle`, которая на первом этапе может работать с
-   текущей таблицей `bikes`.
-3. Добавить недостающие поля миграциями.
-4. Добавить новые таблицы для фото, документов, audit log и price snapshot.
-5. Перевести бизнес-операции в Laravel services.
-6. Переподключить Node.js бот к Laravel API.
-7. После стабилизации решить, нужно ли физически переименовывать `bikes` в `vehicles`.
+1. Создать новую Laravel-схему миграциями с нормальными доменными именами.
+2. Не переносить старые брони и тестовые черновики как production-данные.
+3. Импортировать финальную технику и цены повторяемой command с dry-run.
+4. Проверить количество техники, полноту тарифов и контрольные расчеты.
+5. Перевести бизнес-операции Node.js-бота на Laravel API под feature flag.
+6. В момент cutover убрать у бота DB credentials и полностью запретить dual-write.
+7. Старую базу оставить read-only на согласованный период для проверки/отката.
 
 ## 20. Тестирование
 
@@ -1015,20 +1049,14 @@ S3 не делаем в первом релизе, но Laravel Storage нужн
 
 ## 22. Оценка времени
 
-С учетом AI/Codex GPT-5.5 Extra High:
+С учетом AI/Codex и уже выполненного аудита:
 
-Реалистично: 105-140 часов.
+- этапы реализации: 112-144 часа;
+- integration/review reserve: 12-20 часов;
+- реалистичный итог: 124-164 часа;
+- для договоренности с заказчиком: 130-165 часов.
 
-Для заказчика: 110-140 часов.
-
-Внутренняя цель при стабильных требованиях: 100-125 часов.
-
-Почему оценка снизилась относительно прошлого коридора:
-
-- смена техники в существующей брони отложена;
-- экспорт только CSV, без XLSX;
-- файлы локально, без S3;
-- характеристики машин текстом, без сложной нормализации.
+Детальная разбивка и acceptance gates находятся в `IMPLEMENTATION_ROADMAP.md`.
 
 Почему оценка все еще высокая:
 
@@ -1037,6 +1065,8 @@ S3 не делаем в первом релизе, но Laravel Storage нужн
 - нужно защититься от двойных броней;
 - админка заменяет Excel;
 - нужны статусы, автоотмена, no-show, документы, фото, цены и тестирование.
+- нужно подготовить модель клиента и use cases к будущему web-каналу, не разрабатывая
+  сам клиентский сайт в текущем релизе.
 
 ## 23. Открытые вопросы перед стартом разработки
 
