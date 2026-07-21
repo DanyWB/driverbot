@@ -46,7 +46,8 @@ function writeLaravelEnv(password) {
   const replacements = {
     APP_NAME: '"Drive Phangan"',
     APP_URL: "http://127.0.0.1:8000",
-    APP_TIMEZONE: "Asia/Bangkok",
+    APP_TIMEZONE: "UTC",
+    BUSINESS_TIMEZONE: "Asia/Bangkok",
     DB_CONNECTION: "pgsql",
     DB_HOST: process.env.PG_HOST || "127.0.0.1",
     DB_PORT: process.env.PG_PORT || "5432",

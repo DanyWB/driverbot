@@ -35,7 +35,8 @@ phangan/
   `drive_phangan`.
 - Credentials генерируются локально и записываются только в ignored `backend/.env`.
 - Redis используется для session, cache и queue через PHP extension `phpredis`.
-- Application timezone: `Asia/Bangkok`; системные timestamps проектируются в UTC.
+- Application timezone: `UTC`; бизнес-даты и расписания используют отдельную
+  `BUSINESS_TIMEZONE=Asia/Bangkok`.
 - Добавлены liveness `GET /health/live` и readiness `GET /health/ready` для PostgreSQL
   и Redis.
 - Middleware создает или сохраняет безопасный `X-Request-ID`, добавляет его в response
