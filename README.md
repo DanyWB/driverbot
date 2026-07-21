@@ -14,6 +14,8 @@ behavioral baseline until it is switched to the Laravel API.
 - `STAGE_4_BOOKING_CORE.md` - implemented booking and availability invariants.
 - `STAGE_5_BOOKINGS_ADMIN.md` - implemented booking administration workflows and UI.
 - `STAGE_6_TIMELINE.md` - implemented fleet availability timeline and calendar workflows.
+- `STAGE_7_CATALOG_CUSTOMERS_EXPORT.md` - implemented fleet catalog, pricing, customers,
+  private documents and CSV export.
 
 ## Local infrastructure
 
@@ -59,8 +61,13 @@ composer install
 npm install
 php artisan key:generate
 php artisan migrate
+php artisan storage:link
 npm run build
 ```
+
+Vehicle thumbnail generation requires PHP GD with WebP support. The web server must
+allow Laravel to write to `storage/app/public`, `storage/app/private` and
+`storage/framework`; only the public disk may be exposed through `public/storage`.
 
 Create or update the administrator with a hidden password prompt:
 
@@ -96,6 +103,6 @@ npm run precheck
 
 ## Current boundary
 
-The bot still writes to the legacy database during the migration stages. New business
-logic must be implemented in Laravel only. Permanent dual-write is prohibited; the
-bot will become an API client during the dedicated cutover stage.
+Stages 0-7 are complete. The bot still writes to the legacy database until stage 8.
+New business logic must be implemented in Laravel only. Permanent dual-write is
+prohibited; the bot will become an API client through the versioned Laravel Bot API.

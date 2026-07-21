@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['name', 'locale', 'internal_note'])]
 #[Hidden(['internal_note'])]
@@ -32,5 +33,17 @@ class Customer extends Model
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
+    }
+
+    /** @return HasOne<Booking, $this> */
+    public function latestBooking(): HasOne
+    {
+        return $this->hasOne(Booking::class)->latestOfMany();
+    }
+
+    /** @return HasMany<CustomerDocument, $this> */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(CustomerDocument::class);
     }
 }
