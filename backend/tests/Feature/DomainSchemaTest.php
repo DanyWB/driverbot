@@ -42,6 +42,7 @@ class DomainSchemaTest extends TestCase
             'notification_outbox',
             'service_api_clients',
             'idempotency_keys',
+            'data_import_runs',
         ];
 
         foreach ($tables as $table) {

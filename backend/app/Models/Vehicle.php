@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['external_code', 'type', 'category_id', 'name', 'inventory_code', 'year', 'description', 'characteristics_text', 'emoji', 'is_active', 'is_visible_for_booking', 'sort_order', 'pricing_profile', 'source_sheet', 'source_row', 'imported_at'])]
+#[Fillable(['external_code', 'type', 'category_id', 'name', 'inventory_code', 'year', 'description', 'characteristics_text', 'emoji', 'is_active', 'is_visible_for_booking', 'sort_order', 'pricing_profile', 'source_sheet', 'source_row', 'source_import_run_id', 'imported_at'])]
 class Vehicle extends Model
 {
     /** @use HasFactory<VehicleFactory> */

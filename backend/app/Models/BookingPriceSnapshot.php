@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Pricing\Enums\PricingSource;
 use App\Domain\Pricing\Enums\PricingTier;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -17,11 +18,17 @@ class BookingPriceSnapshot extends Model
         return $this->belongsTo(Booking::class);
     }
 
+    public function pricingSource(): PricingSource
+    {
+        return PricingSource::from((string) $this->getRawOriginal('pricing_source'));
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
             'tier_key' => PricingTier::class,
+            'pricing_source' => PricingSource::class,
             'calculated_total' => 'decimal:6',
             'breakdown' => 'array',
             'calculated_at' => 'datetime',
