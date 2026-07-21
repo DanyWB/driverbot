@@ -17,9 +17,16 @@ Telegram-бота как клиентского интерфейса.
 - Будущий клиентский сайт будет использовать те же Laravel-сервисы; его разработка
   не входит в текущий релиз, но архитектурная готовность входит.
 
-Текущий статус реализации: этап 0 roadmap закрыт. Локально проверены PHP/Composer,
-PostgreSQL и Redis, добавлен безопасный env-шаблон и сохранен legacy baseline.
-Следующий этап - создание Laravel foundation в `backend/`.
+Текущий статус реализации: этапы 0 и 1 roadmap закрыты. Создан Laravel 13 backend с
+Vue 3/TypeScript/Inertia, закрытой регистрацией, admin-командой, PostgreSQL, Redis,
+health endpoints, очередью, scheduler и CI-проверками. Legacy-бот механически перенесен
+в `bot/` и проходит прежний preflight. Следующий этап - новая доменная схема данных и
+базовые модели в Laravel без импорта техники и старых броней.
+
+Открытый production risk: legacy `googleapis@133` оставляет 7 moderate findings в
+транзитивном `uuid`. High advisory старого dependency tree устранен совместимым
+обновлением. До production cutover нужно либо проверить major-upgrade Google APIs, либо
+удалить legacy Google Sheets sync после замены Excel web-админкой.
 
 Актуальные документы по новому направлению:
 
@@ -31,6 +38,7 @@ PostgreSQL и Redis, добавлен безопасный env-шаблон и �
   надежность и готовность к будущему клиентскому сайту.
 - `IMPLEMENTATION_ROADMAP.md` - порядок реализации, оценки этапов и acceptance gates.
 - `DEVELOPMENT_BASELINE.md` - проверенное окружение и acceptance gate этапа 0.
+- `STAGE_1_FOUNDATION.md` - фактический результат и acceptance gate этапа 1.
 
 Ключевые подтвержденные решения:
 

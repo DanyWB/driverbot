@@ -1,5 +1,5 @@
 const net = require("net");
-const db = require("../connect");
+const db = require("../bot/connect");
 
 const REDIS_HOST = process.env.REDIS_HOST || "127.0.0.1";
 const REDIS_PORT = Number(process.env.REDIS_PORT || 6379);
