@@ -4,7 +4,7 @@ const DEV_CONNECTION = {
   host: process.env.PG_HOST || "127.0.0.1",
   port: Number(process.env.PG_PORT || 5432),
   user: process.env.PG_USER || "driverbot_user",
-  password: process.env.PG_PASSWORD || "1337",
+  password: process.env.PG_PASSWORD,
   database: process.env.PG_DATABASE || "driverbot",
 };
 

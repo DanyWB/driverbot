@@ -84,7 +84,7 @@ npm install
 В PowerShell из папки проекта выполни команды ниже. PostgreSQL спросит пароль пользователя `postgres`, который задавался при установке.
 
 ```powershell
-psql -U postgres -c "CREATE USER driverbot_user WITH PASSWORD '1337';"
+psql -U postgres -c "CREATE USER driverbot_user WITH PASSWORD 'CHANGE_ME_LOCAL';"
 psql -U postgres -c "CREATE DATABASE driverbot OWNER driverbot_user;"
 psql -U postgres -d driverbot -f .\bd.sql
 psql -U postgres -d driverbot -c "REASSIGN OWNED BY postgres TO driverbot_user;"
@@ -101,16 +101,22 @@ npm run migrate
 
 ## Создать `.env`
 
-В корне проекта создай файл `.env`. Пример:
+В корне проекта создай `.env` из безопасного шаблона:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Затем укажи реальные локальные credentials. Основные поля:
 
 ```env
-BOT_TOKEN=123456789:telegram_bot_token_here
+BOT_TOKEN=CHANGE_ME_TELEGRAM_BOT_TOKEN
 NODE_ENV=development
 
 PG_HOST=127.0.0.1
 PG_PORT=5432
 PG_USER=driverbot_user
-PG_PASSWORD=1337
+PG_PASSWORD=CHANGE_ME_LOCAL
 PG_DATABASE=driverbot
 
 BOOKING_TZ=Asia/Bangkok
@@ -138,6 +144,19 @@ BIKE_PRICE_ROUNDING=floor
 BIKE_PRICE_ROUNDING_STEP=100
 BIKE_PRICE_ROUNDING_MIN_DAYS=7
 ```
+
+## Проверить локальную инфраструктуру
+
+Для будущего Laravel backend и сессий бота нужен Redis. На текущем Windows/OSPanel
+окружении он запускается так:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-local-redis.ps1
+npm run check:environment
+```
+
+Первая команда безопасно переиспользует уже запущенный Redis. Вторая проверяет
+подключение текущего проекта к PostgreSQL и Redis без вывода credentials.
 
 ## Запустить бота
 
@@ -221,7 +240,7 @@ C:\Program Files\PostgreSQL\17\bin
 
 ```env
 PG_USER=driverbot_user
-PG_PASSWORD=1337
+PG_PASSWORD=CHANGE_ME_LOCAL
 ```
 
 ### `database "driverbot" does not exist`
