@@ -27,6 +27,11 @@ class PricingSeason extends Model
         return $this->hasMany(VehiclePriceTier::class);
     }
 
+    public function seasonKey(): PricingSeasonKey
+    {
+        return PricingSeasonKey::from((string) $this->getRawOriginal('key'));
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {

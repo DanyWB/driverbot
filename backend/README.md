@@ -72,3 +72,28 @@ php artisan queue:work redis --once --queue=default --tries=1 --timeout=30
 php artisan operations:queue-probe --verify=$probeId
 php artisan schedule:list
 ```
+
+## Pricing workbook
+
+The workbook is an external source file and is not committed to Git. Validate it
+without database writes:
+
+```powershell
+php -d memory_limit=1024M artisan pricing:import-workbook "C:\path\pricing.xlsx" --json
+```
+
+Apply an already reviewed file and audit the normalized catalog:
+
+```powershell
+php -d memory_limit=1024M artisan pricing:import-workbook "C:\path\pricing.xlsx" --apply
+php artisan pricing:audit
+```
+
+Run a diagnostic quote through the same service used by future booking channels:
+
+```powershell
+php artisan pricing:quote click-blue-125-2019-A 2027-03-17 2027-04-15
+```
+
+Every applied import stores its source filename, SHA-256 and summary in
+`data_import_runs`.

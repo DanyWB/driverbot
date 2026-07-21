@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['vehicle_id', 'pricing_season_id', 'tier_key', 'min_days', 'max_days', 'anchor_days', 'package_total', 'daily_rate', 'currency', 'is_active', 'source_sheet', 'source_row'])]
+#[Fillable(['vehicle_id', 'pricing_season_id', 'tier_key', 'min_days', 'max_days', 'anchor_days', 'package_total', 'daily_rate', 'currency', 'is_active', 'source_sheet', 'source_row', 'source_import_run_id'])]
 class VehiclePriceTier extends Model
 {
     /** @return BelongsTo<Vehicle, $this> */
