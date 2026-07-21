@@ -40,7 +40,7 @@ class BookingDatesController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Booking dates and price updated.']);
 
-        return to_route('bookings.show', $booking);
+        return $this->bookingShowRedirect($request, $booking);
     }
 
     private function nullable(mixed $value): ?string

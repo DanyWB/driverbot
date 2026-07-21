@@ -38,6 +38,6 @@ class BookingPriceOverrideController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Final price updated.']);
 
-        return to_route('bookings.show', $booking);
+        return $this->bookingShowRedirect($request, $booking);
     }
 }

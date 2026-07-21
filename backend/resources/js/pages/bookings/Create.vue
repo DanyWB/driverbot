@@ -38,6 +38,7 @@ const props = defineProps<{
         ends_on: string;
         vehicle_id: number | null;
     };
+    return_to: string | null;
 }>();
 
 defineOptions({
@@ -87,6 +88,7 @@ let customerRequest: AbortController | undefined;
 const selectedVehicle = computed(() =>
     props.vehicles.find((vehicle) => vehicle.id === Number(form.vehicle_id)),
 );
+const backHref = computed(() => props.return_to ?? '/bookings');
 
 watch(
     () => [form.vehicle_id, form.starts_on, form.ends_on],
@@ -237,7 +239,15 @@ function clearCustomer(): void {
 }
 
 function submit(): void {
-    form.post('/bookings', { preserveScroll: true });
+    form.post(withReturnTo('/bookings'), { preserveScroll: true });
+}
+
+function withReturnTo(path: string): string {
+    if (!props.return_to) {
+        return path;
+    }
+
+    return `${path}?${new URLSearchParams({ return_to: props.return_to })}`;
 }
 
 function domainError(key: string): string | undefined {
@@ -256,9 +266,9 @@ function domainError(key: string): string | undefined {
                 as-child
                 variant="ghost"
                 size="icon"
-                title="Back to bookings"
+                :title="return_to ? 'Back to timeline' : 'Back to bookings'"
             >
-                <Link href="/bookings"
+                <Link :href="backHref"
                     ><ArrowLeft /><span class="sr-only">Back</span></Link
                 >
             </Button>

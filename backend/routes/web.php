@@ -7,12 +7,14 @@ use App\Http\Controllers\Bookings\BookingQuoteController;
 use App\Http\Controllers\Bookings\BookingStatusController;
 use App\Http\Controllers\Bookings\CustomerLookupController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\TimelineController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('timeline', TimelineController::class)->name('timeline.index');
 
     Route::get('bookings/quote', [BookingQuoteController::class, 'create'])->name('bookings.quote');
     Route::get('bookings/customers/search', CustomerLookupController::class)->name('bookings.customers.search');

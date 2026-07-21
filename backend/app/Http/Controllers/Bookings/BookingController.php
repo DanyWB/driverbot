@@ -21,6 +21,7 @@ use App\Http\Requests\Bookings\StoreManualBookingRequest;
 use App\Models\Booking;
 use App\Models\Vehicle;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -69,7 +70,7 @@ class BookingController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         return Inertia::render('bookings/Create', [
             'vehicles' => Vehicle::query()
@@ -87,10 +88,11 @@ class BookingController extends Controller
                     'has_complete_pricing' => (int) $vehicle->getAttribute('active_price_tiers_count') === 15,
                 ]),
             'defaults' => [
-                'starts_on' => request()->string('starts_on')->toString(),
-                'ends_on' => request()->string('ends_on')->toString(),
-                'vehicle_id' => request()->integer('vehicle_id') ?: null,
+                'starts_on' => $request->string('starts_on')->toString(),
+                'ends_on' => $request->string('ends_on')->toString(),
+                'vehicle_id' => $request->integer('vehicle_id') ?: null,
             ],
+            'return_to' => $this->timelineReturnTo($request),
         ]);
     }
 
@@ -147,10 +149,10 @@ class BookingController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Booking created.']);
 
-        return to_route('bookings.show', $booking);
+        return $this->bookingShowRedirect($request, $booking);
     }
 
-    public function show(Booking $booking, AdminBookingPresenter $presenter): Response
+    public function show(Request $request, Booking $booking, AdminBookingPresenter $presenter): Response
     {
         $booking->load([
             'customer.contacts',
@@ -165,6 +167,7 @@ class BookingController extends Controller
 
         return Inertia::render('bookings/Show', [
             'booking' => $presenter->detail($booking),
+            'return_to' => $this->timelineReturnTo($request),
         ]);
     }
 
