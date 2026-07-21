@@ -1,5 +1,9 @@
 // knexfile.js
-require("dotenv").config();
+const path = require("path");
+
+require("dotenv").config({path: path.join(__dirname, ".env")});
+
+const MIGRATIONS_DIRECTORY = path.join(__dirname, "migrations");
 const DEV_CONNECTION = {
   host: process.env.PG_HOST || "127.0.0.1",
   port: Number(process.env.PG_PORT || 5432),
@@ -28,13 +32,13 @@ module.exports = {
     client: "pg",
     connection: DEV_CONNECTION,
     pool: {min: 0, max: 10},
-    migrations: {directory: "./migrations"}, // <- поменяй путь при необходимости
+    migrations: {directory: MIGRATIONS_DIRECTORY},
   },
 
   production: {
     client: "pg",
     connection: PROD_CONNECTION,
     pool: {min: 2, max: 20},
-    migrations: {directory: "./migrations"},
+    migrations: {directory: MIGRATIONS_DIRECTORY},
   },
 };

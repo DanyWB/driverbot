@@ -1,35 +1,16 @@
 {
-  "name": "bike-rent-bot",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "drive-phangan",
+  "private": true,
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "migrate": "knex migrate:latest",
-    "check": "npm run preflight",
-    "preflight": "node scripts/preflight.js",
-    "check:syntax": "node scripts/check-syntax.js",
-    "check:migrations": "node scripts/check-migrations.js",
-    "check:bot-load": "node scripts/check-bot-load.js",
+    "start": "npm --prefix bot start",
+    "dev": "npm --prefix bot run dev",
+    "migrate": "npm --prefix bot run migrate",
+    "check": "npm run precheck",
+    "precheck": "node scripts/precheck.js",
+    "preflight": "npm --prefix bot run preflight",
     "check:environment": "node scripts/check-environment.js",
-    "check:data": "node scripts/check-data.js",
-    "check:data:preflight": "node scripts/check-data.js --allow-content-warnings",
-    "check:rental-service": "node scripts/check-rental-service.js"
-  },
-  "dependencies": {
-    "dayjs": "^1.11.13",
-    "dotenv": "^16.3.1",
-    "googleapis": "^133.0.0",
-    "grammy": "^1.17.0",
-    "knex": "^2.5.1",
-    "module-alias": "^2.2.3",
-    "node-calendar": "^0.1.5",
-    "pg": "^8.11.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
-  "_moduleAliases": {
-    "@": "./src"
+    "setup:laravel-local": "node scripts/setup-laravel-local.js",
+    "backend:build": "npm --prefix backend run build",
+    "backend:check": "composer --working-dir=backend ci:check"
   }
 }
