@@ -10,6 +10,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['vehicle_id', 'booking_id', 'type', 'starts_on', 'ends_on', 'blocks_availability', 'label', 'created_by_admin_id', 'metadata'])]
 class VehicleOccupancy extends Model
 {
+    public function occupancyType(): OccupancyType
+    {
+        return OccupancyType::from((string) $this->getRawOriginal('type'));
+    }
+
     /** @return BelongsTo<Vehicle, $this> */
     public function vehicle(): BelongsTo
     {

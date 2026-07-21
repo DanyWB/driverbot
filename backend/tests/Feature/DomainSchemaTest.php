@@ -57,14 +57,14 @@ class DomainSchemaTest extends TestCase
     public function test_booking_relations_casts_and_public_id_are_usable(): void
     {
         $booking = Booking::factory()->create([
-            'status' => BookingStatus::Pending,
+            'status' => BookingStatus::Process,
             'source' => BookingSource::AdminPhone,
         ]);
 
         $this->assertNotEmpty($booking->public_id);
         $this->assertInstanceOf(Customer::class, $booking->customer);
         $this->assertInstanceOf(Vehicle::class, $booking->vehicle);
-        $this->assertSame(BookingStatus::Pending, $booking->status);
+        $this->assertSame(BookingStatus::Process, $booking->status);
         $this->assertSame(BookingSource::AdminPhone, $booking->source);
     }
 

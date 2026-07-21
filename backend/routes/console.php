@@ -13,3 +13,9 @@ Schedule::command('queue:prune-failed --hours=168')
     ->timezone(config('business.timezone'))
     ->withoutOverlapping()
     ->onOneServer();
+
+Schedule::command('bookings:expire-pending')
+    ->everyTenMinutes()
+    ->timezone(config('business.timezone'))
+    ->withoutOverlapping()
+    ->onOneServer();
