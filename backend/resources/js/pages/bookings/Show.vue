@@ -43,7 +43,10 @@ import {
 } from '@/lib/bookings';
 import type { BookingDetail, PriceQuote } from '@/types';
 
-const props = defineProps<{ booking: BookingDetail }>();
+const props = defineProps<{
+    booking: BookingDetail;
+    return_to: string | null;
+}>();
 
 defineOptions({
     layout: {
@@ -52,6 +55,7 @@ defineOptions({
 });
 
 const currentPrice = computed(() => props.booking.price_snapshots[0] ?? null);
+const backHref = computed(() => props.return_to ?? '/bookings');
 
 const actionForm = useForm({});
 const datesOpen = ref(false);
@@ -147,40 +151,63 @@ async function loadDateQuote(): Promise<void> {
 }
 
 function runAction(action: 'approve' | 'activate' | 'complete'): void {
-    actionForm.post(`/bookings/${props.booking.public_id}/${action}`, {
-        preserveScroll: true,
-    });
+    actionForm.post(
+        withReturnTo(`/bookings/${props.booking.public_id}/${action}`),
+        {
+            preserveScroll: true,
+        },
+    );
 }
 
 function updateDates(): void {
-    datesForm.patch(`/bookings/${props.booking.public_id}/dates`, {
-        preserveScroll: true,
-        onSuccess: () => (datesOpen.value = false),
-    });
+    datesForm.patch(
+        withReturnTo(`/bookings/${props.booking.public_id}/dates`),
+        {
+            preserveScroll: true,
+            onSuccess: () => (datesOpen.value = false),
+        },
+    );
 }
 
 function updatePrice(): void {
-    priceForm.post(`/bookings/${props.booking.public_id}/price-overrides`, {
-        preserveScroll: true,
-        onSuccess: () => {
-            priceOpen.value = false;
-            priceForm.reason = '';
+    priceForm.post(
+        withReturnTo(`/bookings/${props.booking.public_id}/price-overrides`),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                priceOpen.value = false;
+                priceForm.reason = '';
+            },
         },
-    });
+    );
 }
 
 function cancelBooking(): void {
-    cancelForm.post(`/bookings/${props.booking.public_id}/cancel`, {
-        preserveScroll: true,
-        onSuccess: () => (cancelOpen.value = false),
-    });
+    cancelForm.post(
+        withReturnTo(`/bookings/${props.booking.public_id}/cancel`),
+        {
+            preserveScroll: true,
+            onSuccess: () => (cancelOpen.value = false),
+        },
+    );
 }
 
 function markNoShow(): void {
-    noShowForm.post(`/bookings/${props.booking.public_id}/no-show`, {
-        preserveScroll: true,
-        onSuccess: () => (noShowOpen.value = false),
-    });
+    noShowForm.post(
+        withReturnTo(`/bookings/${props.booking.public_id}/no-show`),
+        {
+            preserveScroll: true,
+            onSuccess: () => (noShowOpen.value = false),
+        },
+    );
+}
+
+function withReturnTo(path: string): string {
+    if (!props.return_to) {
+        return path;
+    }
+
+    return `${path}?${new URLSearchParams({ return_to: props.return_to })}`;
 }
 </script>
 
@@ -197,9 +224,11 @@ function markNoShow(): void {
                         as-child
                         variant="ghost"
                         size="icon"
-                        title="Back to bookings"
+                        :title="
+                            return_to ? 'Back to timeline' : 'Back to bookings'
+                        "
                     >
-                        <Link href="/bookings"
+                        <Link :href="backHref"
                             ><ArrowLeft /><span class="sr-only"
                                 >Back</span
                             ></Link

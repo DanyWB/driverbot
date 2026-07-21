@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnlyCast;
 use App\Domain\Availability\Enums\OccupancyType;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -32,8 +33,8 @@ class VehicleOccupancy extends Model
     {
         return [
             'type' => OccupancyType::class,
-            'starts_on' => 'date',
-            'ends_on' => 'date',
+            'starts_on' => DateOnlyCast::class,
+            'ends_on' => DateOnlyCast::class,
             'blocks_availability' => 'boolean',
             'metadata' => 'array',
         ];

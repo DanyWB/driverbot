@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { CalendarDays, LayoutDashboard } from '@lucide/vue';
+import { CalendarRange, ClipboardList, LayoutDashboard } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -23,9 +23,14 @@ const mainNavItems: NavItem[] = [
         icon: LayoutDashboard,
     },
     {
+        title: 'Timeline',
+        href: '/timeline',
+        icon: CalendarRange,
+    },
+    {
         title: 'Bookings',
         href: '/bookings',
-        icon: CalendarDays,
+        icon: ClipboardList,
     },
 ];
 </script>

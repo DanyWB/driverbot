@@ -4,12 +4,49 @@ namespace App\Http\Controllers\Bookings\Concerns;
 
 use App\Domain\Bookings\Exceptions\BookingException;
 use App\Domain\Pricing\Exceptions\PricingException;
+use App\Models\Booking;
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 trait HandlesBookingFailures
 {
+    private function bookingShowRedirect(Request $request, Booking $booking): RedirectResponse
+    {
+        $parameters = ['booking' => $booking];
+        $returnTo = $this->timelineReturnTo($request);
+
+        if ($returnTo !== null) {
+            $parameters['return_to'] = $returnTo;
+        }
+
+        return to_route('bookings.show', $parameters);
+    }
+
+    private function timelineReturnTo(Request $request): ?string
+    {
+        $returnTo = $request->query('return_to');
+
+        if (! is_string($returnTo) || $returnTo === '' || strlen($returnTo) > 2000) {
+            return null;
+        }
+
+        $parts = parse_url($returnTo);
+
+        if ($parts === false
+            || ($parts['path'] ?? null) !== '/timeline'
+            || isset($parts['scheme'])
+            || isset($parts['host'])
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['fragment'])) {
+            return null;
+        }
+
+        return $returnTo;
+    }
+
     private function adminFrom(Request $request): User
     {
         $user = $request->user();

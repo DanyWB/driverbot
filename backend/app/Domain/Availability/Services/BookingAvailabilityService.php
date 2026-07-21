@@ -7,6 +7,7 @@ use App\Domain\Bookings\Exceptions\BookingException;
 use App\Models\Booking;
 use App\Models\Vehicle;
 use App\Models\VehicleOccupancy;
+use DateTimeInterface;
 use Illuminate\Database\QueryException;
 
 class BookingAvailabilityService
@@ -77,8 +78,8 @@ class BookingAvailabilityService
         return $booking->occupancy()->updateOrCreate([], [
             'vehicle_id' => $booking->vehicle_id,
             'type' => OccupancyType::Booking,
-            'starts_on' => (string) $booking->getRawOriginal('starts_on'),
-            'ends_on' => (string) $booking->getRawOriginal('ends_on'),
+            'starts_on' => $this->bookingDate($booking, 'starts_on'),
+            'ends_on' => $this->bookingDate($booking, 'ends_on'),
             'blocks_availability' => true,
             'label' => null,
             'created_by_admin_id' => $booking->created_by_admin_id,
@@ -107,5 +108,16 @@ class BookingAvailabilityService
             'starts_on' => $startsOn,
             'ends_on' => $endsOn,
         ]);
+    }
+
+    private function bookingDate(Booking $booking, string $attribute): string
+    {
+        $value = $booking->getAttribute($attribute);
+
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        return substr((string) $booking->getRawOriginal($attribute), 0, 10);
     }
 }

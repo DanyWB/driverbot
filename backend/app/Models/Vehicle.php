@@ -40,6 +40,12 @@ class Vehicle extends Model
         return $this->hasMany(Booking::class);
     }
 
+    /** @return HasMany<VehicleOccupancy, $this> */
+    public function occupancies(): HasMany
+    {
+        return $this->hasMany(VehicleOccupancy::class);
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {
