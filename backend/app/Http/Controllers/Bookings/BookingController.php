@@ -19,6 +19,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Bookings\ListBookingsRequest;
 use App\Http\Requests\Bookings\StoreManualBookingRequest;
 use App\Models\Booking;
+use App\Models\Customer;
 use App\Models\Vehicle;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -72,6 +73,10 @@ class BookingController extends Controller
 
     public function create(Request $request): Response
     {
+        $defaultCustomer = Customer::query()
+            ->with('contacts')
+            ->find($request->integer('customer_id'));
+
         return Inertia::render('bookings/Create', [
             'vehicles' => Vehicle::query()
                 ->where('is_active', true)
@@ -92,6 +97,11 @@ class BookingController extends Controller
                 'ends_on' => $request->string('ends_on')->toString(),
                 'vehicle_id' => $request->integer('vehicle_id') ?: null,
             ],
+            'default_customer' => $defaultCustomer instanceof Customer ? [
+                'id' => (int) $defaultCustomer->id,
+                'name' => (string) $defaultCustomer->name,
+                'contacts' => $defaultCustomer->contacts->pluck('value')->map(fn ($value): string => (string) $value)->values()->all(),
+            ] : null,
             'return_to' => $this->timelineReturnTo($request),
         ]);
     }

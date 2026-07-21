@@ -47,6 +47,64 @@ class AdminBookingPresenter
         ];
     }
 
+    /** @return list<string> */
+    public function csvHeaders(): array
+    {
+        return [
+            'booking_id',
+            'status',
+            'source',
+            'client_name',
+            'phone',
+            'telegram_username',
+            'vehicle_name',
+            'vehicle_type',
+            'start_date',
+            'end_date',
+            'start_time',
+            'days',
+            'calculated_total',
+            'final_total',
+            'currency',
+            'payment_note',
+            'documents_status',
+            'client_comment',
+            'admin_note',
+            'created_at',
+            'updated_at',
+        ];
+    }
+
+    /** @return list<int|string|null> */
+    public function csvRow(Booking $booking): array
+    {
+        $snapshot = $booking->latestPriceSnapshot;
+
+        return [
+            (string) $booking->public_id,
+            $booking->bookingStatus()->value,
+            (string) $booking->getRawOriginal('source'),
+            (string) $booking->customer->name,
+            $this->contact($booking, ContactType::Phone),
+            $this->contact($booking, ContactType::TelegramUsername),
+            (string) $booking->vehicle->name,
+            (string) $booking->vehicle->getRawOriginal('type'),
+            $this->date($booking, 'starts_on'),
+            $this->date($booking, 'ends_on'),
+            $this->time($booking, 'pickup_time'),
+            $this->totalDays($booking),
+            $snapshot instanceof BookingPriceSnapshot ? (string) $snapshot->calculated_total : null,
+            $snapshot instanceof BookingPriceSnapshot ? (int) $snapshot->final_total : null,
+            $snapshot instanceof BookingPriceSnapshot ? (string) $snapshot->currency : null,
+            $this->nullableString($booking->deposit_note),
+            (int) $booking->documents_count > 0 ? 'yes' : 'no',
+            $this->nullableString($booking->client_comment),
+            $this->nullableString($booking->admin_note),
+            $this->dateTime($booking->created_at),
+            $this->dateTime($booking->updated_at),
+        ];
+    }
+
     /** @return array<string, mixed> */
     public function detail(Booking $booking): array
     {
@@ -101,6 +159,7 @@ class AdminBookingPresenter
                 'id' => (int) $document->id,
                 'type' => (string) $document->type,
                 'filename' => (string) $document->original_filename,
+                'download_url' => route('documents.download', $document),
                 'created_at' => $this->dateTime($document->created_at),
             ])->values()->all(),
             'actions' => $this->actions($booking),

@@ -38,6 +38,7 @@ const props = defineProps<{
         ends_on: string;
         vehicle_id: number | null;
     };
+    default_customer: CustomerOption | null;
     return_to: string | null;
 }>();
 
@@ -51,8 +52,8 @@ defineOptions({
 });
 
 const form = useForm({
-    customer_mode: 'new',
-    customer_id: null as number | null,
+    customer_mode: props.default_customer ? 'existing' : 'new',
+    customer_id: props.default_customer?.id ?? (null as number | null),
     customer_name: '',
     phone: '',
     telegram_username: '',
@@ -77,7 +78,7 @@ const quoteLoading = ref(false);
 const manualPrice = ref(false);
 const customerSearch = ref('');
 const customerResults = ref<CustomerOption[]>([]);
-const selectedCustomer = ref<CustomerOption | null>(null);
+const selectedCustomer = ref<CustomerOption | null>(props.default_customer);
 const customerSearchError = ref('');
 const customerSearchLoading = ref(false);
 let quoteTimer: ReturnType<typeof setTimeout> | undefined;

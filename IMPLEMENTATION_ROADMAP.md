@@ -231,6 +231,9 @@ Acceptance gate:
 
 ## 10. Этап 7. Техника, фото, цены, клиенты и CSV
 
+Статус: выполнен 2026-07-21. Фактический результат и проверки описаны в
+`STAGE_7_CATALOG_CUSTOMERS_EXPORT.md`.
+
 Оценка: 11-14 часов.
 
 Работы:
@@ -424,6 +427,6 @@ UI-задачи можно частично параллелить после с
 
 ## 19. Следующее действие
 
-Начать этап 0: повторно выполнить единый preflight, устранить проблему `sys_temp_dir`
-Composer, проверить локальный PostgreSQL/Redis и создать Laravel foundation в
-`backend/` отдельным коммитом.
+Начать этап 8: зафиксировать OpenAPI-контракт `/api/v1/bot`, модель service tokens,
+idempotency и стабильные error codes, затем перевести Telegram-сценарии с прямых
+Knex-запросов на Laravel API под feature flag.

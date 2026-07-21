@@ -6,6 +6,7 @@ use App\Domain\Bookings\Enums\BookingStatus;
 use App\Models\Booking;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\LazyCollection;
 
 class AdminBookingQuery
 {
@@ -21,10 +22,7 @@ class AdminBookingQuery
 
         $this->applyFilters($query, $filters);
 
-        $sort = in_array($filters['sort'] ?? null, ['created_at', 'updated_at', 'starts_on', 'ends_on', 'status'], true)
-            ? (string) $filters['sort']
-            : 'created_at';
-        $direction = ($filters['direction'] ?? null) === 'asc' ? 'asc' : 'desc';
+        [$sort, $direction] = $this->sorting($filters);
         $perPage = in_array((int) ($filters['per_page'] ?? 25), [15, 25, 50], true)
             ? (int) $filters['per_page']
             : 25;
@@ -34,6 +32,25 @@ class AdminBookingQuery
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return LazyCollection<int, Booking>
+     */
+    public function getForExport(array $filters): LazyCollection
+    {
+        $query = Booking::query()
+            ->with(['customer.contacts', 'vehicle', 'latestPriceSnapshot'])
+            ->withCount('documents');
+
+        $this->applyFilters($query, $filters);
+        [$sort, $direction] = $this->sorting($filters);
+
+        return $query
+            ->orderBy($sort, $direction)
+            ->orderByDesc('id')
+            ->lazy(500);
     }
 
     /**
@@ -105,5 +122,18 @@ class AdminBookingQuery
         } elseif (($filters['documents'] ?? null) === 'no') {
             $query->doesntHave('documents');
         }
+    }
+
+    /** @param array<string, mixed> $filters
+     * @return array{string, 'asc'|'desc'}
+     */
+    private function sorting(array $filters): array
+    {
+        $sort = in_array($filters['sort'] ?? null, ['created_at', 'updated_at', 'starts_on', 'ends_on', 'status'], true)
+            ? (string) $filters['sort']
+            : 'created_at';
+        $direction = ($filters['direction'] ?? null) === 'asc' ? 'asc' : 'desc';
+
+        return [$sort, $direction];
     }
 }

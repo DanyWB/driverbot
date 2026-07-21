@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { CalendarRange, ClipboardList, LayoutDashboard } from '@lucide/vue';
+import {
+    Bike,
+    CalendarRange,
+    ClipboardList,
+    LayoutDashboard,
+    Users,
+} from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -31,6 +37,16 @@ const mainNavItems: NavItem[] = [
         title: 'Bookings',
         href: '/bookings',
         icon: ClipboardList,
+    },
+    {
+        title: 'Fleet',
+        href: '/vehicles',
+        icon: Bike,
+    },
+    {
+        title: 'Customers',
+        href: '/customers',
+        icon: Users,
     },
 ];
 </script>

@@ -6,12 +6,13 @@ import {
     CalendarClock,
     CheckCircle2,
     Clock3,
+    Download,
     FileText,
     Plus,
     RotateCcw,
     Search,
 } from '@lucide/vue';
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import BookingPagination from '@/components/bookings/BookingPagination.vue';
 import BookingStatusBadge from '@/components/bookings/BookingStatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -88,6 +89,11 @@ function query(): Record<string, string | number> {
     ) as Record<string, string | number>;
 }
 
+const exportHref = computed(
+    () =>
+        `/bookings/export.csv?${new URLSearchParams(query() as Record<string, string>).toString()}`,
+);
+
 function applyFilters(): void {
     router.get('/bookings', query(), {
         preserveState: true,
@@ -141,12 +147,17 @@ function sortBy(column: string): void {
                 <p class="text-sm text-muted-foreground">Rental operations</p>
                 <h1 class="text-2xl font-semibold">Bookings</h1>
             </div>
-            <Button as-child>
-                <Link href="/bookings/create">
-                    <Plus />
-                    New booking
-                </Link>
-            </Button>
+            <div class="flex flex-wrap gap-2">
+                <Button as-child variant="outline">
+                    <a :href="exportHref"><Download />Export CSV</a>
+                </Button>
+                <Button as-child>
+                    <Link href="/bookings/create">
+                        <Plus />
+                        New booking
+                    </Link>
+                </Button>
+            </div>
         </header>
 
         <section class="grid border-b sm:grid-cols-2 xl:grid-cols-4">

@@ -126,6 +126,7 @@ export type BookingDetail = BookingListItem & {
         id: number;
         type: string;
         filename: string;
+        download_url: string;
         created_at: string | null;
     }>;
     actions: Record<

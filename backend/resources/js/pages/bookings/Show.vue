@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -7,7 +7,9 @@ import {
     CalendarRange,
     Check,
     ClipboardList,
+    Download,
     FileText,
+    FilePlus2,
     Flag,
     History,
     MessageSquareText,
@@ -15,6 +17,7 @@ import {
     RefreshCw,
     Save,
     SquareCheckBig,
+    Trash2,
     UserRound,
     XCircle,
 } from '@lucide/vue';
@@ -75,6 +78,11 @@ const priceForm = useForm({
 });
 const cancelForm = useForm({ reason: '' });
 const noShowForm = useForm({ reason: '' });
+const documentInput = ref<HTMLInputElement | null>(null);
+const documentForm = useForm<{ document: File | null; type: string }>({
+    document: null,
+    type: 'passport',
+});
 
 const dateQuote = ref<PriceQuote | null>(null);
 const dateAvailable = ref<boolean | null>(null);
@@ -208,6 +216,33 @@ function withReturnTo(path: string): string {
     }
 
     return `${path}?${new URLSearchParams({ return_to: props.return_to })}`;
+}
+
+function selectDocument(event: Event): void {
+    documentForm.document =
+        (event.target as HTMLInputElement).files?.[0] ?? null;
+}
+
+function uploadDocument(): void {
+    documentForm.post(`/bookings/${props.booking.public_id}/documents`, {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            documentForm.reset();
+
+            if (documentInput.value) {
+                documentInput.value.value = '';
+            }
+        },
+    });
+}
+
+function deleteDocument(id: number): void {
+    if (!window.confirm('Delete this private document?')) {
+        return;
+    }
+
+    router.delete(`/documents/${id}`, { preserveScroll: true });
 }
 </script>
 
@@ -581,7 +616,11 @@ function withReturnTo(path: string): string {
                             Customer
                         </h2>
                     </div>
-                    <p class="font-medium">{{ booking.customer.name }}</p>
+                    <Link
+                        :href="`/customers/${booking.customer.id}`"
+                        class="font-medium hover:underline"
+                        >{{ booking.customer.name }}</Link
+                    >
                     <a
                         v-if="booking.customer.phone"
                         :href="`tel:${booking.customer.phone}`"
@@ -670,25 +709,82 @@ function withReturnTo(path: string): string {
                             Documents
                         </h2>
                     </div>
+                    <form class="space-y-3" @submit.prevent="uploadDocument">
+                        <select
+                            v-model="documentForm.type"
+                            class="admin-select w-full"
+                            aria-label="Document type"
+                        >
+                            <option value="passport">Passport</option>
+                            <option value="driver_license">
+                                Driver license
+                            </option>
+                            <option value="photo">Photo</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <Input
+                            ref="documentInput"
+                            type="file"
+                            accept="application/pdf,image/jpeg,image/png,image/webp"
+                            @change="selectDocument"
+                        />
+                        <InputError :message="documentForm.errors.document" />
+                        <Button
+                            type="submit"
+                            variant="outline"
+                            class="w-full"
+                            :disabled="
+                                !documentForm.document ||
+                                documentForm.processing
+                            "
+                            ><FilePlus2 />Upload document</Button
+                        >
+                    </form>
                     <ul
                         v-if="booking.documents.length"
-                        class="space-y-2 text-sm"
+                        class="mt-4 divide-y border-t text-sm"
                     >
                         <li
                             v-for="document in booking.documents"
                             :key="document.id"
-                            class="flex items-center justify-between gap-2"
+                            class="flex items-center justify-between gap-2 py-2"
                         >
-                            <span class="truncate">{{
-                                document.filename
-                            }}</span>
-                            <span
-                                class="shrink-0 text-muted-foreground capitalize"
-                                >{{ document.type }}</span
-                            >
+                            <span class="min-w-0">
+                                <span class="block truncate">{{
+                                    document.filename
+                                }}</span>
+                                <span
+                                    class="block text-xs text-muted-foreground capitalize"
+                                    >{{ document.type.replace('_', ' ') }}</span
+                                >
+                            </span>
+                            <span class="flex shrink-0">
+                                <Button
+                                    as-child
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    title="Download document"
+                                    ><a :href="document.download_url"
+                                        ><Download /><span class="sr-only"
+                                            >Download</span
+                                        ></a
+                                    ></Button
+                                >
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    title="Delete document"
+                                    class="text-destructive"
+                                    @click="deleteDocument(document.id)"
+                                    ><Trash2 /><span class="sr-only"
+                                        >Delete</span
+                                    ></Button
+                                >
+                            </span>
                         </li>
                     </ul>
-                    <p v-else class="text-sm text-muted-foreground">
+                    <p v-else class="mt-4 text-sm text-muted-foreground">
                         No documents.
                     </p>
                 </section>
