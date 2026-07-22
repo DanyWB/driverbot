@@ -21,6 +21,26 @@ class CustomerDocumentService
         User $admin,
         ?Booking $booking = null,
     ): CustomerDocument {
+        return $this->storeDocument($customer, $file, $type, 'admin', $admin->id, $booking);
+    }
+
+    public function storeByCustomer(
+        Customer $customer,
+        UploadedFile $file,
+        string $type,
+        ?Booking $booking = null,
+    ): CustomerDocument {
+        return $this->storeDocument($customer, $file, $type, 'customer', null, $booking);
+    }
+
+    private function storeDocument(
+        Customer $customer,
+        UploadedFile $file,
+        string $type,
+        string $uploadedBy,
+        ?int $adminId,
+        ?Booking $booking,
+    ): CustomerDocument {
         if ($booking instanceof Booking && (int) $booking->customer_id !== (int) $customer->id) {
             throw new RuntimeException('Booking does not belong to this customer.');
         }
@@ -45,8 +65,8 @@ class CustomerDocumentService
                 'original_filename' => basename($file->getClientOriginalName()),
                 'mime_type' => $file->getMimeType(),
                 'file_size' => $file->getSize(),
-                'uploaded_by' => 'admin',
-                'uploaded_by_admin_id' => $admin->id,
+                'uploaded_by' => $uploadedBy,
+                'uploaded_by_admin_id' => $adminId,
             ]);
         } catch (\Throwable $exception) {
             Storage::disk($disk)->delete($path);

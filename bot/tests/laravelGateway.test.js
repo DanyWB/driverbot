@@ -1,0 +1,56 @@
+const assert = require("node:assert/strict");
+const test = require("node:test");
+
+test("uses a fresh idempotency key for each customer sync and profile mutation", async () => {
+  const calls = [];
+  const fakeApi = {
+    async post(path, options) {
+      calls.push({method: "POST", path, options});
+      return {data: {id: 1, telegram: {id: "123"}, passport: {}, profile_complete: {}}};
+    },
+    async patch(path, options) {
+      calls.push({method: "PATCH", path, options});
+      return {data: {id: 1, telegram: {id: "123"}, passport: {}, profile_complete: {}}};
+    },
+    async get(path, options) {
+      calls.push({method: "GET", path, options});
+      return {data: []};
+    },
+  };
+  const clientModule = require("../services/botApiClient");
+  const originalFactory = clientModule.getBotApiClient;
+  clientModule.getBotApiClient = () => fakeApi;
+  delete require.cache[require.resolve("../services/laravelGateway")];
+
+  try {
+    const gateway = require("../services/laravelGateway");
+    const telegramUser = {
+      id: 123,
+      username: "driver",
+      first_name: "Test",
+      language_code: "uk-UA",
+    };
+
+    await gateway.syncTelegramUser(telegramUser);
+    await gateway.syncTelegramUser({...telegramUser, language_code: "de"});
+    await gateway.updateProfile(123, {phone: "+66000000000"});
+    await gateway.updateProfile(123, {phone: "+66000000000"});
+
+    const keys = calls.map((call) => call.options.idempotencyKey);
+    assert.equal(new Set(keys).size, keys.length);
+    assert.match(keys[0], /^telegram:123:sync:/);
+    assert.match(keys[2], /^telegram:123:profile:/);
+    assert.equal(calls[0].options.body.locale, "ua");
+    assert.equal(calls[1].options.body.locale, null);
+
+    await gateway.listBookings(123, "history", {limit: 6, offset: 12});
+    assert.deepEqual(calls.at(-1), {
+      method: "GET",
+      path: "/customers/me/bookings",
+      options: {telegramId: 123, query: {scope: "history", limit: 6, offset: 12}},
+    });
+  } finally {
+    clientModule.getBotApiClient = originalFactory;
+    delete require.cache[require.resolve("../services/laravelGateway")];
+  }
+});

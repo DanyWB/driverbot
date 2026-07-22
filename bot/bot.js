@@ -1,4 +1,5 @@
 require("dotenv").config();
+process.env.TZ = process.env.BOOKING_TZ || "Asia/Bangkok";
 const {Bot} = require("grammy");
 const fs = require("fs");
 const path = require("path");
@@ -6,17 +7,26 @@ const attachDb = require("./middlewares/attachDb");
 const sessionStorage = require("./middlewares/sessionStorage");
 const resetFlow = require("./middlewares/resetFlow");
 const {t, getCtxLang} = require("./utils/i18n");
+const {isLaravelMode, requireLaravelConfig} = require("./config/runtime");
+const {BotApiError} = require("./services/botApiClient");
+
+requireLaravelConfig();
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
-bot.use(attachDb);
-bot.use(sessionStorage);
+if (isLaravelMode()) {
+  bot.use(require("./middlewares/redisSessionStorage"));
+  bot.use(require("./middlewares/backendContext"));
+} else {
+  bot.use(attachDb);
+  bot.use(sessionStorage);
+}
 bot.use(resetFlow);
 
 const commandsPath = path.join(__dirname, "commands");
 if (fs.existsSync(commandsPath)) {
   fs.readdirSync(commandsPath).forEach((file) => {
-    if (file.endsWith(".js")) {
+    if (file.endsWith(".js") && (!isLaravelMode() || file !== "admin.js")) {
       const commandName = file.replace(".js", "");
       const handler = require(`./commands/${file}`);
       bot.command(commandName, handler);
@@ -33,7 +43,7 @@ bot.callbackQuery(/^book:(date_first|bike_first)$/, require("./handlers/book_act
 bot.callbackQuery("book:add_rental", require("./handlers/book_add_rental"));
 bot.callbackQuery("book:draft", require("./handlers/book_draft"));
 bot.callbackQuery("book:confirm_rental", require("./handlers/book_confirm"));
-bot.callbackQuery(/^book:confirm_remove:\d+$/, require("./handlers/book_confirm_remove"));
+bot.callbackQuery(/^book:confirm_remove:[0-9a-f-]+$/i, require("./handlers/book_confirm_remove"));
 bot.callbackQuery("book:delete_bike", require("./handlers/book_remove_bike"));
 bot.callbackQuery("book:reset_rental", require("./handlers/book_reset"));
 bot.callbackQuery(/^book:select_bike:\d+$/, require("./handlers/book_select_bike"));
@@ -83,9 +93,10 @@ bot.callbackQuery(
     "rent:payment",
     "rent:settings",
     "rent:support",
-    /^rent:details:\d+$/,
-    /^rent:cancel:\d+$/,
-    /^rent:cancel_confirm:\d+$/,
+    /^rent:(current|history):\d+$/,
+    /^rent:details:[0-9a-f-]+$/i,
+    /^rent:cancel:[0-9a-f-]+$/i,
+    /^rent:cancel_confirm:[0-9a-f-]+$/i,
   ],
   (ctx, next) => {
     const data = ctx.callbackQuery?.data || "";
@@ -149,32 +160,41 @@ bot.callbackQuery("update:passport", async (ctx) => {
   return ctx.reply(t(lang, "update_passport_prompt"));
 });
 
-bot.callbackQuery(
-  /^admin:rental:(approve|cancel|cancel_skip):\d+$/,
-  require("./handlers/admin_rental_action")
-);
-bot.callbackQuery(
-  /^admin:(menu|list|deposit)/,
-  require("./handlers/admin_menu").handleAdminAction
-);
-bot.callbackQuery(/^admin:bikes/, require("./handlers/admin_bikes").handleAdminBikesCallback);
-bot.callbackQuery(/^admin:bike/, require("./handlers/admin_bikes").handleAdminBikesCallback);
+if (!isLaravelMode()) {
+  bot.callbackQuery(
+    /^admin:rental:(approve|cancel|cancel_skip):\d+$/,
+    require("./handlers/admin_rental_action")
+  );
+  bot.callbackQuery(
+    /^admin:(menu|list|deposit)/,
+    require("./handlers/admin_menu").handleAdminAction
+  );
+  bot.callbackQuery(/^admin:bikes/, require("./handlers/admin_bikes").handleAdminBikesCallback);
+  bot.callbackQuery(/^admin:bike/, require("./handlers/admin_bikes").handleAdminBikesCallback);
+}
 
-bot.catch((err) => {
-  console.error("Ошибка в обработчике бота:", err);
+bot.catch(async (err) => {
+  console.error("Telegram bot handler error:", err.error || err);
+  if (err.error instanceof BotApiError && err.ctx?.from) {
+    try {
+      await err.ctx.reply(t(getCtxLang(err.ctx), "booking_service_unavailable"));
+    } catch (replyError) {
+      console.error("Could not send API failure message:", replyError);
+    }
+  }
 });
 
-// Reminders scheduler (every minute)
-const {sendDueReminders} = require("./utils/reminders");
-const {startGoogleSheetsCalendarSync} = require("./utils/googleSheetsCalendar");
-setInterval(async () => {
-  try {
-    await sendDueReminders(bot, require("./connect"));
-  } catch (e) {
-    // ignore scheduler errors
-  }
-}, 60 * 1000);
-
-startGoogleSheetsCalendarSync(require("./connect"));
+if (!isLaravelMode()) {
+  const {sendDueReminders} = require("./utils/reminders");
+  const {startGoogleSheetsCalendarSync} = require("./utils/googleSheetsCalendar");
+  setInterval(async () => {
+    try {
+      await sendDueReminders(bot, require("./connect"));
+    } catch (error) {
+      console.error("Legacy reminder scheduler error:", error);
+    }
+  }, 60 * 1000);
+  startGoogleSheetsCalendarSync(require("./connect"));
+}
 
 module.exports = bot;

@@ -3,8 +3,10 @@ const {
   updateUserName,
   updateUserPhone,
   updateUserPassportPhoto,
+  uploadUserPassportDocument,
   getUserByTelegramId,
 } = require("../services/userService");
+const {isLaravelMode} = require("../config/runtime");
 const {isValidName, isValidPhone} = require("../utils/validators");
 const {t, getCtxLang} = require("../utils/i18n");
 
@@ -153,13 +155,16 @@ async function handlePassportStep(ctx) {
   }
 
   try {
-    const {filename} = await downloadTelegramFile(
+    const file = await downloadTelegramFile(
       ctx.api,
       photo.file_id,
-      `${fromId}_passport`
+      `${fromId}_passport`,
+      {persist: !isLaravelMode()}
     );
 
-    const success = await updateUserPassportPhoto(fromId, filename);
+    const success = isLaravelMode()
+      ? await uploadUserPassportDocument(fromId, file)
+      : await updateUserPassportPhoto(fromId, file.filename);
     if (!success) {
       await ctx.reply(t(lang, "passport_save_error"));
       return true;

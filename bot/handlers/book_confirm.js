@@ -6,31 +6,57 @@ const {
   confirmDraftRentals,
   getDraftRentalsForUser,
 } = require("../services/rentalService");
+const {isLaravelMode} = require("../config/runtime");
+const {ensureBooking} = require("../services/bookingService");
+const {getUserByTelegramId} = require("../services/userService");
+const gateway = require("../services/laravelGateway");
+const sessionCart = require("../services/sessionCartService");
 
 module.exports = async (ctx) => {
   const telegramId = ctx.from.id;
   const lang = getCtxLang(ctx);
 
   try {
-    const user = await db("users").where({telegram_id: telegramId}).first();
+    const user = isLaravelMode()
+      ? await getUserByTelegramId(telegramId)
+      : await db("users").where({telegram_id: telegramId}).first();
     if (!user) {
       return ctx.reply(t(lang, "not_registered"));
     }
 
-    const admin = await db("users").where({is_admin: true}).first();
-    if (!admin) {
-      return ctx.reply(t(lang, "booking_admin_missing"));
-    }
+    const admin = isLaravelMode() ? null : await db("users").where({is_admin: true}).first();
+    if (!isLaravelMode() && !admin) return ctx.reply(t(lang, "booking_admin_missing"));
 
-    const rentals = await getDraftRentalsForUser(db, user.id);
+    const rentals = isLaravelMode()
+      ? sessionCart.getCart(ctx)
+      : await getDraftRentalsForUser(db, user.id);
 
     if (rentals.length === 0) {
       return ctx.answerCallbackQuery(t(lang, "booking_no_bookings_to_confirm"));
     }
 
-    const accepted =
-      ctx.session?.acceptTerms ||
-      rentals.some((rental) => rental.accept_terms === true);
+    if (
+      isLaravelMode() &&
+      rentals.some(
+        (rental) =>
+          rental.delivery_required && !String(rental.delivery_address || "").trim()
+      )
+    ) {
+      sessionCart.loadOptionsIntoBooking(ctx, ensureBooking(ctx));
+      ctx.session.optionsScope = "process";
+      return ctx.reply(t(lang, "booking_delivery_address_required"), {
+        reply_markup: {
+          inline_keyboard: [[{
+            text: t(lang, "booking_options_set_address"),
+            callback_data: "book:options:address",
+          }]],
+        },
+      });
+    }
+
+    const accepted = isLaravelMode()
+      ? Boolean(ctx.session?.acceptTerms && ctx.session?.acceptedTermsVersion)
+      : ctx.session?.acceptTerms || rentals.some((rental) => rental.accept_terms === true);
 
     if (!accepted) {
       return ctx.reply(t(lang, "conditions_accept_required"), {
@@ -55,7 +81,13 @@ module.exports = async (ctx) => {
       });
     }
 
-    const confirmedRentals = await confirmDraftRentals(db, {userId: user.id});
+    const confirmedRentals = isLaravelMode()
+      ? (await gateway.createBookings(
+          ctx,
+          sessionCart.toApiItems(ctx),
+          sessionCart.confirmationKey(ctx)
+        )).map((entry) => entry.booking)
+      : await confirmDraftRentals(db, {userId: user.id});
 
     if (!confirmedRentals.length) {
       return ctx.answerCallbackQuery(t(lang, "booking_no_bookings_to_confirm"));
@@ -66,6 +98,12 @@ module.exports = async (ctx) => {
         inline_keyboard: [[{text: t(lang, "btn_main_menu"), callback_data: "home"}]],
       },
     });
+
+    if (isLaravelMode()) {
+      sessionCart.clear(ctx);
+      ctx.session.booking = null;
+      return;
+    }
 
     for (const rental of confirmedRentals) {
       const bike = await db("bikes").where({id: rental.bike_id}).first();
@@ -122,7 +160,19 @@ module.exports = async (ctx) => {
       });
     }
   } catch (err) {
-    if (err.code === "overlap_conflict") {
+    if (err.code === "BOT_API_UNAVAILABLE") throw err;
+    if (err.code === "TERMS_VERSION_OUTDATED") {
+      sessionCart.clearTermsAcceptance(ctx);
+      return ctx.reply(t(lang, "conditions_version_changed"), {
+        reply_markup: {
+          inline_keyboard: [[{
+            text: t(lang, "conditions_accept_btn"),
+            callback_data: "conditions:accept_toggle",
+          }]],
+        },
+      });
+    }
+    if (["overlap_conflict", "VEHICLE_UNAVAILABLE"].includes(err.code)) {
       return ctx.reply(t(lang, "booking_bike_busy", {name: ""}));
     }
     console.error("Ошибка подтверждения бронирования:", err);

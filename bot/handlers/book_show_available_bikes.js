@@ -3,6 +3,9 @@ const dayjs = require("dayjs");
 const {t, getCtxLang} = require("../utils/i18n");
 const {tHtml} = require("../utils/html");
 const {listAvailableVehicles} = require("../services/vehicleService");
+const {isLaravelMode} = require("../config/runtime");
+const {listCategories} = require("../services/laravelGateway");
+const {vehicleEmoji} = require("../utils/vehicle");
 
 module.exports = async (ctx) => {
   const booking = ctx.session.booking;
@@ -27,7 +30,7 @@ module.exports = async (ctx) => {
 
   if (availableBikes.length === 0) {
     // create lead for operator
-    try {
+    if (!isLaravelMode()) try {
       const user = await db("users").where({telegram_id: ctx.from.id}).first();
       const category =
         booking.categoryId &&
@@ -61,7 +64,10 @@ module.exports = async (ctx) => {
       // ignore lead errors
     }
 
-    return ctx.editMessageText(t(lang, "booking_no_availability_lead"), {
+    const messageKey = isLaravelMode()
+      ? "booking_no_available_bikes"
+      : "booking_no_availability_lead";
+    return ctx.editMessageText(t(lang, messageKey), {
       reply_markup: {
         inline_keyboard: [
           [{text: t(lang, "btn_back"), callback_data: "book:restart"}],
@@ -76,10 +82,12 @@ module.exports = async (ctx) => {
     const categoryIds = [
       ...new Set(availableBikes.map((bike) => bike.category_id).filter(Boolean)),
     ];
-    const categories = await db("categories")
-      .select("id", "name")
-      .whereIn("id", categoryIds)
-      .orderBy("id");
+    const categories = isLaravelMode()
+      ? (await listCategories()).filter((category) => categoryIds.includes(category.id))
+      : await db("categories")
+          .select("id", "name")
+          .whereIn("id", categoryIds)
+          .orderBy("id");
 
     const categoryLabels = {
       1: "booking_category_light",
@@ -90,7 +98,7 @@ module.exports = async (ctx) => {
     if (categories.length) {
       const keyboard = categories.map((category) => [
         {
-          text: categoryLabels[category.id]
+          text: !isLaravelMode() && categoryLabels[category.id]
             ? t(lang, categoryLabels[category.id])
             : category.name,
           callback_data: `book:cat:${category.id}`,
@@ -105,10 +113,9 @@ module.exports = async (ctx) => {
     }
   }
 
-  const {DEFAULT_BIKE_EMOJI} = require("../utils/constants");
   const keyboard = availableBikes.map((bike) => [
     {
-      text: `${bike.emoji || DEFAULT_BIKE_EMOJI} ${bike.name}`,
+      text: `${vehicleEmoji(bike)} ${bike.name}`,
       callback_data: `book:select_bike:${bike.id}`,
     },
   ]);

@@ -29,6 +29,8 @@ try {
             startsOn: $startsOn,
             endsOn: $endsOn,
             source: BookingSource::Telegram,
+            termsAcceptedAt: now(),
+            termsVersion: (string) config('business.terms_version'),
         ),
         BookingActor::customer((int) $customerId),
     );

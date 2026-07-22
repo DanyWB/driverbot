@@ -1,19 +1,22 @@
 const db = require("../connect");
 const {t, getCtxLang} = require("../utils/i18n");
+const {isLaravelMode} = require("../config/runtime");
+const {clear} = require("../services/sessionCartService");
 
 module.exports = async (ctx) => {
   const telegramId = ctx.from.id;
   const lang = getCtxLang(ctx);
 
-  const user = await db("users").where({telegram_id: telegramId}).first();
-  if (!user) {
-    return ctx.reply(t(lang, "not_registered"));
+  if (isLaravelMode()) {
+    clear(ctx);
+  } else {
+    const user = await db("users").where({telegram_id: telegramId}).first();
+    if (!user) return ctx.reply(t(lang, "not_registered"));
+    await db("rentals")
+      .where("user_id", user.id)
+      .andWhere("status", "process")
+      .del();
   }
-
-  await db("rentals")
-    .where("user_id", user.id)
-    .andWhere("status", "process")
-    .del();
 
   ctx.session.booking = null;
 

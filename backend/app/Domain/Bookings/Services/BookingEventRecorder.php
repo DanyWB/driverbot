@@ -41,6 +41,7 @@ class BookingEventRecorder
             'actor_type' => $actor->type,
             'actor_admin_id' => $actor->adminId,
             'actor_customer_id' => $actor->customerId,
+            'actor_service_client_id' => $actor->serviceClientId,
             'reason' => $reason,
             'context' => $context === [] ? null : $context,
             'request_id' => $requestId,

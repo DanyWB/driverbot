@@ -405,6 +405,47 @@ function deleteDocument(id: number): void {
                         </div>
                         <div>
                             <dt class="text-xs text-muted-foreground">
+                                Helmets
+                            </dt>
+                            <dd class="mt-1 font-medium">
+                                {{ booking.options.helmets_quantity }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-muted-foreground">
+                                Delivery
+                            </dt>
+                            <dd class="mt-1 font-medium">
+                                {{
+                                    booking.options.delivery_required
+                                        ? 'Required'
+                                        : 'Pickup'
+                                }}
+                            </dd>
+                            <dd
+                                v-if="booking.options.delivery_address"
+                                class="text-sm text-muted-foreground"
+                            >
+                                {{ booking.options.delivery_address }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-muted-foreground">
+                                Rental terms
+                            </dt>
+                            <dd class="mt-1 font-medium">
+                                {{ booking.terms?.version || 'Not recorded' }}
+                            </dd>
+                            <dd
+                                v-if="booking.terms?.accepted_at"
+                                class="text-sm text-muted-foreground"
+                            >
+                                Accepted
+                                {{ formatDateTime(booking.terms.accepted_at) }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-muted-foreground">
                                 Created
                             </dt>
                             <dd class="mt-1 font-medium">

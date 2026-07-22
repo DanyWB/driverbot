@@ -9,6 +9,7 @@ use App\Models\BookingPriceSnapshot;
 use App\Models\BookingStatusHistory;
 use App\Models\Customer;
 use App\Models\CustomerContact;
+use App\Models\ServiceApiClient;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -67,6 +68,11 @@ class AdminBookingPresenter
             'final_total',
             'currency',
             'payment_note',
+            'helmets_quantity',
+            'delivery_required',
+            'delivery_address',
+            'terms_version',
+            'terms_accepted_at',
             'documents_status',
             'client_comment',
             'admin_note',
@@ -97,6 +103,11 @@ class AdminBookingPresenter
             $snapshot instanceof BookingPriceSnapshot ? (int) $snapshot->final_total : null,
             $snapshot instanceof BookingPriceSnapshot ? (string) $snapshot->currency : null,
             $this->nullableString($booking->deposit_note),
+            (int) $booking->helmets_quantity,
+            (bool) $booking->delivery_required ? 'yes' : 'no',
+            $this->nullableString($booking->delivery_address),
+            $this->nullableString($booking->terms_version),
+            $this->dateTime($booking->terms_accepted_at),
             (int) $booking->documents_count > 0 ? 'yes' : 'no',
             $this->nullableString($booking->client_comment),
             $this->nullableString($booking->admin_note),
@@ -116,6 +127,15 @@ class AdminBookingPresenter
             'cancellation_reason' => $this->nullableString($booking->cancellation_reason),
             'no_show_reason' => $this->nullableString($booking->no_show_reason),
             'deposit_note' => $this->nullableString($booking->deposit_note),
+            'options' => [
+                'helmets_quantity' => (int) $booking->helmets_quantity,
+                'delivery_required' => (bool) $booking->delivery_required,
+                'delivery_address' => $this->nullableString($booking->delivery_address),
+            ],
+            'terms' => $booking->terms_accepted_at === null ? null : [
+                'version' => $this->nullableString($booking->terms_version),
+                'accepted_at' => $this->dateTime($booking->terms_accepted_at),
+            ],
             'pending_expires_at' => $this->dateTime($booking->pending_expires_at),
             'created_by_admin' => $booking->createdByAdmin === null ? null : [
                 'id' => (int) $booking->createdByAdmin->id,
@@ -219,7 +239,13 @@ class AdminBookingPresenter
 
         $customer = $history->getRelation('actorCustomer');
 
-        return $customer instanceof Customer ? (string) $customer->name : null;
+        if ($customer instanceof Customer) {
+            return (string) $customer->name;
+        }
+
+        $serviceClient = $history->getRelation('actorServiceClient');
+
+        return $serviceClient instanceof ServiceApiClient ? (string) $serviceClient->name : null;
     }
 
     private function startsAt(Booking $booking): CarbonImmutable

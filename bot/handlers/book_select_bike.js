@@ -10,6 +10,17 @@ const {
   findOverlappingRental,
   getBookingDateTimes,
 } = require("../services/rentalService");
+const {getVehicleById} = require("../services/vehicleService");
+const {isLaravelMode} = require("../config/runtime");
+const {preview} = require("../utils/text");
+const {vehicleEmoji} = require("../utils/vehicle");
+
+function calendarRange(booking) {
+  const start = dayjs(
+    `${booking.calendarYear}-${String(booking.calendarMonth).padStart(2, "0")}-01`
+  ).startOf("week");
+  return {startDate: start.format("YYYY-MM-DD"), endDate: start.add(41, "day").format("YYYY-MM-DD")};
+}
 
 module.exports = async (ctx) => {
   const data = ctx.callbackQuery?.data;
@@ -31,7 +42,7 @@ module.exports = async (ctx) => {
 
     let blockedDays = [];
     if (booking.selectedBikeId) {
-      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
+      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, calendarRange(booking));
     }
 
     return ctx.editMessageText(t(lang, "booking_choose_start_date"), {
@@ -55,19 +66,22 @@ module.exports = async (ctx) => {
 async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride) {
   const booking = bookingOverride || ensureBooking(ctx);
   const lang = langOverride || getCtxLang(ctx);
-  const bike = await db("bikes").where({id: bikeId}).first();
+  const bike = await getVehicleById(db, bikeId);
   if (!bike || bike.is_active === false) {
     return ctx.editMessageText(t(lang, "booking_bike_not_found"));
   }
 
-  const {startAtIso, endAtIso} = getBookingDateTimes(booking);
-  const conflict = await findOverlappingRental(db, {
-    bikeId,
-    startAt: startAtIso,
-    endAt: endAtIso,
-    startDate: booking.startDate,
-    endDate: booking.endDate,
-  });
+  let conflict = null;
+  if (!isLaravelMode()) {
+    const {startAtIso, endAtIso} = getBookingDateTimes(booking);
+    conflict = await findOverlappingRental(db, {
+      bikeId,
+      startAt: startAtIso,
+      endAt: endAtIso,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+    });
+  }
 
   if (conflict) {
     booking.startDate = null;
@@ -81,7 +95,7 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
     booking.step = "select_start_date";
     let blockedDays = [];
     try {
-      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
+      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, calendarRange(booking));
     } catch (e) {
       blockedDays = [];
     }
@@ -120,10 +134,20 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
   booking.pricePerDay = pricing.pricePerDay;
   booking.priceUnknown = pricing.priceUnknown;
 
+  if (pricing.available === false) {
+    booking.totalPrice = null;
+    booking.pricePerDay = null;
+    return ctx.editMessageText(t(lang, "booking_range_conflict_bike"), {
+      reply_markup: {
+        inline_keyboard: [[{text: t(lang, "btn_back"), callback_data: "book:back_to_bikes"}]],
+      },
+    });
+  }
+
   return showBikeSummary(ctx, bike, booking);
 }
 
-function showBikeSummary(ctx, bike, bookingOverride) {
+async function showBikeSummary(ctx, bike, bookingOverride) {
   const booking = bookingOverride || ensureBooking(ctx);
   const lang = getCtxLang(ctx);
   let startLabel = booking.startDate
@@ -140,7 +164,8 @@ function showBikeSummary(ctx, bike, bookingOverride) {
       : 0;
 
   const text = tHtml(lang, "booking_bike_summary", {
-    name: bike.name,
+    emoji: vehicleEmoji(bike),
+    name: preview(bike.name, 80),
     start: startLabel,
     end: endLabel,
     days,
@@ -149,8 +174,17 @@ function showBikeSummary(ctx, bike, bookingOverride) {
     price_per_day: booking.priceUnknown
       ? t(lang, "booking_price_tbd")
       : booking.pricePerDay || 0,
-    desc: bike.description || "",
+    desc: preview(bike.description, 240),
   });
+
+  if (bike.image_url && ctx.session.lastPhotoVehicleId !== bike.id) {
+    try {
+      await ctx.replyWithPhoto(bike.image_url, {caption: bike.name});
+      ctx.session.lastPhotoVehicleId = bike.id;
+    } catch (error) {
+      console.warn(`Could not send photo for vehicle ${bike.id}:`, error.message);
+    }
+  }
 
   return ctx.editMessageText(text, {
     parse_mode: "HTML",

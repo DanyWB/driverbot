@@ -2,6 +2,11 @@ const db = require("../connect");
 const dayjs = require("dayjs");
 const {t, getCtxLang} = require("../utils/i18n");
 const {escapeHtml, tHtml} = require("../utils/html");
+const {isLaravelMode} = require("../config/runtime");
+const {getUserByTelegramId} = require("../services/userService");
+const {getCart} = require("../services/sessionCartService");
+const {preview} = require("../utils/text");
+const {vehicleEmoji} = require("../utils/vehicle");
 
 async function buildDraftMenuPayload(ctx, options = {}) {
   const lang = options.lang || getCtxLang(ctx);
@@ -16,38 +21,42 @@ async function buildDraftMenuPayload(ctx, options = {}) {
   ctx.session.commentReturn =
     backAction === "rent:current" ? "rent:current" : "book:draft";
 
-  const user =
-    options.user || (await db("users").where({telegram_id: ctx.from.id}).first());
+  const user = options.user || (isLaravelMode()
+    ? await getUserByTelegramId(ctx.from.id)
+    : await db("users").where({telegram_id: ctx.from.id}).first());
   if (!user) {
     return {error: t(lang, "not_registered")};
   }
 
-  const rentals = await db("rentals")
-    .join("bikes", "rentals.bike_id", "bikes.id")
-    .where("rentals.user_id", user.id)
-    .andWhere("rentals.status", "process")
-    .select(
-      "rentals.id",
-      "rentals.accept_terms",
-      "rentals.start_date",
-      "rentals.end_date",
-      "rentals.start_at",
-      "rentals.end_at",
-      "rentals.total_price",
-      "rentals.helmets_qty",
-      "rentals.delivery_required",
-      "rentals.delivery_address",
-      "rentals.comment",
-      "bikes.name"
-    );
+  const rentals = isLaravelMode()
+    ? getCart(ctx)
+    : await db("rentals")
+        .join("bikes", "rentals.bike_id", "bikes.id")
+        .where("rentals.user_id", user.id)
+        .andWhere("rentals.status", "process")
+        .select(
+          "rentals.id",
+          "rentals.accept_terms",
+          "rentals.start_date",
+          "rentals.end_date",
+          "rentals.start_at",
+          "rentals.end_at",
+          "rentals.total_price",
+          "rentals.helmets_qty",
+          "rentals.delivery_required",
+          "rentals.delivery_address",
+          "rentals.comment",
+          "bikes.name"
+        );
 
   if (!rentals.length) {
     return {empty: true};
   }
 
-  const accepted =
-    Boolean(ctx.session.acceptTerms) ||
-    rentals.some((rental) => rental.accept_terms === true);
+  const accepted = isLaravelMode()
+    ? Boolean(ctx.session.acceptTerms && ctx.session.acceptedTermsVersion)
+    : Boolean(ctx.session.acceptTerms) ||
+      rentals.some((rental) => rental.accept_terms === true);
 
   if (accepted) {
     ctx.session.acceptTerms = true;
@@ -66,33 +75,35 @@ async function buildDraftMenuPayload(ctx, options = {}) {
       : dayjs(rental.end_date).format("DD.MM.YYYY");
 
     text += tHtml(lang, "booking_item", {
-      name: rental.name,
+      emoji: vehicleEmoji(rental.vehicle || rental),
+      name: preview(rental.name, 60),
       start: startLabel,
       end: endLabel,
       days,
       days_label: t(lang, "days_label"),
       price: rental.total_price || t(lang, "booking_price_tbd"),
     });
+  }
 
-    if (
-      rental.helmets_qty ||
-      rental.delivery_required ||
-      rental.delivery_address ||
-      rental.comment
-    ) {
-      text += `🪖 ${rental.helmets_qty || 0}; 🚚 ${
-        rental.delivery_required
-          ? t(lang, "booking_options_delivery_on")
-          : t(lang, "booking_options_delivery_off")
-      }`;
-      if (rental.delivery_address) {
-        text += `; 🏠 ${escapeHtml(rental.delivery_address)}`;
-      }
-      if (rental.comment) {
-        text += `\n✏️ ${escapeHtml(rental.comment)}`;
-      }
-      text += "\n\n";
+  const rentalOptions = rentals[0];
+  if (
+    rentalOptions.helmets_qty ||
+    rentalOptions.delivery_required ||
+    rentalOptions.delivery_address ||
+    rentalOptions.comment
+  ) {
+    text += `🪖 ${rentalOptions.helmets_qty || 0}; 🚚 ${
+      rentalOptions.delivery_required
+        ? t(lang, "booking_options_delivery_on")
+        : t(lang, "booking_options_delivery_off")
+    }`;
+    if (rentalOptions.delivery_address) {
+      text += `; 🏠 ${escapeHtml(preview(rentalOptions.delivery_address, 120))}`;
     }
+    if (rentalOptions.comment) {
+      text += `\n✏️ ${escapeHtml(preview(rentalOptions.comment, 120))}`;
+    }
+    text += "\n\n";
   }
 
   if (accepted) {

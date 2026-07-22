@@ -38,7 +38,11 @@ module.exports = async (ctx) => {
 
     let blockedDays = [];
     if (booking.selectedBikeId) {
-      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
+      const rangeStart = dayjs(selectedDate).startOf("month").startOf("week");
+      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, {
+        startDate: rangeStart.format("YYYY-MM-DD"),
+        endDate: rangeStart.add(41, "day").format("YYYY-MM-DD"),
+      });
     }
 
     return ctx.editMessageText(t(lang, "booking_choose_end_date"), {

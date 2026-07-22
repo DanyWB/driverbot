@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
-#[Fillable(['customer_id', 'vehicle_id', 'starts_on', 'ends_on', 'pickup_time', 'return_time', 'status', 'source', 'client_comment', 'admin_note', 'cancellation_reason', 'no_show_reason', 'deposit_note', 'created_by_admin_id', 'pending_expires_at', 'approved_at', 'activated_at', 'completed_at', 'cancelled_at', 'expired_at', 'no_show_at'])]
+#[Fillable(['customer_id', 'vehicle_id', 'starts_on', 'ends_on', 'pickup_time', 'return_time', 'status', 'source', 'client_comment', 'admin_note', 'cancellation_reason', 'no_show_reason', 'deposit_note', 'helmets_quantity', 'delivery_required', 'delivery_address', 'terms_accepted_at', 'terms_version', 'created_by_admin_id', 'pending_expires_at', 'approved_at', 'activated_at', 'completed_at', 'cancelled_at', 'expired_at', 'no_show_at'])]
 class Booking extends Model
 {
     /** @use HasFactory<BookingFactory> */
@@ -110,6 +110,9 @@ class Booking extends Model
             'ends_on' => 'date',
             'status' => BookingStatus::class,
             'source' => BookingSource::class,
+            'helmets_quantity' => 'integer',
+            'delivery_required' => 'boolean',
+            'terms_accepted_at' => 'datetime',
             'pending_expires_at' => 'datetime',
             'approved_at' => 'datetime',
             'activated_at' => 'datetime',

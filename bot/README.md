@@ -3,6 +3,44 @@
 Инструкция для legacy-приложения в каталоге `bot/`. Если явно не указано иное,
 команды ниже выполняются из этого каталога.
 
+## Актуальный Laravel-режим
+
+Целевой режим после этапа 8 - `BOT_DATA_MODE=laravel`. В нем бот является Telegram UI,
+хранит временную корзину в Redis и обращается к `/api/v1/bot`; цены, доступность,
+клиенты, документы и брони принадлежат Laravel. `PG_*` и `DATABASE_URL` процессу бота
+не нужны. Старые Knex, Telegram-admin handlers, reminders и Google Sheets не запускаются.
+
+Минимальная конфигурация:
+
+```dotenv
+NODE_ENV=production
+BOT_TOKEN=<telegram-token>
+BOT_DATA_MODE=laravel
+BOT_API_URL=https://example.com/api/v1/bot
+BOT_API_TOKEN=<laravel-service-token>
+BOT_API_TIMEOUT_MS=5000
+BOT_API_MAX_ATTEMPTS=3
+REDIS_URL=redis://127.0.0.1:6379/1
+BOOKING_TZ=Asia/Bangkok
+```
+
+Проверка и запуск:
+
+```powershell
+npm ci
+npm run preflight
+npm start
+```
+
+`npm run preflight` сам выбирает Laravel или legacy-набор по `BOT_DATA_MODE`.
+Подробные правила token rotation, Redis, API, cutover и rollback находятся в
+`../STAGE_8_BOT_API.md`.
+
+## Legacy rollback
+
+Остальная часть файла описывает старый режим `BOT_DATA_MODE=legacy`. Он сохраняется
+для контролируемого отката и не должен работать параллельно с Laravel-режимом.
+
 ## Что скачать и установить
 
 1. **Node.js LTS**

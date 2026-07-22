@@ -42,6 +42,7 @@ export type CustomerDocument = {
 
 export type CustomerDetail = CustomerListItem & {
     internal_note: string | null;
+    passport_number: string | null;
     identities: Array<{
         id: number;
         provider: string;

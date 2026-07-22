@@ -1,13 +1,13 @@
 # Drive Phangan
 
-Production rewrite of the Drive Phangan rental system. Laravel owns the target
-business logic and admin application; the existing Node.js Telegram bot remains the
-behavioral baseline until it is switched to the Laravel API.
+Production rewrite of the Drive Phangan rental system. Laravel owns business logic,
+data and the admin application. The Node.js Telegram bot uses the versioned Laravel
+Bot API in the target mode; its direct Knex mode is retained only for rollback.
 
 ## Repository structure
 
 - `backend/` - Laravel 13, Vue 3, TypeScript and Inertia admin application.
-- `bot/` - existing Node.js Telegram bot and its legacy Knex migrations.
+- `bot/` - Node.js Telegram UI, Laravel API client, Redis sessions and legacy rollback code.
 - `scripts/` - shared local environment and setup commands.
 - `ARCHITECTURE.md` - approved system boundaries and technical decisions.
 - `IMPLEMENTATION_ROADMAP.md` - staged implementation plan and acceptance gates.
@@ -16,6 +16,7 @@ behavioral baseline until it is switched to the Laravel API.
 - `STAGE_6_TIMELINE.md` - implemented fleet availability timeline and calendar workflows.
 - `STAGE_7_CATALOG_CUSTOMERS_EXPORT.md` - implemented fleet catalog, pricing, customers,
   private documents and CSV export.
+- `STAGE_8_BOT_API.md` - implemented Bot API, Node.js cutover mode and operational runbook.
 
 ## Local infrastructure
 
@@ -26,15 +27,39 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-local-redis.ps1
 npm run check:environment
 ```
 
-The environment check reads the ignored `bot/.env` and verifies the legacy PostgreSQL
-database plus Redis without printing credentials.
+The environment check reads the ignored `bot/.env`. In Laravel mode it verifies
+Laravel readiness plus Redis; in legacy mode it verifies the old PostgreSQL plus Redis.
 
-## Legacy bot
+## Telegram bot: Laravel mode
+
+Start the Laravel application and Redis first. Issue a service token once:
+
+```powershell
+cd backend
+php artisan bot-api:client issue --name="Local Telegram Bot"
+```
+
+Configure `bot/.env` from `bot/.env.example`. Required target-mode values are
+`BOT_DATA_MODE=laravel`, `BOT_API_URL`, `BOT_API_TOKEN`, `REDIS_URL` and
+`BOOKING_TZ=Asia/Bangkok`. PostgreSQL credentials are not required in this mode.
+
+```powershell
+cd bot
+npm ci
+npm run preflight
+npm start
+```
+
+Do not run two instances with the same Telegram token. Token rotation and the full
+cutover/rollback procedure are documented in `STAGE_8_BOT_API.md`.
+
+## Legacy rollback bot
 
 ```powershell
 cd bot
 npm ci
 Copy-Item .env.example .env
+# Set BOT_DATA_MODE=legacy and fill the legacy PG_* variables in .env.
 npm run migrate
 npm run preflight
 npm start
@@ -95,7 +120,8 @@ composer ci:check
 npm run build
 ```
 
-Run the complete project gate from the repository root:
+Run the complete project gate from the repository root. The bot profile is selected
+by `BOT_DATA_MODE` in `bot/.env`:
 
 ```powershell
 npm run precheck
@@ -103,6 +129,7 @@ npm run precheck
 
 ## Current boundary
 
-Stages 0-7 are complete. The bot still writes to the legacy database until stage 8.
-New business logic must be implemented in Laravel only. Permanent dual-write is
-prohibited; the bot will become an API client through the versioned Laravel Bot API.
+Stages 0-8 are complete. In target mode Laravel is the only writer of business data;
+permanent dual-write is prohibited. Stage 9 must deliver queued Telegram notifications,
+pending expiry and reminders before production cutover. Stage 10 covers deployment,
+backup/restore and final release hardening.

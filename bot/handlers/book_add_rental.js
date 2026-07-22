@@ -1,6 +1,10 @@
 const db = require("../connect");
 const {t, getCtxLang} = require("../utils/i18n");
 const {createDraftRental} = require("../services/rentalService");
+const {isLaravelMode} = require("../config/runtime");
+const {getUserByTelegramId} = require("../services/userService");
+const gateway = require("../services/laravelGateway");
+const sessionCart = require("../services/sessionCartService");
 
 module.exports = async (ctx) => {
   const booking = ctx.session.booking;
@@ -18,12 +22,27 @@ module.exports = async (ctx) => {
   }
 
   try {
-    const user = await db("users").where({telegram_id: telegramId}).first();
+    const user = isLaravelMode()
+      ? await getUserByTelegramId(telegramId)
+      : await db("users").where({telegram_id: telegramId}).first();
     if (!user) {
       return ctx.reply(t(lang, "not_registered"));
     }
 
-    await createDraftRental(db, {user, booking});
+    if (isLaravelMode()) {
+      const [vehicle, quote] = await Promise.all([
+        gateway.getVehicle(booking.selectedBikeId),
+        gateway.quote(booking.selectedBikeId, booking.startDate, booking.endDate),
+      ]);
+      if (!quote.available) {
+        const error = new Error("overlap_conflict");
+        error.code = "overlap_conflict";
+        throw error;
+      }
+      sessionCart.add(ctx, booking, vehicle, quote);
+    } else {
+      await createDraftRental(db, {user, booking});
+    }
 
     const {buildDraftMenuPayload} = require("./booking_draft_menu");
     const payload = await buildDraftMenuPayload(ctx, {lang, user, backAction: "home"});
@@ -40,6 +59,7 @@ module.exports = async (ctx) => {
       reply_markup: payload.reply_markup,
     });
   } catch (error) {
+    if (error.code === "BOT_API_UNAVAILABLE") throw error;
     if (error.code === "bike_not_found") {
       return ctx.reply(t(lang, "booking_bike_not_found"));
     }

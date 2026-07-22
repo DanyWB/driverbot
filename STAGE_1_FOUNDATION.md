@@ -96,6 +96,9 @@ Dependency audit:
   Google Sheets интеграции. Это production blocker, но не blocker локального этапа 2:
   уязвимый UUID API напрямую проектом не вызывается, а интеграция до cutover опциональна.
 
+Актуализация 2026-07-22: blocker закрыт на этапе 8 обновлением до `googleapis@173`;
+`npm audit --omit=dev` возвращает 0 известных vulnerabilities.
+
 ## 7. Acceptance gate
 
 - [x] Защищенные login/logout и dashboard доступны.

@@ -4,8 +4,10 @@ const {tHtml} = require("../utils/html");
 const dayjs = require("dayjs");
 const {USER_CANCELLABLE_RENTAL_STATUSES} = require("../utils/rentalStatus");
 const {cancelRentalByUser} = require("../services/rentalService");
+const {isLaravelMode} = require("../config/runtime");
 
 module.exports = async (ctx) => {
+  if (isLaravelMode()) return require("./laravel_rent_cancel")(ctx);
   const data = ctx.callbackQuery?.data || "";
   const parts = data.split(":"); // rent:cancel:ID or rent:cancel_confirm:ID
   const action = parts[1];

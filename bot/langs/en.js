@@ -27,9 +27,11 @@ module.exports = {
   share_contact_btn: "📨 Share contact",
 
   menu_title: "🏠 Main menu:",
-  menu_my_rent: "🛵 My Rent",
+  menu_my_rent: "🚘 My Rent",
   menu_support: "💬 Support",
   menu_prices: "💸 Look Prices",
+  prices_dynamic_hint:
+    "The exact price is calculated from the current tariffs for the selected vehicle and rental dates.",
   menu_account: "👤 My Account",
   menu_conditions: "📝 Rent Conditions",
   menu_about: "ℹ️ About Us",
@@ -70,13 +72,15 @@ module.exports = {
   conditions_view_btn: "📄 Rental terms",
   conditions_accept_required:
     "To confirm your booking, please accept the rental terms. Tap “Accept rental terms”.",
+  conditions_version_changed:
+    "The rental terms have changed. Please review and accept the current version before confirming your booking.",
   conditions_terms_link:
-    "Full user agreement: <a href=\"https://example.com/terms\">https://example.com/terms</a>",
+    "The full user agreement is available from the manager.",
 
   booking_price_tbd: "price to be confirmed",
 
   rent_intro: "Let's find your perfect scooter. Choose an option:",
-  rent_btn_book: "🛵 Book now",
+  rent_btn_book: "🚘 Book now",
   rent_btn_current: "🗂 Current bookings",
   rent_btn_history: "📜 Rental history",
   rent_btn_contract: "📄 Rental agreement",
@@ -105,6 +109,8 @@ module.exports = {
   rent_status_cancelled: "cancelled",
   rent_status_completed: "completed",
   rent_status_approved: "approved",
+  rent_status_expired: "expired",
+  rent_status_no_show: "no-show",
   reminder_start_24h: "Reminder: rental starts in 24 hours",
   reminder_start_1h: "Reminder: rental starts in 1 hour",
   reminder_end_24h: "Reminder: rental ends in 24 hours",
@@ -134,6 +140,10 @@ module.exports = {
   rent_cancel_confirm: "Cancel booking ID {id}?",
   rent_cancelled: "Booking cancelled.",
   rent_cannot_cancel: "You cannot cancel this booking.",
+  rent_cancel_manager_required:
+    "Less than 24 hours remain before pickup. To cancel and clarify prepayment details, contact the manager directly: {manager}",
+  rent_cancel_manager_contact_missing:
+    "Less than 24 hours remain before pickup. Automatic cancellation is unavailable; please contact us through Support.",
   rent_history_details: "📍 Details (history)",
   about_info:
     "🏝️ DRIVE PHANGAN — scooter and car rental on Koh Phangan.\nOfficially operating since 2019.\n🛵 Every year we update our fleet with new models — for those who value comfort, style, and freedom.\n\n🚀 Renting with us is honest and transparent — no shady tricks or scratch scams.\n⭐ Over 100 positive reviews on Google Maps and many returning customers season after season.\nReliable, simple, and with care for your perfect vacation ✨\n\n🤖 This bot is made to keep booking quick and effortless — everything is automated. You can complete all steps right here. If you have any questions, we are always online!\n\n📍 Find us easily:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://www.instagram.com/drive_phangan/\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
@@ -170,9 +180,9 @@ module.exports = {
   not_registered: "You are not registered.",
 
   booking_intro:
-    "🚲 <b>Bike rental</b>\n\nChoose a convenient booking method:\n- first choose <b>dates</b>, then available bikes;\n- or first choose a <b>bike</b>, then available dates.\n\n📌 Choose an option below:",
+    "🚘 <b>Vehicle rental</b>\n\nChoose a convenient booking method:\n- first choose <b>dates</b>, then available vehicles;\n- or first choose a <b>vehicle</b>, then available dates.\n\n📌 Choose an option below:",
   booking_btn_date_first: "📅 Choose date first",
-  booking_btn_bike_first: "🏍️ Choose bike first",
+  booking_btn_bike_first: "🚘 Choose vehicle first",
 
   booking_choose_start_date: "📅 Choose the rental start date.",
   booking_choose_end_date: "📅 Choose the rental end date:",
@@ -182,9 +192,9 @@ module.exports = {
   booking_start_in_past: "Start time must be at least 1 hour from now.",
   booking_end_before_start: "End date cannot be earlier than start date.",
   booking_min_duration: "Minimum rental duration is 1 hour.",
-  booking_choose_category: "🏍️ First choose a bike category.",
-  booking_choose_bike: "🏍️ Choose a bike:",
-  booking_no_bikes_in_category: "😔 No bikes in this category yet.",
+  booking_choose_category: "🚘 First choose a vehicle category.",
+  booking_choose_bike: "🚘 Choose a vehicle:",
+  booking_no_bikes_in_category: "😔 No vehicles in this category yet.",
 
   booking_category_light: "🌿 Light (110-125cc)",
   booking_category_comfort: "✨ Comfort (150-160cc)",
@@ -194,22 +204,22 @@ module.exports = {
   booking_profile_required:
     "To book, please provide your name and phone number in My Account.",
   booking_no_available_bikes:
-    "😔 Unfortunately, no bikes are available for the selected dates.",
+    "😔 Unfortunately, no vehicles are available for the selected dates.",
   booking_no_availability_lead:
-    "No bikes are free for these dates. We created a request for the operator — they will contact you and try to find an option.",
+    "No vehicles are free for these dates. We created a request for the operator — they will contact you and try to find an option.",
   admin_no_availability_lead:
     "🚨 <b>No availability</b>\n\n📅 Dates: {start} — {end}\n👤 User: {user} (@{username})\n📞 Phone: {phone}\n🏷️ Category: {category}\n✏️ Comment: {comment}",
-  booking_available_bikes_title: "🏍️ Available bikes:",
+  booking_available_bikes_title: "🚘 Available vehicles:",
 
   booking_range_conflict:
     "There are already booked dates in the selected range. Try again.\n\n📅 Choose the rental start date:",
   booking_range_conflict_bike:
-    "The selected range includes booked dates for this bike. Choose another period.",
+    "The selected range includes booked dates for this vehicle. Choose another period.",
   booking_end_before_start: "End date cannot be earlier than start date.",
   booking_date_in_past: "You cannot select a date in the past.",
 
-  booking_invalid_bike_id: "Invalid bike ID format.",
-  booking_bike_not_found: "Bike not found.",
+  booking_invalid_bike_id: "Invalid vehicle ID format.",
+  booking_bike_not_found: "Vehicle not found.",
   booking_season_not_found: "Failed to determine season for the selected date.",
 
   booking_period_label: "Rental period:",
@@ -221,41 +231,43 @@ module.exports = {
   booking_not_enough_data: "Not enough data to create a rental.",
   booking_current_title: "🧾 <b>Current rental:</b>\n\n",
   booking_item:
-    "🏍️ <b>{name}</b>\n{start} - {end} ({days} {days_label})\nPrice: {price} THB\n\n",
+    "{emoji} <b>{name}</b>\n{start} - {end} ({days} {days_label})\nPrice: {price} THB\n\n",
   booking_confirm_btn: "✅ Confirm booking",
-  booking_add_bike_btn: "➕ Add bike",
-  booking_delete_bike_btn: "🗑️ Remove bike",
+  booking_add_bike_btn: "➕ Add vehicle",
+  booking_delete_bike_btn: "🗑️ Remove vehicle",
   booking_reset_btn: "♻️ Reset",
   booking_comment_btn: "💬 Notes",
   booking_add_error: "⚠️ Error while saving the rental.",
+  booking_service_unavailable:
+    "The booking service is temporarily unavailable. Your data is saved; please try the action again shortly.",
 
   booking_confirmed:
     "✅ Your rental is confirmed!\nPlease wait for admin confirmation.",
   booking_no_bookings_to_confirm: "No bookings to confirm.",
   booking_bike_busy:
-    'Bike "{name}" is already booked for these dates. Please choose another period.',
+    'Vehicle "{name}" is already booked for these dates. Please choose another period.',
   booking_admin_missing:
     "Sorry. There is no admin in the system right now. Please cancel this rental and try again later.",
   booking_admin_new:
     "🚨 <b>New booking request</b>\n\n👤 {user} (@{username})\n📞 Phone: {phone}\n🛵 Model: <b>{bike}</b>\n📅 Period: {start} — {end}\n💰 Price: {price}\n🧾 Deposit: {deposit}\n🪪 Documents: {docs}\n\n🪖 Helmets: {helmets}\n🚚 Delivery: {delivery}\n🏠 Address: {address}\n✏️ Notes: {comment}",
 
-  booking_delete_failed: "Failed to remove the bike.",
-  booking_bike_removed: "🗑️ Bike removed from your rental.",
-  booking_no_bikes_in_process: "You have no bikes in the rental process.",
-  booking_delete_prompt: "🗑️ Choose a bike to remove from your rental:",
+  booking_delete_failed: "Failed to remove the vehicle.",
+  booking_bike_removed: "🗑️ Vehicle removed from your rental.",
+  booking_no_bikes_in_process: "You have no vehicles in the rental process.",
+  booking_delete_prompt: "🗑️ Choose a vehicle to remove from your rental:",
   booking_delete_bike_item: "Remove {name}",
   booking_reset_done: "♻️ Rental reset. You can start again.",
   booking_comment_prompt:
     "💬 Enter your notes (e.g. “double helmet”, “hotel delivery”):",
   booking_comment_saved: "💬 Your notes have been saved.",
-  booking_choose_bike_btn: "Choose a bike",
+  booking_choose_bike_btn: "Choose a vehicle",
   booking_period_selected:
-    "📅 You selected the rental period:\n{start} - {end}\n\nNow choose a bike.",
+    "📅 You selected the rental period:\n{start} - {end}\n\nNow choose a vehicle.",
   booking_start_date_selected:
     "📅 Start date: {date}\n\nNow choose the end date.",
-  booking_add_bike_to_rental_btn: "➕ Add a bike to the rental",
+  booking_add_bike_to_rental_btn: "➕ Add a vehicle to the rental",
   booking_bike_summary:
-    "🛵 <b>{name}</b>\n\n<b>Rental period:</b> {start} - {end} ({days} {days_label})\n<b>Price per day:</b> {price_per_day} THB\n<b>Price:</b> {price} THB\n\n{desc}",
+    "{emoji} <b>{name}</b>\n\n<b>Rental period:</b> {start} - {end} ({days} {days_label})\n<b>Price per day:</b> {price_per_day} THB\n<b>Price:</b> {price} THB\n\n{desc}",
 
   btn_back: "⬅️ Back",
   btn_home: "🏠 Home",
@@ -314,6 +326,7 @@ module.exports = {
   booking_options_address_prompt: "🏠 Enter delivery address:",
   booking_options_notes_prompt: "✏️ Enter your notes:",
   booking_options_address_saved: "Delivery address saved.",
+  booking_delivery_address_required: "Enter a delivery address before confirming the booking.",
   booking_options_notes_saved: "Notes saved.",
   admin_not_allowed: "Access denied.",
   admin_menu_title: "👑 Admin panel",

@@ -9,6 +9,8 @@ const {
   HISTORY_RENTAL_STATUSES,
   USER_CANCELLABLE_RENTAL_STATUSES,
 } = require("../utils/rentalStatus");
+const {isLaravelMode} = require("../config/runtime");
+const {handleLaravelRentMenuAction} = require("./laravel_rent_menu");
 
 function getRentMenuKeyboard(lang) {
   return {
@@ -99,6 +101,9 @@ async function sendDepositInfo(ctx, langOverride) {
 }
 
 async function handleRentMenuAction(ctx) {
+  if (isLaravelMode()) {
+    return handleLaravelRentMenuAction(ctx, getRentMenuKeyboard);
+  }
   const lang = getCtxLang(ctx);
   const action = ctx.callbackQuery?.data;
 
@@ -347,4 +352,4 @@ async function handleRentMenuAction(ctx) {
   }
 }
 
-module.exports = {sendRentMenu, handleRentMenuAction};
+module.exports = {sendRentMenu, handleRentMenuAction, getRentMenuKeyboard};

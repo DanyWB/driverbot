@@ -261,6 +261,9 @@ Acceptance gate:
 
 Оценка: 14-18 часов.
 
+Статус: выполнен 2026-07-22. Фактическая архитектура, API, конфигурация, cutover,
+rollback и результаты проверок описаны в `STAGE_8_BOT_API.md`.
+
 Работы:
 
 - OpenAPI contract `/api/v1/bot`;
@@ -427,6 +430,6 @@ UI-задачи можно частично параллелить после с
 
 ## 19. Следующее действие
 
-Начать этап 8: зафиксировать OpenAPI-контракт `/api/v1/bot`, модель service tokens,
-idempotency и стабильные error codes, затем перевести Telegram-сценарии с прямых
-Knex-запросов на Laravel API под feature flag.
+Начать этап 9: подключить delivery worker к существующему `notification_outbox`,
+реализовать автоexpiry pending-заявок, Telegram-уведомления и напоминания с
+deduplication/retry. До приемки текстов указать реальный runtime-контакт менеджера.

@@ -7,6 +7,8 @@ const {
 const {detectMainMenuAction} = require("../utils/mainMenu");
 const {handleMainMenuAction} = require("./main_menu");
 const {t, getCtxLang} = require("../utils/i18n");
+const {isLaravelMode} = require("../config/runtime");
+const {applyOptions} = require("../services/sessionCartService");
 
 module.exports = async (ctx) => {
   const step = ctx.session?.step;
@@ -20,21 +22,28 @@ module.exports = async (ctx) => {
   if (!step) return;
 
   if (step.startsWith("admin_bike_")) {
+    if (isLaravelMode()) return;
     const {handleAdminBikeStep} = require("./admin_bikes");
     return handleAdminBikeStep(ctx);
   }
 
   if (step === "awaiting_comment" && ctx.message?.text) {
     const lang = getCtxLang(ctx);
-    const user = await db("users").where({telegram_id: telegramId}).first();
-    if (!user) {
-      await ctx.reply(t(lang, "user_not_found"));
-      return;
+    if (isLaravelMode()) {
+      const booking = ctx.session.booking || {};
+      booking.notes = ctx.message.text;
+      ctx.session.booking = booking;
+      applyOptions(ctx, booking);
+    } else {
+      const user = await db("users").where({telegram_id: telegramId}).first();
+      if (!user) {
+        await ctx.reply(t(lang, "user_not_found"));
+        return;
+      }
+      await db("rentals")
+        .where({user_id: user.id, status: "process"})
+        .update({comment: ctx.message.text});
     }
-
-    await db("rentals")
-      .where({user_id: user.id, status: "process"})
-      .update({comment: ctx.message.text});
 
     ctx.session.step = null;
 
@@ -114,6 +123,7 @@ module.exports = async (ctx) => {
   }
 
   if (step === "admin_decline_reason" && ctx.message?.text) {
+    if (isLaravelMode()) return;
     const rentalId = ctx.session.adminDeclineRentalId;
     ctx.session.step = null;
     ctx.session.adminDeclineRentalId = null;
@@ -122,6 +132,7 @@ module.exports = async (ctx) => {
   }
 
   if (step === "admin_deposit_note" && ctx.message?.text) {
+    if (isLaravelMode()) return;
     const lang = getCtxLang(ctx);
     const rentalId = ctx.session.adminDepositRentalId;
     ctx.session.step = null;

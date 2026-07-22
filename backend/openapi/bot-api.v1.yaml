@@ -1,0 +1,710 @@
+openapi: 3.1.0
+info:
+  title: Drive Phangan Telegram Bot API
+  version: 1.0.0
+  description: >-
+    Private service API used by the Telegram bot. Laravel is the only source of
+    truth for customers, catalog, availability, pricing, bookings and documents.
+    Clients may supply X-Request-ID for correlation; the service returns it in the
+    response header and in response metadata or error details.
+servers:
+  - url: /api/v1/bot
+security:
+  - serviceToken: []
+tags:
+  - name: Configuration
+  - name: Customers
+  - name: Catalog
+  - name: Pricing
+  - name: Bookings
+  - name: Documents
+paths:
+  /configuration:
+    get:
+      tags: [Configuration]
+      operationId: getBotConfiguration
+      responses:
+        '200':
+          description: Runtime business settings safe for the bot.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/Configuration'
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /customers/sync:
+    post:
+      tags: [Customers]
+      operationId: syncTelegramCustomer
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerSyncRequest'
+      responses:
+        '200': {$ref: '#/components/responses/CustomerSuccess'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /customers/me:
+    parameters:
+      - $ref: '#/components/parameters/TelegramUserId'
+    get:
+      tags: [Customers]
+      operationId: getTelegramCustomer
+      responses:
+        '200': {$ref: '#/components/responses/CustomerSuccess'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+    patch:
+      tags: [Customers]
+      operationId: updateTelegramCustomer
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdateRequest'
+      responses:
+        '200': {$ref: '#/components/responses/CustomerSuccess'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /customers/me/documents:
+    post:
+      tags: [Documents]
+      operationId: uploadCustomerDocument
+      parameters:
+        - $ref: '#/components/parameters/TelegramUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentUploadRequest'
+      responses:
+        '201': {$ref: '#/components/responses/DocumentSuccess'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /categories:
+    get:
+      tags: [Catalog]
+      operationId: listBookingCategories
+      responses:
+        '200':
+          description: Active categories with published vehicles.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: array
+                        items: {$ref: '#/components/schemas/Category'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /vehicles:
+    get:
+      tags: [Catalog]
+      operationId: listBookingVehicles
+      parameters:
+        - $ref: '#/components/parameters/VehicleType'
+        - $ref: '#/components/parameters/CategoryId'
+      responses:
+        '200': {$ref: '#/components/responses/VehicleListSuccess'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /vehicles/available:
+    get:
+      tags: [Catalog]
+      operationId: listAvailableVehicles
+      parameters:
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/VehicleType'
+        - $ref: '#/components/parameters/CategoryId'
+      responses:
+        '200': {$ref: '#/components/responses/VehicleListSuccess'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /vehicles/{vehicle}:
+    get:
+      tags: [Catalog]
+      operationId: getBookingVehicle
+      parameters:
+        - $ref: '#/components/parameters/VehicleId'
+      responses:
+        '200':
+          description: Published vehicle.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: {$ref: '#/components/schemas/Vehicle'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /vehicles/{vehicle}/availability:
+    get:
+      tags: [Catalog]
+      operationId: getVehicleAvailabilityCalendar
+      parameters:
+        - $ref: '#/components/parameters/VehicleId'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+      responses:
+        '200':
+          description: Date-level availability over a maximum 93-day range.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: {$ref: '#/components/schemas/AvailabilityCalendar'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /quotes:
+    post:
+      tags: [Pricing]
+      operationId: quoteBooking
+      description: Calculates the authoritative price and returns current availability.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuoteRequest'
+      responses:
+        '200':
+          description: Authoritative quote.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: {$ref: '#/components/schemas/Quote'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /bookings:
+    post:
+      tags: [Bookings]
+      operationId: createTelegramBookings
+      description: >-
+        Atomically creates every cart item. If one vehicle is unavailable, no
+        booking is created. Reusing the same key and payload replays the result.
+      parameters:
+        - $ref: '#/components/parameters/TelegramUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingsRequest'
+      responses:
+        '201':
+          description: Batch created or replayed.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data:
+                        type: array
+                        items: {$ref: '#/components/schemas/CreatedBooking'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /customers/me/bookings:
+    get:
+      tags: [Bookings]
+      operationId: listTelegramCustomerBookings
+      parameters:
+        - $ref: '#/components/parameters/TelegramUserId'
+        - name: scope
+          in: query
+          schema: {type: string, enum: [current, history, all], default: current}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: offset
+          in: query
+          schema: {type: integer, minimum: 0, maximum: 10000, default: 0}
+      responses:
+        '200': {$ref: '#/components/responses/BookingListSuccess'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /bookings/{booking}:
+    get:
+      tags: [Bookings]
+      operationId: getTelegramCustomerBooking
+      parameters:
+        - $ref: '#/components/parameters/TelegramUserId'
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200': {$ref: '#/components/responses/BookingSuccess'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /bookings/{booking}/cancel:
+    post:
+      tags: [Bookings]
+      operationId: cancelTelegramCustomerBooking
+      parameters:
+        - $ref: '#/components/parameters/TelegramUserId'
+        - $ref: '#/components/parameters/BookingId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: {type: [string, 'null'], maxLength: 2000}
+      responses:
+        '200': {$ref: '#/components/responses/BookingSuccess'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /bookings/{booking}/documents:
+    post:
+      tags: [Documents]
+      operationId: uploadBookingDocument
+      parameters:
+        - $ref: '#/components/parameters/TelegramUserId'
+        - $ref: '#/components/parameters/BookingId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {$ref: '#/components/schemas/DocumentUploadRequest'}
+      responses:
+        '201': {$ref: '#/components/responses/DocumentSuccess'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Hashed, rotatable service token with route abilities.
+  parameters:
+    TelegramUserId:
+      name: X-Telegram-User-ID
+      in: header
+      required: true
+      schema: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 1, maxLength: 255}
+    VehicleId:
+      name: vehicle
+      in: path
+      required: true
+      schema: {type: integer, minimum: 1}
+    BookingId:
+      name: booking
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    StartDate:
+      name: start_date
+      in: query
+      required: true
+      schema: {type: string, format: date}
+    EndDate:
+      name: end_date
+      in: query
+      required: true
+      schema: {type: string, format: date}
+    VehicleType:
+      name: type
+      in: query
+      schema: {type: string, enum: [bike, scooter, car]}
+    CategoryId:
+      name: category_id
+      in: query
+      schema: {type: integer, minimum: 1}
+  responses:
+    Unauthorized:
+      description: Missing, invalid or revoked service token.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    Forbidden:
+      description: Service token lacks the required ability.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    NotFound:
+      description: Resource is unavailable or does not belong to this customer.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    Conflict:
+      description: Domain conflict, stale availability, late cancellation or idempotency conflict.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    ValidationFailed:
+      description: Request validation failed.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    RateLimited:
+      description: Authentication, per-service or per-Telegram-user request limit exceeded.
+      headers:
+        Retry-After: {schema: {type: integer}}
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    CustomerSuccess:
+      description: Customer profile.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccessEnvelope'
+              - properties:
+                  data: {$ref: '#/components/schemas/Customer'}
+    VehicleListSuccess:
+      description: Published vehicles.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccessEnvelope'
+              - properties:
+                  data:
+                    type: array
+                    items: {$ref: '#/components/schemas/Vehicle'}
+    BookingListSuccess:
+      description: Customer-owned bookings.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccessEnvelope'
+              - properties:
+                  data:
+                    type: array
+                    items: {$ref: '#/components/schemas/Booking'}
+    BookingSuccess:
+      description: Customer-owned booking.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccessEnvelope'
+              - properties:
+                  data: {$ref: '#/components/schemas/Booking'}
+    DocumentSuccess:
+      description: Private document metadata; no storage path is exposed.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccessEnvelope'
+              - properties:
+                  data: {$ref: '#/components/schemas/Document'}
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data: {}
+        meta: {$ref: '#/components/schemas/ResponseMeta'}
+    ResponseMeta:
+      type: object
+      required: [request_id, idempotency_replayed]
+      properties:
+        request_id: {type: string}
+        idempotency_replayed: {type: boolean}
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, fields, details, request_id]
+          properties:
+            code: {type: string, pattern: '^[A-Z0-9_]+$'}
+            message: {type: string}
+            fields: {type: object, additionalProperties: {type: array, items: {type: string}}}
+            details: {type: object, additionalProperties: true}
+            request_id: {type: string}
+    Configuration:
+      type: object
+      required: [timezone, currency, terms_version, pending_ttl_hours]
+      properties:
+        timezone: {type: string, example: Asia/Bangkok}
+        currency: {type: string, example: THB}
+        terms_version: {type: string}
+        pending_ttl_hours: {type: integer, minimum: 1}
+        manager_telegram: {type: [string, 'null']}
+    CustomerSyncRequest:
+      type: object
+      required: [telegram_id]
+      properties:
+        telegram_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+        username: {type: [string, 'null'], maxLength: 64}
+        first_name: {type: [string, 'null'], maxLength: 255}
+        last_name: {type: [string, 'null'], maxLength: 255}
+        locale:
+          type: [string, 'null']
+          maxLength: 35
+          description: Raw Telegram language code; `uk` is normalized to the internal `ua` locale.
+    CustomerUpdateRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name: {type: string, minLength: 2, maxLength: 255}
+        locale: {type: string, enum: [ru, en, ua]}
+        phone: {type: [string, 'null'], maxLength: 64}
+        username: {type: [string, 'null'], maxLength: 64}
+        passport_number: {type: [string, 'null'], maxLength: 100}
+    Customer:
+      type: object
+      required: [id, name, locale, phone, telegram, passport, profile_complete]
+      properties:
+        id: {type: integer}
+        name: {type: [string, 'null']}
+        locale: {type: [string, 'null'], enum: [ru, en, ua, null]}
+        phone: {type: [string, 'null']}
+        telegram:
+          type: object
+          properties:
+            id: {type: [string, 'null']}
+            username: {type: [string, 'null']}
+        passport:
+          type: object
+          properties:
+            number: {type: [string, 'null']}
+            has_document: {type: boolean}
+        profile_complete:
+          type: object
+          properties:
+            name: {type: boolean}
+            language: {type: boolean}
+            phone: {type: boolean}
+            passport: {type: boolean}
+    Category:
+      type: object
+      required: [id, code, name, vehicles_count]
+      properties:
+        id: {type: integer}
+        code: {type: string}
+        name: {type: string}
+        vehicle_type: {type: [string, 'null'], enum: [bike, scooter, car, null]}
+        description: {type: [string, 'null']}
+        vehicles_count: {type: integer, minimum: 0}
+    Photo:
+      type: object
+      required: [id, url, thumbnail_url, is_primary]
+      properties:
+        id: {type: integer}
+        url: {type: string}
+        thumbnail_url: {type: string}
+        alt_text: {type: [string, 'null']}
+        is_primary: {type: boolean}
+    Vehicle:
+      type: object
+      required: [id, type, name, photos]
+      properties:
+        id: {type: integer}
+        type: {type: string, enum: [bike, scooter, car]}
+        name: {type: string}
+        year: {type: [integer, 'null']}
+        description: {type: [string, 'null']}
+        characteristics: {type: [string, 'null']}
+        emoji: {type: [string, 'null']}
+        category: {anyOf: [{$ref: '#/components/schemas/Category'}, {type: 'null'}]}
+        primary_photo: {anyOf: [{$ref: '#/components/schemas/Photo'}, {type: 'null'}]}
+        photos: {type: array, items: {$ref: '#/components/schemas/Photo'}}
+    AvailabilityCalendar:
+      type: object
+      required: [vehicle_id, start_date, end_date, available, unavailable_dates]
+      properties:
+        vehicle_id: {type: integer}
+        start_date: {type: string, format: date}
+        end_date: {type: string, format: date}
+        available: {type: boolean}
+        unavailable_dates: {type: array, uniqueItems: true, items: {type: string, format: date}}
+    QuoteRequest:
+      type: object
+      required: [vehicle_id, starts_on, ends_on]
+      properties:
+        vehicle_id: {type: integer, minimum: 1}
+        starts_on: {type: string, format: date, description: Must not be before the current business date.}
+        ends_on: {type: string, format: date, description: Inclusive period; maximum 366 days by default.}
+    PriceBreakdown:
+      type: object
+      properties:
+        season: {type: string}
+        days: {type: integer}
+        tier: {type: string}
+        package_total: {type: integer}
+        anchor_days: {type: integer}
+        daily_rate: {type: string}
+        subtotal: {type: string}
+    Quote:
+      type: object
+      required: [vehicle_id, start_date, end_date, total_days, tier_key, calculated_total, rounded_total, final_total, average_daily_rate, currency, breakdown, available]
+      properties:
+        vehicle_id: {type: integer}
+        start_date: {type: string, format: date}
+        end_date: {type: string, format: date}
+        total_days: {type: integer, minimum: 1}
+        tier_key: {type: string}
+        calculated_total: {type: string}
+        rounded_total: {type: integer}
+        final_total: {type: integer}
+        average_daily_rate: {type: integer}
+        currency: {type: string}
+        breakdown: {type: array, items: {$ref: '#/components/schemas/PriceBreakdown'}}
+        missing_prices: {type: array, items: {type: object}}
+        available: {type: boolean}
+    CreateBookingsRequest:
+      type: object
+      required: [terms_accepted, terms_version, items]
+      properties:
+        terms_accepted: {type: boolean, const: true}
+        terms_version: {type: string, maxLength: 64}
+        items:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items: {$ref: '#/components/schemas/CreateBookingItem'}
+    CreateBookingItem:
+      type: object
+      required: [client_reference, vehicle_id, starts_on, ends_on, helmets_quantity, delivery_required]
+      allOf:
+        - if:
+            properties:
+              delivery_required: {const: true}
+          then:
+            required: [delivery_address]
+            properties:
+              delivery_address: {type: string, minLength: 1, maxLength: 2000}
+      properties:
+        client_reference: {type: string, maxLength: 100}
+        vehicle_id: {type: integer, minimum: 1}
+        starts_on: {type: string, format: date, description: Must not be before the current business date.}
+        ends_on: {type: string, format: date, description: Inclusive period; maximum 366 days by default.}
+        pickup_time: {type: [string, 'null'], pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
+        return_time: {type: [string, 'null'], pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
+        helmets_quantity: {type: integer, minimum: 0, maximum: 4}
+        delivery_required: {type: boolean}
+        delivery_address: {type: [string, 'null'], maxLength: 2000, description: Required and non-blank when delivery is requested.}
+        client_comment: {type: [string, 'null'], maxLength: 5000}
+    CreatedBooking:
+      type: object
+      required: [client_reference, booking]
+      properties:
+        client_reference: {type: string}
+        booking: {$ref: '#/components/schemas/Booking'}
+    Booking:
+      type: object
+      required: [public_id, status, vehicle, starts_on, ends_on, price, options, terms, documents, can_cancel, cancellation]
+      properties:
+        public_id: {type: string, format: uuid}
+        status: {type: string, enum: [process, pending, approved, active, completed, cancelled, cancelled_by_client, expired, no_show]}
+        vehicle: {$ref: '#/components/schemas/Vehicle'}
+        starts_on: {type: string, format: date}
+        ends_on: {type: string, format: date}
+        pickup_time: {type: [string, 'null']}
+        return_time: {type: [string, 'null']}
+        price:
+          type: object
+          properties:
+            total_days: {type: integer}
+            tier_key: {type: string}
+            calculated_total: {type: string}
+            final_total: {type: integer}
+            currency: {type: string}
+        options:
+          type: object
+          properties:
+            helmets_quantity: {type: integer}
+            delivery_required: {type: boolean}
+            delivery_address: {type: [string, 'null']}
+            client_comment: {type: [string, 'null']}
+        terms:
+          type: object
+          properties:
+            version: {type: [string, 'null']}
+            accepted_at: {type: [string, 'null'], format: date-time}
+        documents: {type: array, items: {$ref: '#/components/schemas/Document'}}
+        can_cancel: {type: boolean}
+        cancellation:
+          type: object
+          properties:
+            can_cancel: {type: boolean}
+            requires_manager: {type: boolean}
+            manager_telegram: {type: [string, 'null']}
+        pending_expires_at: {type: [string, 'null'], format: date-time}
+        created_at: {type: [string, 'null'], format: date-time}
+        updated_at: {type: [string, 'null'], format: date-time}
+    DocumentUploadRequest:
+      type: object
+      required: [type, document]
+      properties:
+        type: {type: string, enum: [passport, driver_license, photo, other]}
+        document: {type: string, format: binary}
+    Document:
+      type: object
+      required: [id, type, filename]
+      properties:
+        id: {type: integer}
+        type: {type: string}
+        filename: {type: string}
+        mime_type: {type: [string, 'null']}
+        file_size: {type: [integer, 'null']}
+        booking_public_id: {type: [string, 'null'], format: uuid}
+        created_at: {type: [string, 'null'], format: date-time}
