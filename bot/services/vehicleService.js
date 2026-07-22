@@ -8,6 +8,8 @@ const {
   KNOWN_VEHICLE_TYPES,
   normalizeVehicleType,
 } = require("../utils/vehicleTypes");
+const {isLaravelMode} = require("../config/runtime");
+const gateway = require("./laravelGateway");
 
 function normalizeVehicle(row) {
   if (!row) return row;
@@ -30,11 +32,13 @@ function getBookingDateTimes({startDate, endDate, startTime = null, endTime = nu
 }
 
 async function getVehicleById(client, vehicleId) {
+  if (isLaravelMode()) return gateway.getVehicle(vehicleId);
   const row = await client("bikes").where({id: vehicleId}).first();
   return normalizeVehicle(row);
 }
 
 async function getActiveVehicleById(client, vehicleId) {
+  if (isLaravelMode()) return gateway.getVehicle(vehicleId);
   const row = await client("bikes")
     .where({id: vehicleId, is_active: true})
     .first();
@@ -45,6 +49,12 @@ async function findBusyVehicleIds(
   client,
   {startDate, endDate, startTime = null, endTime = null}
 ) {
+  if (isLaravelMode()) {
+    const all = await gateway.listVehicles();
+    const available = await gateway.listAvailableVehicles({startDate, endDate});
+    const availableIds = new Set(available.map((vehicle) => vehicle.id));
+    return all.filter((vehicle) => !availableIds.has(vehicle.id)).map((vehicle) => vehicle.id);
+  }
   const {startAtIso, endAtIso} = getBookingDateTimes({
     startDate,
     endDate,
@@ -66,6 +76,11 @@ async function listActiveVehicles(
   client,
   {categoryId = null, vehicleType = null, excludeIds = [], columns = null} = {}
 ) {
+  if (isLaravelMode()) {
+    const vehicles = await gateway.listVehicles({category_id: categoryId, type: vehicleType});
+    const excluded = new Set(excludeIds);
+    return vehicles.filter((vehicle) => !excluded.has(vehicle.id));
+  }
   const selectedColumns =
     columns && columns.length
       ? columns
@@ -107,6 +122,14 @@ async function listAvailableVehicles(
   client,
   {startDate, endDate, startTime = null, endTime = null, categoryId = null, vehicleType = null}
 ) {
+  if (isLaravelMode()) {
+    return gateway.listAvailableVehicles({
+      startDate,
+      endDate,
+      categoryId,
+      vehicleType,
+    });
+  }
   const busyIds = await findBusyVehicleIds(client, {
     startDate,
     endDate,
@@ -144,6 +167,20 @@ async function calculateVehiclePricing(
   client,
   {vehicleId, startDate, endDate, startTime = null, endTime = null}
 ) {
+  if (isLaravelMode()) {
+    const quote = await gateway.quote(vehicleId, startDate, endDate);
+    return {
+      seasonId: null,
+      days: quote.total_days,
+      daysType: quote.tier_key,
+      priceRow: quote,
+      pricePerDay: quote.average_daily_rate,
+      totalPrice: quote.final_total,
+      priceUnknown: false,
+      available: quote.available,
+      quote,
+    };
+  }
   const startAt = makeDateTime(startDate, startTime);
   const endAt = makeDateTime(endDate, endTime);
   const start = startAt ? dayjs(startAt) : dayjs(startDate);

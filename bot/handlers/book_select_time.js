@@ -7,6 +7,7 @@ const {getCalendarLabels, getWeekdays, getCtxLang, t} = require("../utils/i18n")
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const db = require("../connect");
 const showAvailableBikes = require("./book_show_available_bikes");
+const {isLaravelMode} = require("../config/runtime");
 
 async function handleStartTime(ctx, booking, lang) {
   const startAt = makeDateTime(booking.startDate, booking.startTime);
@@ -33,7 +34,11 @@ async function handleStartTime(ctx, booking, lang) {
 
   let blockedDays = [];
   if (booking.selectedBikeId) {
-    blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
+    const rangeStart = startAt.startOf("month").startOf("week");
+    blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, {
+      startDate: rangeStart.format("YYYY-MM-DD"),
+      endDate: rangeStart.add(41, "day").format("YYYY-MM-DD"),
+    });
   }
 
   return ctx.editMessageText(t(lang, "booking_choose_end_date"), {
@@ -90,8 +95,12 @@ async function handleEndTime(ctx, booking, lang) {
   booking.step = "dates_selected";
 
   // Check blocked days for selected bike (date-level)
-  if (booking.selectedBikeId) {
-    const blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
+  if (booking.selectedBikeId && !isLaravelMode()) {
+    const rangeStart = dayjs(booking.startDate).startOf("month").startOf("week");
+    const blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, {
+      startDate: rangeStart.format("YYYY-MM-DD"),
+      endDate: dayjs(booking.endDate).endOf("month").endOf("week").format("YYYY-MM-DD"),
+    });
     const selectedDates = [];
     let current = dayjs(booking.startDate);
     const end = dayjs(booking.endDate);

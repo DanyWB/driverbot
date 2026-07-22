@@ -1,5 +1,5 @@
-const db = require("../connect");
-const {registerUser} = require("../services/userService");
+const {registerUser, getUserByTelegramId} = require("../services/userService");
+const {isLaravelMode} = require("../config/runtime");
 const {setUserCommands} = require("../utils/setCommands");
 const {getMainMenuKeyboard} = require("../utils/mainMenu");
 const {
@@ -24,17 +24,19 @@ module.exports = async (ctx) => {
     }
   }
 
-  let user = await db("users").where({telegram_id: telegramId}).first();
+  let user = null;
+  try {
+    user = await getUserByTelegramId(telegramId);
+  } catch (error) {
+    if (!isLaravelMode() || error.code !== "CUSTOMER_NOT_SYNCED") throw error;
+  }
   let isNewUser = false;
 
   if (!user) {
-    await registerUser({
-      id: telegramId,
-      username: ctx.from.username || null,
-    });
-
-    user = await db("users").where({telegram_id: telegramId}).first();
+    user = await registerUser(ctx.from);
     isNewUser = true;
+  } else if (isLaravelMode()) {
+    user = await registerUser(ctx.from);
   }
 
   if (isNewUser) {

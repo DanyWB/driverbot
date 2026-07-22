@@ -4,6 +4,7 @@ namespace App\Domain\Bookings\Data;
 
 use App\Domain\Bookings\Enums\BookingSource;
 use App\Domain\Bookings\Enums\BookingStatus;
+use DateTimeInterface;
 
 final readonly class CreateBookingData
 {
@@ -19,5 +20,10 @@ final readonly class CreateBookingData
         public ?string $clientComment = null,
         public ?string $adminNote = null,
         public ?string $depositNote = null,
+        public int $helmetsQuantity = 0,
+        public bool $deliveryRequired = false,
+        public ?string $deliveryAddress = null,
+        public ?DateTimeInterface $termsAcceptedAt = null,
+        public ?string $termsVersion = null,
     ) {}
 }

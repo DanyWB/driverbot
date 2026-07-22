@@ -27,9 +27,11 @@ module.exports = {
   share_contact_btn: "📨 Надіслати контакт",
 
   menu_title: "🏠 Головне меню:",
-  menu_my_rent: "🛵 Моя оренда",
+  menu_my_rent: "🚘 Моя оренда",
   menu_support: "💬 Підтримка",
   menu_prices: "💸 Ціни",
+  prices_dynamic_hint:
+    "Точна вартість розраховується за актуальними тарифами для обраної техніки та дат оренди.",
   menu_account: "👤 Мій профіль",
   menu_conditions: "📝 Умови оренди",
   menu_about: "ℹ️ Про нас",
@@ -81,13 +83,15 @@ module.exports = {
   conditions_view_btn: "📄 Умови оренди",
   conditions_accept_required:
     "Щоб підтвердити бронювання, прийміть умови оренди. Натисніть «Прийняти умови оренди».",
+  conditions_version_changed:
+    "Умови оренди змінилися. Перед підтвердженням бронювання перегляньте нову версію та прийміть її.",
   conditions_terms_link:
-    "Повний договір користувача: <a href=\"https://example.com/terms\">https://example.com/terms</a>",
+    "Повний текст користувацької угоди можна запросити у менеджера.",
 
   booking_price_tbd: "ціна уточнюється",
 
   rent_intro: "Давайте підберемо ідеальний скутер. Оберіть дію:",
-  rent_btn_book: "🛵 Забронювати",
+  rent_btn_book: "🚘 Забронювати",
   rent_btn_current: "🗂 Поточні бронювання",
   rent_btn_history: "📜 Історія оренд",
   rent_btn_contract: "📄 Договір оренди",
@@ -116,6 +120,8 @@ module.exports = {
   rent_status_cancelled: "скасована",
   rent_status_completed: "завершена",
   rent_status_approved: "підтверджена",
+  rent_status_expired: "прострочена",
+  rent_status_no_show: "неявка",
   reminder_start_24h: "Нагадування: оренда починається через 24 години",
   reminder_start_1h: "Нагадування: оренда починається через 1 годину",
   reminder_end_24h: "Нагадування: оренда завершується через 24 години",
@@ -145,6 +151,10 @@ module.exports = {
   rent_cancel_confirm: "Скасувати бронювання ID {id}?",
   rent_cancelled: "Бронювання скасовано.",
   rent_cannot_cancel: "Не можна скасувати це бронювання.",
+  rent_cancel_manager_required:
+    "До початку оренди залишилося менше 24 годин. Для скасування та уточнення передоплати зв'яжіться з менеджером напряму: {manager}",
+  rent_cancel_manager_contact_missing:
+    "До початку оренди залишилося менше 24 годин. Автоматичне скасування недоступне; зверніться до нас через розділ «Підтримка».",
   rent_history_details: "📍 Деталі (історія)",
   about_info:
     "🏝️ DRIVE PHANGAN — оренда скутерів та авто на острові Ко Пханган.\nОфіційно працюємо з 2019 року.\n🛵 Щороку оновлюємо парк новими моделями — для тих, хто цінує комфорт, стиль і свободу пересування.\n\n🚀 Оренда у нас — це чесно і прозоро: без мутних схем і «розводів» на подряпини.\n⭐ Понад 100 позитивних відгуків у Google Maps і багато клієнтів, які повертаються до нас сезон за сезоном.\nНадійно, просто і з турботою про ваш відпочинок ✨\n\n🤖 Цей бот створено, щоб спростити оренду: усе автоматизовано, без зайвої рутини. Ви можете пройти всі етапи бронювання прямо тут. Якщо виникнуть питання — ми на зв'язку!\n\n📍 Нас легко знайти:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://www.instagram.com/drive_phangan/\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
@@ -168,9 +178,9 @@ module.exports = {
   not_registered: "Ви не зареєстровані.",
 
   booking_intro:
-    "🚲 <b>Оренда байка</b>\n\nОберіть зручний спосіб бронювання:\n- спочатку обрати <b>дати</b>, а потім доступні байки;\n- або спочатку обрати <b>байк</b>, а потім вільні дати.\n\n📌 Оберіть варіант нижче:",
+    "🚘 <b>Оренда транспорту</b>\n\nОберіть зручний спосіб бронювання:\n- спочатку обрати <b>дати</b>, а потім доступний транспорт;\n- або спочатку обрати <b>транспорт</b>, а потім вільні дати.\n\n📌 Оберіть варіант нижче:",
   booking_btn_date_first: "📅 Спочатку обрати дату",
-  booking_btn_bike_first: "🏍️ Спочатку обрати байк",
+  booking_btn_bike_first: "🚘 Спочатку обрати транспорт",
 
   booking_choose_start_date: "📅 Оберіть дату початку оренди.",
   booking_choose_end_date: "📅 Оберіть дату закінчення оренди:",
@@ -180,9 +190,9 @@ module.exports = {
   booking_start_in_past: "Час початку має бути щонайменше через 1 годину від зараз.",
   booking_end_before_start: "Дата закінчення не може бути раніше початку.",
   booking_min_duration: "Мінімальна тривалість оренди — 1 година.",
-  booking_choose_category: "🏍️ Спочатку оберіть категорію байків.",
-  booking_choose_bike: "🏍️ Оберіть байк:",
-  booking_no_bikes_in_category: "😔 У цій категорії поки немає байків.",
+  booking_choose_category: "🚘 Спочатку оберіть категорію транспорту.",
+  booking_choose_bike: "🚘 Оберіть транспорт:",
+  booking_no_bikes_in_category: "😔 У цій категорії поки немає транспорту.",
 
   booking_category_light: "🌿 Light (110-125cc)",
   booking_category_comfort: "✨ Comfort (150-160cc)",
@@ -192,22 +202,22 @@ module.exports = {
   booking_profile_required:
     "Для бронювання вкажіть ім'я та номер телефону в розділі «Мій профіль».",
   booking_no_available_bikes:
-    "😔 На вибрані дати немає доступних байків.",
+    "😔 На вибрані дати немає доступного транспорту.",
   booking_no_availability_lead:
-    "На ці дати немає вільних байків. Ми створили заявку для оператора — він зв'яжеться з вами і спробує знайти варіант.",
+    "На ці дати немає вільного транспорту. Ми створили заявку для оператора — він зв'яжеться з вами і спробує знайти варіант.",
   admin_no_availability_lead:
     "🚨 <b>Немає доступних байків</b>\n\n📅 Дати: {start} — {end}\n👤 Користувач: {user} (@{username})\n📞 Телефон: {phone}\n🏷️ Категорія: {category}\n✏️ Коментар: {comment}",
-  booking_available_bikes_title: "🏍️ Доступні байки:",
+  booking_available_bikes_title: "🚘 Доступний транспорт:",
 
   booking_range_conflict:
     "У вибраному діапазоні вже є зайняті дати. Спробуйте ще раз.\n\n📅 Оберіть дату початку оренди:",
   booking_range_conflict_bike:
-    "У вибраному діапазоні є зайняті дати для цього байка. Оберіть інший період.",
+    "У вибраному діапазоні є зайняті дати для цього транспорту. Оберіть інший період.",
   booking_end_before_start: "Дата закінчення не може бути раніше початку.",
   booking_date_in_past: "Не можна вибрати дату в минулому.",
 
-  booking_invalid_bike_id: "Невірний формат ID байка.",
-  booking_bike_not_found: "Байк не знайдено.",
+  booking_invalid_bike_id: "Невірний формат ID транспорту.",
+  booking_bike_not_found: "Транспорт не знайдено.",
 
   booking_period_label: "Період оренди:",
   booking_price_label: "Вартість:",
@@ -218,41 +228,43 @@ module.exports = {
   booking_not_enough_data: "Недостатньо даних для оренди.",
   booking_current_title: "🧾 <b>Поточна оренда:</b>\n\n",
   booking_item:
-    "🏍️ <b>{name}</b>\n{start} - {end} ({days} {days_label})\nВартість: {price} THB\n\n",
+    "{emoji} <b>{name}</b>\n{start} - {end} ({days} {days_label})\nВартість: {price} THB\n\n",
   booking_confirm_btn: "✅ Підтвердити бронювання",
-  booking_add_bike_btn: "➕ Додати байк",
-  booking_delete_bike_btn: "🗑️ Видалити байк",
+  booking_add_bike_btn: "➕ Додати транспорт",
+  booking_delete_bike_btn: "🗑️ Видалити транспорт",
   booking_reset_btn: "♻️ Скинути",
   booking_comment_btn: "💬 Побажання",
   booking_add_error: "⚠️ Сталася помилка під час збереження оренди.",
+  booking_service_unavailable:
+    "Сервіс бронювання тимчасово недоступний. Ваші дані збережено, повторіть дію трохи пізніше.",
 
   booking_confirmed:
     "✅ Вашу оренду підтверджено!\nОчікуйте підтвердження адміністратора.",
   booking_no_bookings_to_confirm: "Немає бронювань для підтвердження.",
   booking_bike_busy:
-    "Байк \"{name}\" уже зайнятий на вибрані дати. Оберіть інший період.",
+    "Транспорт \"{name}\" уже зайнятий на вибрані дати. Оберіть інший період.",
   booking_admin_missing:
     "Вибачте. Зараз у системі немає адміністратора. Скасуйте цю оренду та повторіть спробу пізніше.",
   booking_admin_new:
     "🚨 <b>Нова заявка</b>\n\n👤 {user} (@{username})\n📞 Телефон: {phone}\n🛵 Модель: <b>{bike}</b>\n📅 Період: {start} — {end}\n💰 Вартість: {price}\n🧾 Депозит: {deposit}\n🪪 Документи: {docs}\n\n🪖 Шоломи: {helmets}\n🚚 Доставка: {delivery}\n🏠 Адреса: {address}\n✏️ Побажання: {comment}",
 
-  booking_delete_failed: "Не вдалося видалити байк.",
-  booking_bike_removed: "🗑️ Байк видалено з вашої оренди.",
-  booking_no_bikes_in_process: "У вас немає байків у процесі оренди.",
-  booking_delete_prompt: "🗑️ Оберіть байк, який хочете видалити з оренди:",
+  booking_delete_failed: "Не вдалося видалити транспорт.",
+  booking_bike_removed: "🗑️ Транспорт видалено з вашої оренди.",
+  booking_no_bikes_in_process: "У вас немає транспорту в процесі оренди.",
+  booking_delete_prompt: "🗑️ Оберіть транспорт, який хочете видалити з оренди:",
   booking_delete_bike_item: "Видалити {name}",
   booking_reset_done: "♻️ Оренду скинуто. Ви можете почати заново.",
   booking_comment_prompt:
     "💬 Введіть ваші побажання (наприклад, «подвійний шолом», «доставка в готель»):",
   booking_comment_saved: "💬 Ваші побажання збережено.",
-  booking_choose_bike_btn: "Обрати байк",
+  booking_choose_bike_btn: "Обрати транспорт",
   booking_period_selected:
-    "📅 Ви обрали період оренди:\n{start} - {end}\n\nТепер оберіть байк.",
+    "📅 Ви обрали період оренди:\n{start} - {end}\n\nТепер оберіть транспорт.",
   booking_start_date_selected:
     "📅 Дата початку оренди: {date}\n\nТепер оберіть дату закінчення оренди.",
-  booking_add_bike_to_rental_btn: "➕ Додати байк до оренди",
+  booking_add_bike_to_rental_btn: "➕ Додати транспорт до оренди",
   booking_bike_summary:
-    "🛵 <b>{name}</b>\n\n<b>Період оренди:</b> {start} - {end} ({days} {days_label})\n<b>Вартість на день:</b> {price_per_day} THB\n<b>Вартість:</b> {price} THB\n\n{desc}",
+    "{emoji} <b>{name}</b>\n\n<b>Період оренди:</b> {start} - {end} ({days} {days_label})\n<b>Вартість на день:</b> {price_per_day} THB\n<b>Вартість:</b> {price} THB\n\n{desc}",
   booking_season_not_found:
     "Не вдалося визначити сезон для вибраної дати.",
 
@@ -313,6 +325,7 @@ module.exports = {
   booking_options_address_prompt: "🏠 Введіть адресу доставки:",
   booking_options_notes_prompt: "✏️ Введіть ваші побажання/коментар:",
   booking_options_address_saved: "Адресу доставки збережено.",
+  booking_delivery_address_required: "Перед підтвердженням бронювання вкажіть адресу доставки.",
   booking_options_notes_saved: "Побажання збережено.",
   admin_not_allowed: "Доступ заборонено.",
   admin_menu_title: "👑 Адмін-панель",

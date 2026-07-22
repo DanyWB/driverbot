@@ -6,6 +6,7 @@ use App\Domain\Availability\Services\BookingAvailabilityService;
 use App\Domain\Bookings\Data\BookingActor;
 use App\Domain\Bookings\Data\ChangeBookingDatesData;
 use App\Domain\Bookings\Data\CreateBookingData;
+use App\Domain\Bookings\Enums\BookingSource;
 use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Bookings\Exceptions\BookingException;
 use App\Domain\Pricing\Services\BookingPriceSnapshotService;
@@ -41,14 +42,30 @@ class BookingService
             $this->assertActor($actor, ActorType::Admin);
         }
 
+        if ($data->helmetsQuantity < 0 || $data->helmetsQuantity > 4) {
+            throw new BookingException('invalid_helmets_quantity', 'Helmets quantity must be between 0 and 4.', 422);
+        }
+
+        $deliveryAddress = trim((string) $data->deliveryAddress);
+
+        if ($data->deliveryRequired && $deliveryAddress === '') {
+            throw new BookingException('delivery_address_required', 'A delivery address is required when delivery is requested.', 422);
+        }
+
         $this->assertCustomerOwnership($actor, $data->customerId);
+
+        if ($data->source === BookingSource::Telegram
+            && $actor->type !== ActorType::Admin
+            && ($data->termsAcceptedAt === null || trim((string) $data->termsVersion) === '')) {
+            throw new BookingException('terms_acceptance_required', 'Current rental terms must be accepted.', 422);
+        }
 
         $period = $this->period($data->startsOn, $data->endsOn);
         $pickupTime = $this->normalizeTime($data->pickupTime);
         $returnTime = $this->normalizeTime($data->returnTime);
 
         try {
-            return DB::transaction(function () use ($data, $actor, $requestId, $period, $pickupTime, $returnTime): Booking {
+            return DB::transaction(function () use ($data, $actor, $requestId, $period, $pickupTime, $returnTime, $deliveryAddress): Booking {
                 if (! Customer::query()->whereKey($data->customerId)->exists()) {
                     throw new BookingException('customer_not_found', 'Customer was not found.', 404, [
                         'customer_id' => $data->customerId,
@@ -72,6 +89,11 @@ class BookingService
                     'client_comment' => $data->clientComment,
                     'admin_note' => $data->adminNote,
                     'deposit_note' => $data->depositNote,
+                    'helmets_quantity' => $data->helmetsQuantity,
+                    'delivery_required' => $data->deliveryRequired,
+                    'delivery_address' => $data->deliveryRequired ? $deliveryAddress : null,
+                    'terms_accepted_at' => $data->termsAcceptedAt,
+                    'terms_version' => $data->termsVersion,
                     'created_by_admin_id' => $actor->adminId,
                     'pending_expires_at' => $data->initialStatus === BookingStatus::Pending
                         ? $now->addHours($this->pendingTtlHours())

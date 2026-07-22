@@ -171,6 +171,7 @@ class BookingController extends Controller
             'latestPriceSnapshot',
             'statusHistory.actorAdmin',
             'statusHistory.actorCustomer',
+            'statusHistory.actorServiceClient',
             'documents',
             'createdByAdmin',
         ])->loadCount('documents');

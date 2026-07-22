@@ -26,9 +26,11 @@ module.exports = {
   share_contact_btn: "📨 Отправить контакт",
 
   menu_title: "🏠 Главное меню:",
-  menu_my_rent: "🛵 Моя аренда",
+  menu_my_rent: "🚘 Моя аренда",
   menu_support: "💬 Поддержка",
   menu_prices: "💸 Цены",
+  prices_dynamic_hint:
+    "Точная стоимость рассчитывается по актуальным тарифам для выбранной техники и дат аренды.",
   menu_account: "👤 Мой профиль",
   menu_conditions: "📝 Условия аренды",
   menu_about: "ℹ️ О нас",
@@ -81,13 +83,15 @@ module.exports = {
   conditions_view_btn: "📄 Условия аренды",
   conditions_accept_required:
     "Чтобы подтвердить бронирование, нужно принять условия аренды. Нажмите «Принять условия аренды».",
+  conditions_version_changed:
+    "Условия аренды изменились. Перед подтверждением бронирования ознакомьтесь с новой версией и примите её.",
   conditions_terms_link:
-    "Полное пользовательское соглашение: <a href=\"https://example.com/terms\">https://example.com/terms</a>",
+    "Полный текст пользовательского соглашения можно запросить у менеджера.",
 
   booking_price_tbd: "цена уточняется",
 
   rent_intro: "Давайте подберём идеальный скутер. Выберите действие:",
-  rent_btn_book: "🛵 Забронировать",
+  rent_btn_book: "🚘 Забронировать",
   rent_btn_current: "🗂 Текущие бронирования",
   rent_btn_history: "📜 История аренды",
   rent_btn_contract: "📄 Договор аренды",
@@ -116,6 +120,8 @@ module.exports = {
   rent_status_cancelled: "отменена",
   rent_status_completed: "завершена",
   rent_status_approved: "подтверждена",
+  rent_status_expired: "истекла",
+  rent_status_no_show: "неявка",
   reminder_start_24h: "Напоминание: аренда начинается через 24 часа",
   reminder_start_1h: "Напоминание: аренда начинается через 1 час",
   reminder_end_24h: "Напоминание: аренда заканчивается через 24 часа",
@@ -145,6 +151,10 @@ module.exports = {
   rent_cancel_confirm: "Отменить бронирование ID {id}?",
   rent_cancelled: "Бронирование отменено.",
   rent_cannot_cancel: "Нельзя отменить эту бронь.",
+  rent_cancel_manager_required:
+    "До начала аренды осталось менее 24 часов. Для отмены и уточнения деталей по предоплате свяжитесь с менеджером напрямую: {manager}",
+  rent_cancel_manager_contact_missing:
+    "До начала аренды осталось менее 24 часов. Автоматическая отмена недоступна; свяжитесь с нами через раздел «Поддержка».",
   rent_history_details: "📍 Детали (история)",
   about_info:
     "🏝️ DRIVE PHANGAN — аренда скутеров и авто на Ко Пангане.\nОфициально работаем с 2019 года.\n🛵 Каждый год пополняем парк новыми моделями — для тех, кто ценит комфорт, стиль и свободу передвижения.\n\n🚀 Аренда у нас — это честно и прозрачно: никаких мутных схем и разводов на царапинах.\n⭐ Более 100 честных отзывов на Google Maps и множество клиентов, которые возвращаются к нам сезон за сезоном.\nНадёжно, просто и с заботой о вашем отдыхе ✨\n\n🤖 Этот бот создан, чтобы сделать процесс аренды максимально простым и удобным — всё автоматизировано, без лишней рутины. Вы можете пройти все этапы бронирования прямо здесь. Если возникнут вопросы — мы всегда на связи!\n\n📍 Нас легко найти:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://www.instagram.com/drive_phangan/\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
@@ -168,9 +178,9 @@ module.exports = {
   not_registered: "Вы не зарегистрированы.",
 
   booking_intro:
-    "🚲 <b>Аренда байка</b>\n\nВыберите удобный для вас способ бронирования:\n- сначала выбрать <b>даты</b>, а затем доступные байки;\n- или сначала выбрать <b>байк</b>, а затем свободные даты.\n\n📌 Выберите вариант ниже:",
+    "🚘 <b>Аренда транспорта</b>\n\nВыберите удобный способ бронирования:\n- сначала выбрать <b>даты</b>, а затем доступную технику;\n- или сначала выбрать <b>технику</b>, а затем свободные даты.\n\n📌 Выберите вариант ниже:",
   booking_btn_date_first: "📅 Сначала выбрать дату",
-  booking_btn_bike_first: "🏍️ Сначала выбрать байк",
+  booking_btn_bike_first: "🚘 Сначала выбрать технику",
 
   booking_choose_start_date: "📅 Выберите дату начала аренды.",
   booking_choose_end_date: "📅 Выберите дату окончания аренды:",
@@ -180,9 +190,9 @@ module.exports = {
   booking_start_in_past: "Время начала должно быть не раньше чем через час от текущего.",
   booking_end_before_start: "Дата окончания не может быть раньше начала.",
   booking_min_duration: "Минимальная длительность аренды — 1 час.",
-  booking_choose_category: "🏍️ Сначала выберите категорию байков.",
-  booking_choose_bike: "🏍️ Выберите байк:",
-  booking_no_bikes_in_category: "😔 В этой категории пока нет байков.",
+  booking_choose_category: "🚘 Сначала выберите категорию техники.",
+  booking_choose_bike: "🚘 Выберите технику:",
+  booking_no_bikes_in_category: "😔 В этой категории пока нет техники.",
 
   booking_category_light: "🌿 Лёгкие (110-125cc)",
   booking_category_comfort: "✨ Комфорт (150-160cc)",
@@ -192,22 +202,22 @@ module.exports = {
   booking_profile_required:
     "Для бронирования укажите имя и номер телефона. Заполните в разделе «Мой профиль».",
   booking_no_available_bikes:
-    "😔 К сожалению, нет доступных байков на выбранные даты.",
+    "😔 К сожалению, на выбранные даты нет доступной техники.",
   booking_no_availability_lead:
-    "На эти даты свободных байков нет. Мы создали заявку для оператора. Он свяжется с вами и постарается найти вариант.",
+    "На эти даты свободной техники нет. Мы создали заявку для оператора. Он свяжется с вами и постарается найти вариант.",
   admin_no_availability_lead:
     "🚨 <b>Нет доступных байков</b>\n\n📅 Даты: {start} — {end}\n👤 Пользователь: {user} (@{username})\n📞 Телефон: {phone}\n🏷️ Категория: {category}\n✏️ Комментарий: {comment}",
-  booking_available_bikes_title: "🏍️ Доступные байки:",
+  booking_available_bikes_title: "🚘 Доступная техника:",
 
   booking_range_conflict:
     "В выбранном диапазоне уже есть занятые даты. Попробуйте снова.\n\n📅 Выберите дату начала аренды:",
   booking_range_conflict_bike:
-    "В выбранном диапазоне есть занятые даты для этого байка. Выберите другой период.",
+    "В выбранном диапазоне есть занятые даты для этой техники. Выберите другой период.",
   booking_end_before_start: "Дата окончания не может быть раньше начала.",
   booking_date_in_past: "Нельзя выбрать дату в прошлом.",
 
-  booking_invalid_bike_id: "Неверный формат ID байка.",
-  booking_bike_not_found: "Байк не найден.",
+  booking_invalid_bike_id: "Неверный формат ID техники.",
+  booking_bike_not_found: "Техника не найдена.",
   booking_season_not_found: "Не удалось определить сезон по выбранной дате.",
 
   booking_period_label: "Период аренды:",
@@ -219,41 +229,43 @@ module.exports = {
   booking_not_enough_data: "Недостаточно данных для аренды.",
   booking_current_title: "🧾 <b>Текущая аренда:</b>\n\n",
   booking_item:
-    "🏍️ <b>{name}</b>\n{start} - {end} ({days} {days_label})\nСтоимость: {price} THB\n\n",
+    "{emoji} <b>{name}</b>\n{start} - {end} ({days} {days_label})\nСтоимость: {price} THB\n\n",
   booking_confirm_btn: "✅ Подтвердить бронирование",
-  booking_add_bike_btn: "➕ Добавить байк",
-  booking_delete_bike_btn: "🗑️ Удалить байк",
+  booking_add_bike_btn: "➕ Добавить технику",
+  booking_delete_bike_btn: "🗑️ Удалить технику",
   booking_reset_btn: "♻️ Сбросить",
   booking_comment_btn: "💬 Пожелания",
   booking_add_error: "⚠️ Произошла ошибка при сохранении аренды.",
+  booking_service_unavailable:
+    "Сервис бронирования временно недоступен. Ваши данные сохранены, повторите действие немного позже.",
 
   booking_confirmed:
     "✅ Ваша аренда подтверждена!\nОжидайте подтверждения администратора.",
   booking_no_bookings_to_confirm: "Нет бронирований для подтверждения.",
   booking_bike_busy:
-    "Байк \"{name}\" уже занят на выбранные даты. Проверьте новый период.",
+    "Техника \"{name}\" уже занята на выбранные даты. Проверьте новый период.",
   booking_admin_missing:
     "Извините. Сейчас в системе нет администратора. Пожалуйста, отмените эту аренду и повторите попытку позднее.",
   booking_admin_new:
     "🚨 <b>Новая заявка</b>\n\n👤 {user} (@{username})\n📞 Телефон: {phone}\n🛵 Модель: <b>{bike}</b>\n📅 Период: {start} — {end}\n💰 Стоимость: {price}\n🧾 Депозит: {deposit}\n🪪 Документы: {docs}\n\n🪖 Шлемы: {helmets}\n🚚 Доставка: {delivery}\n🏠 Адрес: {address}\n✏️ Пожелания: {comment}",
 
-  booking_delete_failed: "Не удалось удалить байк.",
-  booking_bike_removed: "🗑️ Байк удалён из вашей аренды.",
-  booking_no_bikes_in_process: "У вас нет байков в процессе аренды.",
-  booking_delete_prompt: "🗑️ Выберите байк, который хотите удалить из аренды:",
+  booking_delete_failed: "Не удалось удалить технику.",
+  booking_bike_removed: "🗑️ Техника удалена из вашей аренды.",
+  booking_no_bikes_in_process: "У вас нет техники в процессе аренды.",
+  booking_delete_prompt: "🗑️ Выберите технику, которую хотите удалить из аренды:",
   booking_delete_bike_item: "Удалить {name}",
   booking_reset_done: "♻️ Аренда сброшена. Вы можете начать заново.",
   booking_comment_prompt:
     "💬 Введите ваши пожелания (например, «двойной шлем», «доставка в отель»):",
   booking_comment_saved: "💬 Ваши пожелания сохранены.",
-  booking_choose_bike_btn: "Выбрать байк",
+  booking_choose_bike_btn: "Выбрать технику",
   booking_period_selected:
-    "📅 Вы выбрали период аренды:\n{start} - {end}\n\nТеперь выберите байк.",
+    "📅 Вы выбрали период аренды:\n{start} - {end}\n\nТеперь выберите технику.",
   booking_start_date_selected:
     "📅 Дата начала аренды: {date}\n\nТеперь выберите дату окончания аренды.",
-  booking_add_bike_to_rental_btn: "➕ Добавить байк к аренде",
+  booking_add_bike_to_rental_btn: "➕ Добавить технику к аренде",
   booking_bike_summary:
-    "🛵 <b>{name}</b>\n\n<b>Период аренды:</b> {start} - {end} ({days} {days_label})\n<b>Стоимость в день:</b> {price_per_day} THB\n<b>Стоимость:</b> {price} THB\n\n{desc}",
+    "{emoji} <b>{name}</b>\n\n<b>Период аренды:</b> {start} - {end} ({days} {days_label})\n<b>Стоимость в день:</b> {price_per_day} THB\n<b>Стоимость:</b> {price} THB\n\n{desc}",
 
   btn_back: "⬅️ Назад",
   btn_home: "🏠 В меню",
@@ -312,6 +324,7 @@ module.exports = {
   booking_options_address_prompt: "🏠 Введите адрес доставки:",
   booking_options_notes_prompt: "✏️ Введите ваши пожелания/комментарий:",
   booking_options_address_saved: "Адрес доставки сохранён.",
+  booking_delivery_address_required: "Перед подтверждением бронирования укажите адрес доставки.",
   booking_options_notes_saved: "Пожелания сохранены.",
   admin_not_allowed: "Доступ запрещён.",
   admin_menu_title: "👑 Админ-панель",

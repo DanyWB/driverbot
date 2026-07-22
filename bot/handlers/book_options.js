@@ -5,6 +5,9 @@ const {getTimeKeyboard} = require("../utils/timeKeyboard");
 const {makeDateTime} = require("../utils/timeSlots");
 const db = require("../connect");
 const {showBikeSummary} = require("./book_select_bike");
+const {isLaravelMode} = require("../config/runtime");
+const {applyOptions, loadOptionsIntoBooking} = require("../services/sessionCartService");
+const {getVehicleById} = require("../services/vehicleService");
 
 function getOptionsKeyboard(lang) {
   return {
@@ -58,6 +61,10 @@ async function sendOptions(ctx, langOverride) {
 }
 
 async function persistProcessOptions(ctx, booking) {
+  if (isLaravelMode()) {
+    applyOptions(ctx, booking);
+    return;
+  }
   const user = await db("users").where({telegram_id: ctx.from.id}).first();
   if (!user) return;
 
@@ -92,6 +99,13 @@ async function persistProcessOptions(ctx, booking) {
 }
 
 async function loadProcessOptions(ctx, lang) {
+  if (isLaravelMode()) {
+    const booking = ensureBooking(ctx);
+    const item = loadOptionsIntoBooking(ctx, booking);
+    if (!item) return ctx.answerCallbackQuery(t(lang, "booking_no_bikes_in_process"));
+    ctx.session.optionsScope = "process";
+    return sendOptions(ctx, lang);
+  }
   const user = await db("users").where({telegram_id: ctx.from.id}).first();
   if (!user) {
     return ctx.reply(t(lang, "not_registered"));
@@ -229,7 +243,7 @@ module.exports = async (ctx) => {
       });
     }
     const bike = booking.selectedBikeId
-      ? await db("bikes").where({id: booking.selectedBikeId}).first()
+      ? await getVehicleById(db, booking.selectedBikeId)
       : null;
     if (bike) {
       return showBikeSummary(ctx, bike, booking);

@@ -8,4 +8,5 @@ return [
     'csv_delimiter' => env('BOOKING_CSV_DELIMITER', ';'),
     'vehicle_photo_max_mb' => (int) env('VEHICLE_PHOTO_MAX_MB', 8),
     'customer_document_max_mb' => (int) env('CUSTOMER_DOCUMENT_MAX_MB', 10),
+    'terms_version' => env('BOOKING_TERMS_VERSION', '2026-07-22'),
 ];

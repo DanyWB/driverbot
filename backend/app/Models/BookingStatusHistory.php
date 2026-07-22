@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
-#[Fillable(['booking_id', 'from_status', 'to_status', 'actor_type', 'actor_admin_id', 'actor_customer_id', 'reason', 'context', 'request_id', 'created_at'])]
+#[Fillable(['booking_id', 'from_status', 'to_status', 'actor_type', 'actor_admin_id', 'actor_customer_id', 'actor_service_client_id', 'reason', 'context', 'request_id', 'created_at'])]
 class BookingStatusHistory extends Model
 {
     public $timestamps = false;
@@ -40,6 +40,12 @@ class BookingStatusHistory extends Model
     public function actorCustomer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'actor_customer_id');
+    }
+
+    /** @return BelongsTo<ServiceApiClient, $this> */
+    public function actorServiceClient(): BelongsTo
+    {
+        return $this->belongsTo(ServiceApiClient::class, 'actor_service_client_id');
     }
 
     /** @return array<string, string> */

@@ -145,6 +145,12 @@ function fileSize(bytes: number | null): string {
                 <p v-else class="mt-4 text-sm text-muted-foreground">
                     No contacts.
                 </p>
+                <div v-if="customer.passport_number" class="mt-6">
+                    <h3 class="text-sm font-medium">Passport number</h3>
+                    <p class="mt-2 font-mono text-sm">
+                        {{ customer.passport_number }}
+                    </p>
+                </div>
                 <div v-if="customer.identities.length" class="mt-6">
                     <h3 class="text-sm font-medium">Channel identities</h3>
                     <div class="mt-2 flex flex-wrap gap-2">

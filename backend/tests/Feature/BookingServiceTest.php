@@ -80,6 +80,30 @@ class BookingServiceTest extends TestCase
         $this->assertDatabaseHas('notification_outbox', ['event_type' => 'booking.pending', 'channel' => 'internal']);
     }
 
+    public function test_delivery_requires_an_address_at_the_domain_boundary(): void
+    {
+        try {
+            $this->bookings->create(
+                new CreateBookingData(
+                    customerId: $this->customer->id,
+                    vehicleId: $this->vehicle->id,
+                    startsOn: '2026-08-10',
+                    endsOn: '2026-08-12',
+                    source: BookingSource::AdminManual,
+                    deliveryRequired: true,
+                    deliveryAddress: '   ',
+                ),
+                BookingActor::admin($this->admin->id),
+            );
+            $this->fail('A delivery booking without an address was accepted.');
+        } catch (BookingException $exception) {
+            $this->assertSame('delivery_address_required', $exception->errorCode);
+            $this->assertSame(422, $exception->httpStatus);
+        }
+
+        $this->assertDatabaseCount('bookings', 0);
+    }
+
     public function test_conflict_returns_409_and_admin_cancellation_releases_dates(): void
     {
         $first = $this->createPending();
@@ -272,6 +296,8 @@ class BookingServiceTest extends TestCase
                 startsOn: '2026-08-10',
                 endsOn: '2026-08-12',
                 source: BookingSource::Telegram,
+                termsAcceptedAt: now(),
+                termsVersion: (string) config('business.terms_version'),
             ),
             $actor,
         );

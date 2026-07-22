@@ -1,6 +1,6 @@
-const db = require("../connect");
 const {t, getCtxLang} = require("../utils/i18n");
 const {escapeHtml, tHtml} = require("../utils/html");
+const {getUserByTelegramId} = require("../services/userService");
 
 function normalizeMeta(meta) {
   if (!meta) return {};
@@ -43,7 +43,7 @@ function formatAccountText(user, lang) {
 
 async function sendAccountMenu(ctx, langOverride) {
   const lang = langOverride || getCtxLang(ctx);
-  const user = await db("users").where({telegram_id: ctx.from.id}).first();
+  const user = await getUserByTelegramId(ctx.from.id);
   if (!user) {
     return ctx.reply(t(lang, "not_registered"));
   }

@@ -47,7 +47,11 @@ module.exports = async (ctx) => {
 
     let blockedDays = [];
     if (booking.selectedBikeId) {
-      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db);
+      const rangeStart = newDate.startOf("month").startOf("week");
+      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, {
+        startDate: rangeStart.format("YYYY-MM-DD"),
+        endDate: rangeStart.add(41, "day").format("YYYY-MM-DD"),
+      });
     }
 
     const keyboard = generateCalendarKeyboard(

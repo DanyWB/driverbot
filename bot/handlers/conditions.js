@@ -1,5 +1,13 @@
 const db = require("../connect");
 const {t, getCtxLang} = require("../utils/i18n");
+const {isLaravelMode} = require("../config/runtime");
+const {markTermsAccepted} = require("../services/sessionCartService");
+const {getConfiguration} = require("../services/laravelGateway");
+
+async function acceptCurrentTerms(ctx) {
+  const configuration = await getConfiguration({refresh: true});
+  markTermsAccepted(ctx, configuration.terms_version);
+}
 
 function conditionsKeyboard(lang, accepted) {
   return {
@@ -25,8 +33,10 @@ function conditionsKeyboard(lang, accepted) {
 
 async function sendConditions(ctx, langOverride) {
   const lang = langOverride || getCtxLang(ctx);
-  let accepted = Boolean(ctx.session?.acceptTerms);
-  if (!accepted) {
+  let accepted = isLaravelMode()
+    ? Boolean(ctx.session?.acceptTerms && ctx.session?.acceptedTermsVersion)
+    : Boolean(ctx.session?.acceptTerms);
+  if (!accepted && !isLaravelMode()) {
     const user = await db("users").where({telegram_id: ctx.from.id}).first();
     if (user) {
       const hasAccepted = await db("rentals")
@@ -53,17 +63,24 @@ async function handleConditionsAction(ctx) {
   }
 
   if (action === "conditions:accept") {
-    if (ctx.session?.acceptTerms) {
+    if (
+      ctx.session?.acceptTerms &&
+      (!isLaravelMode() || ctx.session?.acceptedTermsVersion)
+    ) {
       return ctx.answerCallbackQuery(t(lang, "conditions_accepted_label"));
     }
 
-    const user = await db("users").where({telegram_id: ctx.from.id}).first();
-    if (user) {
-      await db("rentals")
-        .where({user_id: user.id, status: "process"})
-        .update({accept_terms: true});
+    if (isLaravelMode()) {
+      await acceptCurrentTerms(ctx);
+    } else {
+      const user = await db("users").where({telegram_id: ctx.from.id}).first();
+      if (user) {
+        await db("rentals")
+          .where({user_id: user.id, status: "process"})
+          .update({accept_terms: true});
+      }
+      ctx.session.acceptTerms = true;
     }
-    ctx.session.acceptTerms = true;
     return ctx.editMessageReplyMarkup({
       reply_markup: conditionsKeyboard(lang, true),
     });
@@ -74,7 +91,8 @@ async function handleConditionsAction(ctx) {
   }
 
   if (action === "conditions:accept_toggle") {
-    ctx.session.acceptTerms = true;
+    if (isLaravelMode()) await acceptCurrentTerms(ctx);
+    else ctx.session.acceptTerms = true;
     const current = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
     const updated = current.map((row) =>
       row.map((btn) => {

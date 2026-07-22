@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const {InputFile} = require("grammy");
 const {t, getCtxLang} = require("../utils/i18n");
+const {isLaravelMode} = require("../config/runtime");
 
 const PRICE_IMAGES = {
   low: ["low.png"],
@@ -35,6 +36,16 @@ function getPricesMenuKeyboard(lang) {
 
 async function sendPricesMenu(ctx, langOverride) {
   const lang = langOverride || getCtxLang(ctx);
+  if (isLaravelMode()) {
+    return ctx.reply(t(lang, "prices_dynamic_hint"), {
+      reply_markup: {
+        inline_keyboard: [
+          [{text: t(lang, "conditions_book_btn"), callback_data: "book:start"}],
+          [{text: t(lang, "btn_main_menu"), callback_data: "prices:back"}],
+        ],
+      },
+    });
+  }
   return ctx.reply(t(lang, "prices_choose_season"), {
     reply_markup: getPricesMenuKeyboard(lang),
   });
@@ -73,6 +84,11 @@ async function handlePricesAction(ctx) {
     } catch (e) {
       // ignore delete errors
     }
+    return sendPricesMenu(ctx, lang);
+  }
+
+  if (isLaravelMode()) {
+    await safeAnswer(ctx);
     return sendPricesMenu(ctx, lang);
   }
 

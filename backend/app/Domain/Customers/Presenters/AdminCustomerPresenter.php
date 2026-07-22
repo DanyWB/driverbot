@@ -34,9 +34,12 @@ class AdminCustomerPresenter
     /** @return array<string, mixed> */
     public function detail(Customer $customer): array
     {
+        $private = $customer->privateData();
+
         return [
             ...$this->listItem($customer),
             'internal_note' => $customer->internal_note,
+            'passport_number' => isset($private['passport_number']) ? (string) $private['passport_number'] : null,
             'identities' => $customer->identities->map(fn (CustomerIdentity $identity): array => [
                 'id' => (int) $identity->id,
                 'provider' => (string) $identity->getRawOriginal('provider'),

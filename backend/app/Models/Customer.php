@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['name', 'locale', 'internal_note'])]
-#[Hidden(['internal_note'])]
+#[Fillable(['name', 'locale', 'internal_note', 'private_data'])]
+#[Hidden(['internal_note', 'private_data'])]
 class Customer extends Model
 {
     /** @use HasFactory<CustomerFactory> */
@@ -45,5 +45,27 @@ class Customer extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(CustomerDocument::class);
+    }
+
+    /** @return array<string, mixed> */
+    public function privateData(): array
+    {
+        $value = $this->getAttribute('private_data');
+
+        return is_array($value) ? $value : [];
+    }
+
+    /** @param array<string, mixed> $value */
+    public function replacePrivateData(array $value): void
+    {
+        $this->setAttribute('private_data', $value);
+    }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'private_data' => 'encrypted:array',
+        ];
     }
 }

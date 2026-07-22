@@ -3,8 +3,10 @@ const dayjs = require("dayjs");
 const {t, getCtxLang} = require("../utils/i18n");
 const {escapeHtml, tHtml} = require("../utils/html");
 const {USER_CANCELLABLE_RENTAL_STATUSES} = require("../utils/rentalStatus");
+const {isLaravelMode} = require("../config/runtime");
 
 module.exports = async (ctx) => {
+  if (isLaravelMode()) return require("./laravel_rent_details")(ctx);
   const data = ctx.callbackQuery?.data || "";
   const parts = data.split(":"); // rent:details:ID
   const rentalId = Number(parts[2]);

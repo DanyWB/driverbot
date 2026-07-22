@@ -109,6 +109,15 @@ export type BookingDetail = BookingListItem & {
     cancellation_reason: string | null;
     no_show_reason: string | null;
     deposit_note: string | null;
+    options: {
+        helmets_quantity: number;
+        delivery_required: boolean;
+        delivery_address: string | null;
+    };
+    terms: {
+        version: string | null;
+        accepted_at: string | null;
+    } | null;
     pending_expires_at: string | null;
     created_by_admin: { id: number; name: string } | null;
     price_snapshots: BookingPriceSnapshot[];

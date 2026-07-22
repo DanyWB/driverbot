@@ -10,6 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['customer_id', 'provider', 'external_id', 'metadata'])]
 class CustomerIdentity extends Model
 {
+    /** @return array<string, mixed> */
+    public function metadataValues(): array
+    {
+        $value = $this->getAttribute('metadata');
+
+        return is_array($value) ? $value : [];
+    }
+
     /** @return BelongsTo<Customer, $this> */
     public function customer(): BelongsTo
     {

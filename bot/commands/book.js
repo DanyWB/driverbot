@@ -1,6 +1,6 @@
 const {createEmptyBooking} = require("../services/bookingService");
 const {t, getCtxLang} = require("../utils/i18n");
-const db = require("../connect");
+const {getUserByTelegramId} = require("../services/userService");
 
 module.exports = async (ctx) => {
   const lang = getCtxLang(ctx);
@@ -16,7 +16,7 @@ module.exports = async (ctx) => {
       // ignore delete errors
     }
   }
-  const user = await db("users").where({telegram_id: ctx.from.id}).first();
+  const user = await getUserByTelegramId(ctx.from.id);
 
   if (!user || !user.name) {
     ctx.session.step = "waiting_for_name";

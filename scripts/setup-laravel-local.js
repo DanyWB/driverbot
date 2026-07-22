@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+process.env.BOT_DATA_MODE = "legacy";
 const db = require("../bot/connect");
 
 const ROLE_NAME = "drive_phangan_app";
@@ -46,7 +47,7 @@ function writeLaravelEnv(password) {
   const replacements = {
     APP_NAME: '"Drive Phangan"',
     APP_URL: "http://127.0.0.1:8000",
-    APP_TIMEZONE: "UTC",
+    APP_TIMEZONE: "Asia/Bangkok",
     BUSINESS_TIMEZONE: "Asia/Bangkok",
     DB_CONNECTION: "pgsql",
     DB_HOST: process.env.PG_HOST || "127.0.0.1",
