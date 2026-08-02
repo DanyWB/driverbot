@@ -33,6 +33,10 @@ export type TimelineVehicle = {
     is_visible: boolean;
     category: { id: number; name: string } | null;
     occupancies: TimelineOccupancy[];
+    blocked_ranges: Array<{
+        start_index: number;
+        span_days: number;
+    }>;
 };
 
 export type TimelineData = {
@@ -61,6 +65,13 @@ export type TimelineFilters = {
     visibility: string;
     status: string;
     available_only: boolean;
+};
+
+export type TimelineBookingSelection = {
+    vehicleId: number;
+    vehicleName: string;
+    startsOn: string;
+    endsOn: string;
 };
 
 export type TimelineOptions = {

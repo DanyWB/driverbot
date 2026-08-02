@@ -5,12 +5,18 @@ import VehicleForm from '@/components/vehicles/VehicleForm.vue';
 import VehiclePhotoManager from '@/components/vehicles/VehiclePhotoManager.vue';
 import VehiclePricingEditor from '@/components/vehicles/VehiclePricingEditor.vue';
 import { Button } from '@/components/ui/button';
-import type { CategoryOption, VehicleDetail } from '@/types';
+import { useLocale } from '@/composables/useLocale';
+import type {
+    CategoryOption,
+    PricingTemplateOption,
+    VehicleDetail,
+} from '@/types';
 
 defineProps<{
     vehicle: VehicleDetail;
     types: string[];
     categories: CategoryOption[];
+    pricing_templates: PricingTemplateOption[];
 }>();
 
 defineOptions({
@@ -18,6 +24,8 @@ defineOptions({
         breadcrumbs: [{ title: 'Fleet', href: '/vehicles' }],
     },
 });
+
+const { t } = useLocale();
 </script>
 
 <template>
@@ -31,9 +39,11 @@ defineOptions({
                     as-child
                     variant="ghost"
                     size="icon"
-                    title="Back to fleet"
+                    :title="t('Back to fleet')"
                     ><Link href="/vehicles"
-                        ><ArrowLeft /><span class="sr-only">Back</span></Link
+                        ><ArrowLeft /><span class="sr-only">{{
+                            t('Back')
+                        }}</span></Link
                     ></Button
                 >
                 <div class="min-w-0">
@@ -47,15 +57,17 @@ defineOptions({
                         <span
                             v-if="vehicle.is_active"
                             class="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800"
-                            >Active</span
+                            >{{ t('Active') }}</span
                         ><span
                             v-else
                             class="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs text-muted-foreground"
-                            ><CircleOff class="size-3" />Inactive</span
+                            ><CircleOff class="size-3" />{{
+                                t('Inactive')
+                            }}</span
                         ><span
                             v-if="vehicle.is_visible_for_booking"
                             class="inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-800"
-                            ><Eye class="size-3" />Published</span
+                            ><Eye class="size-3" />{{ t('Published') }}</span
                         ><span
                             :class="
                                 vehicle.has_complete_pricing
@@ -63,7 +75,7 @@ defineOptions({
                                     : 'text-amber-700'
                             "
                             class="rounded border px-2 py-0.5 text-xs"
-                            >Prices
+                            >{{ t('Prices') }}
                             {{ vehicle.active_price_tiers_count }}/15</span
                         >
                     </div>
@@ -71,27 +83,27 @@ defineOptions({
             </div>
             <Button as-child variant="outline"
                 ><Link :href="`/bookings/create?vehicle_id=${vehicle.id}`"
-                    ><CalendarPlus />New booking</Link
+                    ><CalendarPlus />{{ t('New booking') }}</Link
                 ></Button
             >
         </header>
 
         <nav
             class="flex gap-1 overflow-x-auto border-b px-4 py-2 sm:px-6 lg:px-8"
-            aria-label="Vehicle sections"
+            :aria-label="t('Vehicle sections')"
         >
             <a
                 href="#details"
                 class="rounded-md px-3 py-1.5 text-sm font-medium hover:bg-muted"
-                >Details</a
+                >{{ t('Details') }}</a
             ><a
                 href="#photos"
                 class="rounded-md px-3 py-1.5 text-sm font-medium hover:bg-muted"
-                >Photos</a
+                >{{ t('Photos') }}</a
             ><a
                 href="#pricing"
                 class="rounded-md px-3 py-1.5 text-sm font-medium hover:bg-muted"
-                >Pricing</a
+                >{{ t('Pricing') }}</a
             >
         </nav>
 
@@ -109,6 +121,8 @@ defineOptions({
         <VehiclePricingEditor
             :vehicle-id="vehicle.id"
             :pricing="vehicle.pricing"
+            :pricing-profile="vehicle.pricing_profile"
+            :templates="pricing_templates"
         />
     </div>
 </template>

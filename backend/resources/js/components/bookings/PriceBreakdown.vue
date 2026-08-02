@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { formatMoney } from '@/lib/bookings';
+import { useLocale } from '@/composables/useLocale';
 import type { PriceBreakdownItem } from '@/types';
 
 defineProps<{
     items: PriceBreakdownItem[];
     currency: string;
 }>();
+
+const { t } = useLocale();
 </script>
 
 <template>
@@ -13,19 +16,25 @@ defineProps<{
         <table class="w-full text-sm">
             <thead class="bg-muted/60 text-left text-xs text-muted-foreground">
                 <tr>
-                    <th class="px-3 py-2 font-medium">Season</th>
-                    <th class="px-3 py-2 text-right font-medium">Days</th>
+                    <th class="px-3 py-2 font-medium">{{ t('Season') }}</th>
+                    <th class="px-3 py-2 text-right font-medium">
+                        {{ t('Days') }}
+                    </th>
                     <th
                         class="hidden px-3 py-2 text-right font-medium sm:table-cell"
                     >
-                        Daily rate
+                        {{ t('Daily rate') }}
                     </th>
-                    <th class="px-3 py-2 text-right font-medium">Subtotal</th>
+                    <th class="px-3 py-2 text-right font-medium">
+                        {{ t('Subtotal') }}
+                    </th>
                 </tr>
             </thead>
             <tbody class="divide-y">
                 <tr v-for="item in items" :key="`${item.season}-${item.tier}`">
-                    <td class="px-3 py-2 capitalize">{{ item.season }}</td>
+                    <td class="px-3 py-2 capitalize">
+                        {{ t(`${item.season} season`) }}
+                    </td>
                     <td class="px-3 py-2 text-right tabular-nums">
                         {{ item.days }}
                     </td>

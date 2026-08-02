@@ -10,6 +10,7 @@ import {
 } from '@lucide/vue';
 import BookingStatusBadge from '@/components/bookings/BookingStatusBadge.vue';
 import { Button } from '@/components/ui/button';
+import { useLocale } from '@/composables/useLocale';
 import { formatDate, formatMoney, shortBookingId } from '@/lib/bookings';
 import { dashboard } from '@/routes';
 import type { BookingListItem } from '@/types';
@@ -35,10 +36,12 @@ defineOptions({
         ],
     },
 });
+
+const { t } = useLocale();
 </script>
 
 <template>
-    <Head title="Dashboard" />
+    <Head :title="t('Dashboard')" />
 
     <div class="flex min-w-0 flex-1 flex-col">
         <header
@@ -46,10 +49,12 @@ defineOptions({
         >
             <div>
                 <p class="text-sm text-muted-foreground">Drive Phangan</p>
-                <h1 class="text-2xl font-semibold">Operations</h1>
+                <h1 class="text-2xl font-semibold">{{ t('Operations') }}</h1>
             </div>
             <Button as-child>
-                <Link href="/bookings/create"><Plus />New booking</Link>
+                <Link href="/bookings/create"
+                    ><Plus />{{ t('New booking') }}</Link
+                >
             </Button>
         </header>
 
@@ -59,7 +64,9 @@ defineOptions({
             >
                 <Clock3 class="size-5 text-amber-600" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Pending review</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Pending review') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.pending }}
                     </p>
@@ -70,7 +77,9 @@ defineOptions({
             >
                 <CalendarClock class="size-5 text-violet-600" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Pickups today</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Pickups today') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.pickups_today }}
                     </p>
@@ -81,7 +90,9 @@ defineOptions({
             >
                 <CheckCircle2 class="size-5 text-cyan-600" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Active rentals</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Active rentals') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.active }}
                     </p>
@@ -90,7 +101,9 @@ defineOptions({
             <div class="flex items-center gap-3 px-4 py-4 lg:px-6">
                 <Bike class="size-5 text-emerald-600" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Available today</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Available today') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.available_vehicles }}
                         <span class="text-sm font-normal text-muted-foreground"
@@ -108,14 +121,16 @@ defineOptions({
             <div class="mb-4 flex items-center justify-between gap-4">
                 <div>
                     <h2 id="current-bookings-heading" class="font-semibold">
-                        Current bookings
+                        {{ t('Current bookings') }}
                     </h2>
                     <p class="mt-1 text-sm text-muted-foreground">
-                        Pending requests and upcoming rentals.
+                        {{ t('Pending requests and upcoming rentals.') }}
                     </p>
                 </div>
                 <Button as-child variant="ghost" size="sm">
-                    <Link href="/bookings">View all <ArrowRight /></Link>
+                    <Link href="/bookings"
+                        >{{ t('View all') }} <ArrowRight
+                    /></Link>
                 </Button>
             </div>
 
@@ -163,9 +178,9 @@ defineOptions({
                 class="flex min-h-48 flex-col items-center justify-center rounded-md border border-dashed text-center"
             >
                 <CheckCircle2 class="mb-3 size-7 text-muted-foreground" />
-                <p class="font-medium">No current bookings</p>
+                <p class="font-medium">{{ t('No current bookings') }}</p>
                 <p class="mt-1 text-sm text-muted-foreground">
-                    New requests will appear here.
+                    {{ t('New requests will appear here.') }}
                 </p>
             </div>
         </section>

@@ -1,22 +1,38 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     ArrowUpDown,
     Bike,
     CalendarClock,
+    Check,
     CheckCircle2,
     Clock3,
     Download,
+    Eye,
     FileText,
     Plus,
     RotateCcw,
     Search,
+    XCircle,
 } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import BookingPagination from '@/components/bookings/BookingPagination.vue';
 import BookingStatusBadge from '@/components/bookings/BookingStatusBadge.vue';
+import AdminDateInput from '@/components/AdminDateInput.vue';
+import AdminSelect from '@/components/AdminSelect.vue';
+import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useLocale } from '@/composables/useLocale';
 import {
     bookingSourceLabels,
     bookingStatusLabels,
@@ -25,7 +41,12 @@ import {
     formatMoney,
     shortBookingId,
 } from '@/lib/bookings';
-import type { BookingSource, BookingStatus, PaginatedBookings } from '@/types';
+import type {
+    BookingListItem,
+    BookingSource,
+    BookingStatus,
+    PaginatedBookings,
+} from '@/types';
 
 type Filters = {
     search: string;
@@ -66,7 +87,22 @@ defineOptions({
 });
 
 const filters = reactive<Filters>({ ...props.filters });
+const { t } = useLocale();
 const loading = ref(false);
+const quickActionId = ref<string | null>(null);
+const quickActionError = ref('');
+const cancelTarget = ref<BookingListItem | null>(null);
+const cancelForm = useForm({ reason: '' });
+const cancelOpen = computed({
+    get: () => cancelTarget.value !== null,
+    set: (open: boolean) => {
+        if (!open) {
+            cancelTarget.value = null;
+            cancelForm.reset();
+            cancelForm.clearErrors();
+        }
+    },
+});
 let stopStart: (() => void) | undefined;
 let stopFinish: (() => void) | undefined;
 
@@ -134,27 +170,84 @@ function sortBy(column: string): void {
     filters.sort = column;
     applyFilters();
 }
+
+function listReturnTo(): string {
+    return `${window.location.pathname}${window.location.search}`;
+}
+
+function approveFromList(booking: BookingListItem): void {
+    quickActionError.value = '';
+    quickActionId.value = booking.public_id;
+    const query = new URLSearchParams({ return_to: listReturnTo() });
+
+    router.post(
+        `/bookings/${booking.public_id}/approve?${query}`,
+        {},
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onError: (errors) => {
+                quickActionError.value = t(
+                    Object.values(errors)[0] ?? 'Booking could not be updated.',
+                );
+            },
+            onFinish: () => (quickActionId.value = null),
+        },
+    );
+}
+
+function openCancel(booking: BookingListItem): void {
+    cancelForm.reset();
+    cancelForm.clearErrors();
+    cancelTarget.value = booking;
+}
+
+function cancelFromList(): void {
+    if (!cancelTarget.value) {
+        return;
+    }
+
+    const query = new URLSearchParams({ return_to: listReturnTo() });
+    cancelForm.post(
+        `/bookings/${cancelTarget.value.public_id}/cancel?${query}`,
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => (cancelOpen.value = false),
+        },
+    );
+}
+
+function canCancel(booking: BookingListItem): boolean {
+    return ['pending', 'approved', 'active'].includes(booking.status);
+}
+
+function formError(errors: object, key: string): string | undefined {
+    return (errors as Record<string, string | undefined>)[key];
+}
 </script>
 
 <template>
-    <Head title="Bookings" />
+    <Head :title="t('Bookings')" />
 
     <div class="flex min-w-0 flex-1 flex-col">
         <header
             class="flex flex-col gap-4 border-b px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
         >
             <div>
-                <p class="text-sm text-muted-foreground">Rental operations</p>
-                <h1 class="text-2xl font-semibold">Bookings</h1>
+                <p class="text-sm text-muted-foreground">
+                    {{ t('Rental operations') }}
+                </p>
+                <h1 class="text-2xl font-semibold">{{ t('Bookings') }}</h1>
             </div>
             <div class="flex flex-wrap gap-2">
                 <Button as-child variant="outline">
-                    <a :href="exportHref"><Download />Export CSV</a>
+                    <a :href="exportHref"><Download />{{ t('Export CSV') }}</a>
                 </Button>
                 <Button as-child>
                     <Link href="/bookings/create">
                         <Plus />
-                        New booking
+                        {{ t('New booking') }}
                     </Link>
                 </Button>
             </div>
@@ -166,7 +259,9 @@ function sortBy(column: string): void {
             >
                 <Clock3 class="size-5 text-amber-600" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Pending review</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Pending review') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.pending }}
                     </p>
@@ -177,7 +272,9 @@ function sortBy(column: string): void {
             >
                 <CheckCircle2 class="size-5 text-emerald-600" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Approved</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Approved') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.approved }}
                     </p>
@@ -188,7 +285,9 @@ function sortBy(column: string): void {
             >
                 <Bike class="size-5 text-cyan-600" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Active rentals</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Active rentals') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.active }}
                     </p>
@@ -197,7 +296,9 @@ function sortBy(column: string): void {
             <div class="flex items-center gap-3 px-4 py-4 lg:px-6">
                 <CalendarClock class="size-5 text-violet-600" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Pickups today</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Pickups today') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.pickups_today }}
                     </p>
@@ -223,13 +324,11 @@ function sortBy(column: string): void {
                         "
                         @click="setScope(scope)"
                     >
-                        {{ scope }}
+                        {{ t(scope) }}
                     </button>
                 </div>
                 <p class="text-sm text-muted-foreground">
-                    {{ bookings.total }} result{{
-                        bookings.total === 1 ? '' : 's'
-                    }}
+                    {{ t('Results count', { count: bookings.total }) }}
                 </p>
             </div>
 
@@ -238,102 +337,92 @@ function sortBy(column: string): void {
                 @submit.prevent="applyFilters"
             >
                 <label class="relative md:col-span-2">
-                    <span class="sr-only">Search bookings</span>
+                    <span class="sr-only">{{ t('Search bookings') }}</span>
                     <Search
                         class="absolute top-2.5 left-3 size-4 text-muted-foreground"
                     />
                     <Input
                         v-model="filters.search"
                         class="pl-9"
-                        placeholder="ID, customer, phone or vehicle"
+                        :placeholder="t('ID, customer, phone or vehicle')"
                     />
                 </label>
-                <select
+                <AdminSelect
                     v-model="filters.status"
-                    class="admin-select"
-                    aria-label="Status"
-                >
-                    <option value="">All statuses</option>
-                    <option
-                        v-for="status in options.statuses"
-                        :key="status"
-                        :value="status"
-                    >
-                        {{ bookingStatusLabels[status] }}
-                    </option>
-                </select>
-                <select
-                    v-model.number="filters.vehicle_id"
-                    class="admin-select"
-                    aria-label="Vehicle"
-                >
-                    <option :value="null">All vehicles</option>
-                    <option
-                        v-for="vehicle in options.vehicles"
-                        :key="vehicle.id"
-                        :value="vehicle.id"
-                    >
-                        {{ vehicle.name }}
-                    </option>
-                </select>
-                <select
+                    :aria-label="t('Status')"
+                    :options="[
+                        { value: '', label: t('All statuses') },
+                        ...options.statuses.map((status) => ({
+                            value: status,
+                            label: t(bookingStatusLabels[status]),
+                        })),
+                    ]"
+                />
+                <AdminSelect
+                    v-model="filters.vehicle_id"
+                    :aria-label="t('Vehicle')"
+                    :options="[
+                        { value: null, label: t('All vehicles') },
+                        ...options.vehicles.map((vehicle) => ({
+                            value: vehicle.id,
+                            label: vehicle.name,
+                        })),
+                    ]"
+                />
+                <AdminSelect
                     v-model="filters.source"
-                    class="admin-select"
-                    aria-label="Source"
-                >
-                    <option value="">All sources</option>
-                    <option
-                        v-for="source in options.sources"
-                        :key="source"
-                        :value="source"
-                    >
-                        {{ bookingSourceLabels[source] }}
-                    </option>
-                </select>
-                <select
+                    :aria-label="t('Source')"
+                    :options="[
+                        { value: '', label: t('All sources') },
+                        ...options.sources.map((source) => ({
+                            value: source,
+                            label: t(bookingSourceLabels[source]),
+                        })),
+                    ]"
+                />
+                <AdminSelect
                     v-model="filters.documents"
-                    class="admin-select"
-                    aria-label="Documents"
-                >
-                    <option value="">Any documents</option>
-                    <option value="yes">Has documents</option>
-                    <option value="no">No documents</option>
-                </select>
+                    :aria-label="t('Documents')"
+                    :options="[
+                        { value: '', label: t('Any documents') },
+                        { value: 'yes', label: t('Has documents') },
+                        { value: 'no', label: t('No documents') },
+                    ]"
+                />
                 <label>
-                    <span class="mb-1 block text-xs text-muted-foreground"
-                        >From</span
-                    >
-                    <Input v-model="filters.starts_from" type="date" />
+                    <span class="mb-1 block text-xs text-muted-foreground">{{
+                        t('From')
+                    }}</span>
+                    <AdminDateInput v-model="filters.starts_from" />
                 </label>
                 <label>
-                    <span class="mb-1 block text-xs text-muted-foreground"
-                        >To</span
-                    >
-                    <Input v-model="filters.starts_to" type="date" />
+                    <span class="mb-1 block text-xs text-muted-foreground">{{
+                        t('To')
+                    }}</span>
+                    <AdminDateInput v-model="filters.starts_to" />
                 </label>
-                <select
+                <AdminSelect
                     v-model="filters.vehicle_type"
-                    class="admin-select self-end"
-                    aria-label="Vehicle type"
-                >
-                    <option value="">All vehicle types</option>
-                    <option
-                        v-for="type in options.vehicle_types"
-                        :key="type"
-                        :value="type"
-                    >
-                        {{ type }}
-                    </option>
-                </select>
-                <select
-                    v-model.number="filters.per_page"
-                    class="admin-select self-end"
-                    aria-label="Rows per page"
-                >
-                    <option :value="15">15 rows</option>
-                    <option :value="25">25 rows</option>
-                    <option :value="50">50 rows</option>
-                </select>
+                    class="self-end"
+                    :aria-label="t('Vehicle type')"
+                    :options="[
+                        { value: '', label: t('All vehicle types') },
+                        ...options.vehicle_types.map((type) => ({
+                            value: type,
+                            label: t(type),
+                        })),
+                    ]"
+                />
+                <AdminSelect
+                    v-model="filters.per_page"
+                    class="self-end"
+                    :aria-label="t('Rows per page')"
+                    :options="[
+                        { value: 15, label: t('Rows count', { count: 15 }) },
+                        { value: 25, label: t('Rows count', { count: 25 }) },
+                        { value: 50, label: t('Rows count', { count: 50 }) },
+                    ]"
+                />
                 <div class="flex items-end gap-2 xl:col-span-2 xl:justify-end">
                     <Button
                         type="submit"
@@ -341,17 +430,17 @@ function sortBy(column: string): void {
                         class="flex-1 xl:flex-none"
                     >
                         <Search />
-                        Apply
+                        {{ t('Apply') }}
                     </Button>
                     <Button
                         type="button"
                         variant="outline"
                         size="icon"
-                        title="Reset filters"
+                        :title="t('Reset filters')"
                         @click="resetFilters"
                     >
                         <RotateCcw />
-                        <span class="sr-only">Reset filters</span>
+                        <span class="sr-only">{{ t('Reset filters') }}</span>
                     </Button>
                 </div>
             </form>
@@ -362,52 +451,90 @@ function sortBy(column: string): void {
             :class="loading ? 'opacity-60' : ''"
             aria-live="polite"
         >
+            <p
+                v-if="quickActionError"
+                class="border-b bg-destructive/10 px-4 py-3 text-sm text-destructive sm:px-6 lg:px-8"
+            >
+                {{ quickActionError }}
+            </p>
             <div
                 v-if="bookings.data.length === 0"
                 class="flex min-h-72 flex-col items-center justify-center px-6 text-center"
             >
                 <CalendarClock class="mb-3 size-8 text-muted-foreground" />
-                <h2 class="font-medium">No bookings found</h2>
+                <h2 class="font-medium">{{ t('No bookings found') }}</h2>
                 <p class="mt-1 text-sm text-muted-foreground">
-                    Change the filters or create a manual booking.
+                    {{ t('Change the filters or create a manual booking.') }}
                 </p>
                 <Button as-child variant="outline" class="mt-4">
-                    <Link href="/bookings/create"><Plus />New booking</Link>
+                    <Link href="/bookings/create"
+                        ><Plus />{{ t('New booking') }}</Link
+                    >
                 </Button>
             </div>
 
             <template v-else>
                 <div class="hidden overflow-x-auto md:block">
-                    <table class="w-full min-w-[1080px] text-sm">
+                    <table class="w-full min-w-[1480px] text-sm">
                         <thead
                             class="border-b bg-muted/35 text-left text-xs text-muted-foreground"
                         >
                             <tr>
                                 <th class="px-4 py-3 font-medium lg:px-6">
-                                    Booking
+                                    {{ t('Booking') }}
                                 </th>
-                                <th class="px-4 py-3 font-medium">Customer</th>
-                                <th class="px-4 py-3 font-medium">Vehicle</th>
+                                <th class="px-4 py-3 font-medium">
+                                    <button
+                                        class="flex items-center gap-1 hover:text-foreground"
+                                        @click="sortBy('status')"
+                                    >
+                                        {{ t('Status') }}
+                                        <ArrowUpDown class="size-3" />
+                                    </button>
+                                </th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Customer') }}
+                                </th>
+                                <th class="px-4 py-3 font-medium">
+                                    <button
+                                        class="flex items-center gap-1 hover:text-foreground"
+                                        @click="sortBy('vehicle')"
+                                    >
+                                        {{ t('Vehicle') }}
+                                        <ArrowUpDown class="size-3" />
+                                    </button>
+                                </th>
                                 <th class="px-4 py-3 font-medium">
                                     <button
                                         class="flex items-center gap-1 hover:text-foreground"
                                         @click="sortBy('starts_on')"
                                     >
-                                        Rental dates
+                                        {{ t('Rental dates') }}
                                         <ArrowUpDown class="size-3" />
                                     </button>
                                 </th>
                                 <th class="px-4 py-3 text-right font-medium">
-                                    Final price
+                                    {{ t('Final price') }}
                                 </th>
-                                <th class="px-4 py-3 font-medium">Source</th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Notes') }}
+                                </th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Source') }}
+                                </th>
                                 <th class="px-4 py-3 font-medium">
                                     <button
                                         class="flex items-center gap-1 hover:text-foreground"
-                                        @click="sortBy('updated_at')"
+                                        @click="sortBy('created_at')"
                                     >
-                                        Updated <ArrowUpDown class="size-3" />
+                                        {{ t('Records') }}
+                                        <ArrowUpDown class="size-3" />
                                     </button>
+                                </th>
+                                <th
+                                    class="sticky right-0 z-10 border-l bg-muted px-4 py-3 text-right font-medium"
+                                >
+                                    {{ t('Actions') }}
                                 </th>
                             </tr>
                         </thead>
@@ -415,7 +542,7 @@ function sortBy(column: string): void {
                             <tr
                                 v-for="booking in bookings.data"
                                 :key="booking.public_id"
-                                class="hover:bg-muted/25"
+                                class="group hover:bg-muted/25"
                             >
                                 <td class="px-4 py-3 lg:px-6">
                                     <Link
@@ -424,11 +551,11 @@ function sortBy(column: string): void {
                                     >
                                         #{{ shortBookingId(booking.public_id) }}
                                     </Link>
-                                    <div class="mt-1.5">
-                                        <BookingStatusBadge
-                                            :status="booking.status"
-                                        />
-                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <BookingStatusBadge
+                                        :status="booking.status"
+                                    />
                                 </td>
                                 <td class="px-4 py-3">
                                     <p class="font-medium">
@@ -439,9 +566,14 @@ function sortBy(column: string): void {
                                     >
                                         {{
                                             booking.customer.phone ||
-                                            booking.customer.telegram ||
-                                            'No contact'
+                                            t('No phone')
                                         }}
+                                    </p>
+                                    <p
+                                        v-if="booking.customer.telegram"
+                                        class="mt-0.5 text-xs text-muted-foreground"
+                                    >
+                                        {{ booking.customer.telegram }}
                                     </p>
                                 </td>
                                 <td class="px-4 py-3">
@@ -451,7 +583,7 @@ function sortBy(column: string): void {
                                     <p
                                         class="mt-0.5 text-xs text-muted-foreground capitalize"
                                     >
-                                        {{ booking.vehicle.type }}
+                                        {{ t(booking.vehicle.type) }}
                                     </p>
                                 </td>
                                 <td class="px-4 py-3 tabular-nums">
@@ -462,10 +594,14 @@ function sortBy(column: string): void {
                                     <p
                                         class="mt-0.5 text-xs text-muted-foreground"
                                     >
-                                        {{ booking.total_days }} days<span
-                                            v-if="booking.pickup_time"
-                                        >
+                                        {{
+                                            t('Days count', {
+                                                count: booking.total_days,
+                                            })
+                                        }}<span v-if="booking.pickup_time">
                                             · {{ booking.pickup_time }}</span
+                                        ><span v-if="booking.return_time">
+                                            → {{ booking.return_time }}</span
                                         >
                                     </p>
                                 </td>
@@ -485,25 +621,144 @@ function sortBy(column: string): void {
                                                 'manual_override'
                                             "
                                             class="block text-xs font-normal text-amber-700"
-                                            >Adjusted</span
+                                            >{{ t('Adjusted') }}</span
                                         >
+                                        <span
+                                            v-if="
+                                                Number(
+                                                    booking.price
+                                                        .calculated_total,
+                                                ) !== booking.price.final_total
+                                            "
+                                            class="block text-xs font-normal text-muted-foreground"
+                                        >
+                                            {{ t('Calculated') }}
+                                            {{
+                                                formatMoney(
+                                                    booking.price
+                                                        .calculated_total,
+                                                    booking.price.currency,
+                                                )
+                                            }}
+                                        </span>
                                     </template>
                                     <span v-else>—</span>
                                 </td>
+                                <td class="max-w-56 px-4 py-3 text-xs">
+                                    <p
+                                        v-if="booking.client_comment"
+                                        class="truncate"
+                                        :title="booking.client_comment"
+                                    >
+                                        {{ t('Client') }}:
+                                        {{ booking.client_comment }}
+                                    </p>
+                                    <p
+                                        v-if="booking.admin_note"
+                                        class="mt-0.5 truncate text-muted-foreground"
+                                        :title="booking.admin_note"
+                                    >
+                                        {{ t('Internal') }}:
+                                        {{ booking.admin_note }}
+                                    </p>
+                                    <p
+                                        v-if="booking.deposit_note"
+                                        class="mt-0.5 truncate text-muted-foreground"
+                                        :title="booking.deposit_note"
+                                    >
+                                        {{ t('Payment') }}:
+                                        {{ booking.deposit_note }}
+                                    </p>
+                                    <span
+                                        v-if="
+                                            !booking.client_comment &&
+                                            !booking.admin_note &&
+                                            !booking.deposit_note
+                                        "
+                                        class="text-muted-foreground"
+                                        >—</span
+                                    >
+                                </td>
                                 <td class="px-4 py-3 text-muted-foreground">
-                                    {{ bookingSourceLabels[booking.source] }}
+                                    {{ t(bookingSourceLabels[booking.source]) }}
                                 </td>
                                 <td
                                     class="px-4 py-3 text-xs text-muted-foreground"
                                 >
-                                    {{ formatDateTime(booking.updated_at) }}
-                                    <span
-                                        v-if="booking.documents_count"
-                                        class="mt-1 flex items-center gap-1"
-                                        ><FileText class="size-3" />{{
-                                            booking.documents_count
+                                    <span class="block"
+                                        >{{ t('Created') }}
+                                        {{
+                                            formatDateTime(booking.created_at)
                                         }}</span
                                     >
+                                    <span class="mt-0.5 block"
+                                        >{{ t('Updated') }}
+                                        {{
+                                            formatDateTime(booking.updated_at)
+                                        }}</span
+                                    >
+                                    <span class="mt-1 flex items-center gap-1"
+                                        ><FileText class="size-3" />{{
+                                            t('Documents')
+                                        }}:
+                                        {{
+                                            booking.documents_count
+                                                ? t('yes')
+                                                : t('no')
+                                        }}</span
+                                    >
+                                </td>
+                                <td
+                                    class="sticky right-0 border-l bg-background px-4 py-3 group-hover:bg-muted"
+                                >
+                                    <div class="flex justify-end gap-1">
+                                        <Button
+                                            as-child
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            :title="t('Open booking')"
+                                        >
+                                            <Link
+                                                :href="`/bookings/${booking.public_id}`"
+                                            >
+                                                <Eye />
+                                                <span class="sr-only">{{
+                                                    t('Open')
+                                                }}</span>
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            v-if="booking.status === 'pending'"
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            :title="t('Approve booking')"
+                                            :disabled="
+                                                quickActionId ===
+                                                booking.public_id
+                                            "
+                                            @click="approveFromList(booking)"
+                                        >
+                                            <Check />
+                                            <span class="sr-only">{{
+                                                t('Approve')
+                                            }}</span>
+                                        </Button>
+                                        <Button
+                                            v-if="canCancel(booking)"
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            :title="t('Cancel booking')"
+                                            class="text-destructive"
+                                            @click="openCancel(booking)"
+                                        >
+                                            <XCircle />
+                                            <span class="sr-only">{{
+                                                t('Cancel')
+                                            }}</span>
+                                        </Button>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
@@ -511,53 +766,136 @@ function sortBy(column: string): void {
                 </div>
 
                 <div class="divide-y md:hidden">
-                    <Link
+                    <article
                         v-for="booking in bookings.data"
                         :key="booking.public_id"
-                        :href="`/bookings/${booking.public_id}`"
-                        class="block px-4 py-4 hover:bg-muted/30"
                     >
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <p class="truncate font-medium">
-                                    {{ booking.customer.name }}
-                                </p>
-                                <p
-                                    class="mt-0.5 truncate text-sm text-muted-foreground"
-                                >
-                                    {{ booking.vehicle.name }}
-                                </p>
-                            </div>
-                            <BookingStatusBadge :status="booking.status" />
-                        </div>
-                        <div
-                            class="mt-3 flex items-end justify-between gap-3 text-sm"
+                        <Link
+                            :href="`/bookings/${booking.public_id}`"
+                            class="block px-4 py-4 hover:bg-muted/30"
                         >
-                            <div>
-                                <p>
-                                    {{ formatDate(booking.starts_on) }} –
-                                    {{ formatDate(booking.ends_on) }}
-                                </p>
-                                <p class="mt-0.5 text-xs text-muted-foreground">
-                                    #{{ shortBookingId(booking.public_id) }} ·
-                                    {{ booking.total_days }} days
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="truncate font-medium">
+                                        {{ booking.customer.name }}
+                                    </p>
+                                    <p
+                                        class="mt-0.5 truncate text-sm text-muted-foreground"
+                                    >
+                                        {{ booking.vehicle.name }}
+                                    </p>
+                                </div>
+                                <BookingStatusBadge :status="booking.status" />
+                            </div>
+                            <div
+                                class="mt-3 flex items-end justify-between gap-3 text-sm"
+                            >
+                                <div>
+                                    <p>
+                                        {{ formatDate(booking.starts_on) }} –
+                                        {{ formatDate(booking.ends_on) }}
+                                    </p>
+                                    <p
+                                        class="mt-0.5 text-xs text-muted-foreground"
+                                    >
+                                        #{{ shortBookingId(booking.public_id) }}
+                                        ·
+                                        {{
+                                            t('Days count', {
+                                                count: booking.total_days,
+                                            })
+                                        }}
+                                    </p>
+                                </div>
+                                <p class="shrink-0 font-semibold tabular-nums">
+                                    {{
+                                        booking.price
+                                            ? formatMoney(
+                                                  booking.price.final_total,
+                                                  booking.price.currency,
+                                              )
+                                            : '—'
+                                    }}
                                 </p>
                             </div>
-                            <p class="shrink-0 font-semibold tabular-nums">
-                                {{
-                                    booking.price
-                                        ? formatMoney(
-                                              booking.price.final_total,
-                                              booking.price.currency,
-                                          )
-                                        : '—'
-                                }}
-                            </p>
+                        </Link>
+                        <div
+                            v-if="
+                                booking.status === 'pending' ||
+                                canCancel(booking)
+                            "
+                            class="flex gap-2 px-4 pb-4"
+                        >
+                            <Button
+                                v-if="booking.status === 'pending'"
+                                type="button"
+                                size="sm"
+                                :disabled="quickActionId === booking.public_id"
+                                @click="approveFromList(booking)"
+                            >
+                                <Check />{{ t('Approve') }}
+                            </Button>
+                            <Button
+                                v-if="canCancel(booking)"
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                class="text-destructive"
+                                @click="openCancel(booking)"
+                            >
+                                <XCircle />{{ t('Cancel') }}
+                            </Button>
                         </div>
-                    </Link>
+                    </article>
                 </div>
                 <BookingPagination :paginator="bookings" />
             </template>
         </section>
     </div>
+
+    <Dialog v-model:open="cancelOpen">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>{{ t('Cancel booking') }}</DialogTitle>
+                <DialogDescription>
+                    {{ cancelTarget?.customer.name }} ·
+                    {{ cancelTarget?.vehicle.name }}
+                </DialogDescription>
+            </DialogHeader>
+            <form class="space-y-4" @submit.prevent="cancelFromList">
+                <div>
+                    <Label for="list_cancel_reason">{{ t('Reason') }}</Label>
+                    <textarea
+                        id="list_cancel_reason"
+                        v-model="cancelForm.reason"
+                        class="admin-textarea mt-2"
+                        rows="4"
+                        required
+                    />
+                    <InputError
+                        class="mt-1"
+                        :message="
+                            cancelForm.errors.reason ||
+                            formError(cancelForm.errors, 'action')
+                        "
+                    />
+                </div>
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="cancelOpen = false"
+                        >{{ t('Keep booking') }}</Button
+                    >
+                    <Button
+                        type="submit"
+                        variant="destructive"
+                        :disabled="cancelForm.processing"
+                    >
+                        <XCircle />{{ t('Cancel booking') }}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
 </template>

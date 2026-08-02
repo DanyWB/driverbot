@@ -146,6 +146,98 @@ class AdminVehicleCatalogTest extends TestCase
         $this->assertDatabaseCount('vehicle_price_tiers', 0);
     }
 
+    public function test_enabled_tariff_requires_a_package_total(): void
+    {
+        $vehicle = Vehicle::factory()->create();
+        $payload = $this->pricePayload();
+        $payload['prices']['low']['7d'] = null;
+        $payload['enabled']['low']['7d'] = true;
+
+        $this->actingAs($this->admin)
+            ->patch(route('vehicles.pricing.update', $vehicle), $payload)
+            ->assertSessionHasErrors('prices.low.7d');
+
+        $this->assertDatabaseCount('vehicle_price_tiers', 0);
+    }
+
+    public function test_admin_generates_a_discounted_price_matrix_without_saving_it(): void
+    {
+        $vehicle = Vehicle::factory()->create(['type' => 'scooter']);
+
+        $this->actingAs($this->admin)
+            ->getJson(route('vehicles.pricing.generate', [
+                'vehicle' => $vehicle,
+                'template' => 'click',
+                'base_prices' => [
+                    'high' => 120,
+                    'middle' => 110,
+                    'low' => 100,
+                ],
+            ]))
+            ->assertOk()
+            ->assertJsonPath('data.prices.high.1d', 120)
+            ->assertJsonPath('data.prices.high.7d', 800)
+            ->assertJsonPath('data.prices.high.14d', 1500)
+            ->assertJsonPath('data.prices.high.21d', 2000)
+            ->assertJsonPath('data.prices.high.month', 2200)
+            ->assertJsonPath('data.prices.middle.1d', 110)
+            ->assertJsonPath('data.prices.middle.7d', 700)
+            ->assertJsonPath('data.prices.low.1d', 100)
+            ->assertJsonPath('data.prices.low.month', 1900)
+            ->assertJsonPath('data.enabled.low.month', true);
+
+        $this->assertDatabaseCount('vehicle_price_tiers', 0);
+    }
+
+    public function test_price_generator_rejects_a_template_for_another_vehicle_type(): void
+    {
+        $vehicle = Vehicle::factory()->create(['type' => 'car']);
+
+        $this->actingAs($this->admin)
+            ->getJson(route('vehicles.pricing.generate', [
+                'vehicle' => $vehicle,
+                'template' => 'click',
+                'base_prices' => [
+                    'high' => 1500,
+                    'middle' => 1200,
+                    'low' => 1000,
+                ],
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('template');
+    }
+
+    public function test_price_generator_rejects_a_base_price_below_the_rounding_step(): void
+    {
+        $vehicle = Vehicle::factory()->create(['type' => 'scooter']);
+
+        $this->actingAs($this->admin)
+            ->getJson(route('vehicles.pricing.generate', [
+                'vehicle' => $vehicle,
+                'template' => 'click',
+                'base_prices' => [
+                    'high' => 99,
+                    'middle' => 400,
+                    'low' => 300,
+                ],
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('base_prices.high');
+    }
+
+    public function test_saving_generated_prices_remembers_the_selected_template(): void
+    {
+        $vehicle = Vehicle::factory()->create(['type' => 'scooter']);
+        $payload = $this->pricePayload();
+        $payload['template'] = 'aerox';
+
+        $this->actingAs($this->admin)
+            ->patch(route('vehicles.pricing.update', $vehicle), $payload)
+            ->assertRedirect(route('vehicles.edit', $vehicle));
+
+        $this->assertSame('aerox', $vehicle->refresh()->pricing_profile);
+    }
+
     public function test_deactivating_category_hides_assigned_vehicles(): void
     {
         $category = Category::factory()->create(['is_active' => true]);
@@ -261,7 +353,6 @@ class AdminVehicleCatalogTest extends TestCase
             'is_active' => true,
             'is_visible_for_booking' => false,
             'sort_order' => 10,
-            'pricing_profile' => 'standard',
         ];
     }
 

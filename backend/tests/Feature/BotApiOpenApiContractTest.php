@@ -64,11 +64,11 @@ class BotApiOpenApiContractTest extends TestCase
             $document['paths']['/bookings/{booking}/cancel']['post']['requestBody']['content']['application/json']['schema']['properties']['reason']['maxLength'] ?? null,
         );
         $this->assertSame(
-            ['bike', 'scooter', 'car'],
+            ['scooter', 'car'],
             $document['components']['parameters']['VehicleType']['schema']['enum'] ?? null,
         );
         $this->assertSame(
-            ['bike', 'scooter', 'car'],
+            ['scooter', 'car'],
             $document['components']['schemas']['Vehicle']['properties']['type']['enum'] ?? null,
         );
         $this->assertSame(

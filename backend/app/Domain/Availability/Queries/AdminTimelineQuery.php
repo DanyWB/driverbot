@@ -3,6 +3,7 @@
 namespace App\Domain\Availability\Queries;
 
 use App\Domain\Availability\Enums\OccupancyType;
+use App\Models\Booking;
 use App\Models\Vehicle;
 use App\Models\VehicleOccupancy;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,7 +14,7 @@ class AdminTimelineQuery
 {
     /**
      * @param  array<string, mixed>  $filters
-     * @return array{vehicles: Collection<int, Vehicle>, occupancies: Collection<int, VehicleOccupancy>}
+     * @return array{vehicles: Collection<int, Vehicle>, occupancies: Collection<int, VehicleOccupancy>, blockingOccupancies: Collection<int, VehicleOccupancy>}
      */
     public function get(array $filters): array
     {
@@ -39,26 +40,33 @@ class AdminTimelineQuery
             ->get();
 
         if ($vehicleRows->isEmpty()) {
-            return ['vehicles' => $vehicleRows, 'occupancies' => collect()];
+            return [
+                'vehicles' => $vehicleRows,
+                'occupancies' => collect(),
+                'blockingOccupancies' => collect(),
+            ];
         }
 
-        $occupancies = VehicleOccupancy::query()
+        $blockingOccupancies = VehicleOccupancy::query()
             ->whereIn('vehicle_id', $vehicleRows->pluck('id'))
             ->with('booking.customer')
             ->where(function (Builder $query) use ($startsOn, $endsOn): void {
                 $this->overlapping($query, $startsOn, $endsOn);
-            });
-
-        if ($status !== '') {
-            $this->withStatus($occupancies, $status);
-        }
-
-        $occupancyRows = $occupancies
+            })
             ->orderBy('starts_on')
             ->orderBy('id')
             ->get();
+        $occupancyRows = $status === ''
+            ? $blockingOccupancies
+            : $blockingOccupancies
+                ->filter(fn (VehicleOccupancy $occupancy): bool => $this->matchesStatus($occupancy, $status))
+                ->values();
 
-        return ['vehicles' => $vehicleRows, 'occupancies' => $occupancyRows];
+        return [
+            'vehicles' => $vehicleRows,
+            'occupancies' => $occupancyRows,
+            'blockingOccupancies' => $blockingOccupancies,
+        ];
     }
 
     /**
@@ -117,5 +125,18 @@ class AdminTimelineQuery
         $query
             ->where('type', OccupancyType::Booking->value)
             ->whereHas('booking', fn (Builder $query) => $query->where('status', $status));
+    }
+
+    private function matchesStatus(VehicleOccupancy $occupancy, string $status): bool
+    {
+        if ($status === 'maintenance') {
+            return $occupancy->occupancyType() === OccupancyType::Maintenance;
+        }
+
+        $booking = $occupancy->booking;
+
+        return $occupancy->occupancyType() === OccupancyType::Booking
+            && $booking instanceof Booking
+            && $booking->bookingStatus()->value === $status;
     }
 }

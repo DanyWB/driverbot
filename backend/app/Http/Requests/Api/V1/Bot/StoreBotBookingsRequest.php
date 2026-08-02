@@ -3,12 +3,14 @@
 namespace App\Http\Requests\Api\V1\Bot;
 
 use App\Http\Requests\Api\V1\Bot\Concerns\ValidatesBotRentalPeriod;
+use App\Http\Requests\Concerns\ValidatesRentalTimeRange;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
 class StoreBotBookingsRequest extends FormRequest
 {
     use ValidatesBotRentalPeriod;
+    use ValidatesRentalTimeRange;
 
     /** @return array<string, mixed> */
     public function rules(): array
@@ -20,7 +22,7 @@ class StoreBotBookingsRequest extends FormRequest
             'terms_version' => ['required', 'string', 'max:64'],
             'items' => ['required', 'array', 'min:1', "max:{$max}"],
             'items.*.client_reference' => ['required', 'string', 'max:100', 'distinct'],
-            'items.*.vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
+            'items.*.vehicle_id' => ['required', 'integer', 'distinct', 'exists:vehicles,id'],
             'items.*.starts_on' => ['required', 'date_format:Y-m-d'],
             'items.*.ends_on' => ['required', 'date_format:Y-m-d', 'after_or_equal:items.*.starts_on'],
             'items.*.pickup_time' => ['nullable', 'date_format:H:i'],
@@ -61,6 +63,14 @@ class StoreBotBookingsRequest extends FormRequest
                     $item['ends_on'] ?? null,
                     "items.{$index}.starts_on",
                     "items.{$index}.ends_on",
+                );
+                $this->validateRentalTimeRange(
+                    $validator,
+                    $item['starts_on'] ?? null,
+                    $item['ends_on'] ?? null,
+                    $item['pickup_time'] ?? null,
+                    $item['return_time'] ?? null,
+                    "items.{$index}.return_time",
                 );
             }
         }];

@@ -43,9 +43,13 @@ export type BookingListItem = {
     starts_on: string;
     ends_on: string;
     pickup_time: string | null;
+    return_time: string | null;
     total_days: number;
     price: BookingPrice | null;
     documents_count: number;
+    client_comment: string | null;
+    admin_note: string | null;
+    deposit_note: string | null;
     created_at: string | null;
     updated_at: string | null;
 };
@@ -103,12 +107,8 @@ export type BookingPriceSnapshot = BookingPrice & {
 };
 
 export type BookingDetail = BookingListItem & {
-    return_time: string | null;
-    client_comment: string | null;
-    admin_note: string | null;
     cancellation_reason: string | null;
     no_show_reason: string | null;
-    deposit_note: string | null;
     options: {
         helmets_quantity: number;
         delivery_required: boolean;
@@ -145,6 +145,8 @@ export type BookingDetail = BookingListItem & {
         | 'cancel'
         | 'no_show'
         | 'change_dates'
+        | 'edit_note'
+        | 'recalculate_price'
         | 'override_price',
         boolean
     >;

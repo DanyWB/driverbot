@@ -490,9 +490,12 @@ Cache не используется для принятия окончатель
 ```text
 Nginx
   -> PHP-FPM / Laravel web
-  -> Node.js bot webhook endpoint
 
-Supervisor or systemd
+Outgoing application process
+  -> Node.js bot long polling Telegram
+  -> Laravel Bot API
+
+systemd
   -> Laravel queue workers
   -> Laravel scheduler process/cron
   -> Node.js bot process
@@ -503,9 +506,10 @@ Private services
   -> local persistent storage
 ```
 
-Процессы перезапускаются автоматически. Deployment выполняет миграции перед
-переключением трафика, затем перезапускает workers. Нужны отдельные env для local,
-staging и production. Точная конфигурация сервера фиксируется до этапа deployment.
+Процессы перезапускаются автоматически. Deployment создает immutable release, связывает shared
+env/storage, снимает backup, выполняет миграции перед атомарным переключением `current`, затем
+перезапускает workers/scheduler/bot и выполняет smoke. Конкретные конфиги находятся в `deploy/`,
+эксплуатационные процедуры - в `OPERATIONS_RUNBOOK.md`.
 
 ## 20. Миграция данных и cutover
 

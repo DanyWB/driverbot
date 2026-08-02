@@ -24,6 +24,7 @@ class TimelineController extends Controller
         $timeline = $presenter->present(
             $result['vehicles'],
             $result['occupancies'],
+            $result['blockingOccupancies'],
             (string) $filters['starts_on'],
             (string) $filters['ends_on'],
         );

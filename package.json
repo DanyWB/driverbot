@@ -7,10 +7,13 @@
     "migrate": "npm --prefix bot run migrate",
     "check": "npm run precheck",
     "precheck": "node scripts/precheck.js",
+    "check:secrets": "node scripts/check-secrets.js",
     "preflight": "npm --prefix bot run preflight",
     "check:environment": "node scripts/check-environment.js",
     "setup:laravel-local": "node scripts/setup-laravel-local.js",
     "backend:build": "npm --prefix backend run build",
-    "backend:check": "composer --working-dir=backend ci:check"
+    "backend:check": "composer --working-dir=backend ci:check",
+    "release:preflight": "php backend/artisan operations:release-preflight --strict",
+    "release:bot": "npm --prefix bot run release:preflight"
   }
 }

@@ -124,6 +124,9 @@
     --sidebar-border: hsl(0 0% 91%);
     --sidebar-ring: hsl(217.2 91.2% 59.8%);
     --sidebar: hsl(0 0% 98%);
+    --scrollbar-track: hsl(0 0% 95%);
+    --scrollbar-thumb: hsl(0 0% 68%);
+    --scrollbar-thumb-hover: hsl(0 0% 48%);
 }
 
 .dark {
@@ -160,6 +163,9 @@
     --sidebar-border: hsl(0 0% 15.9%);
     --sidebar-ring: hsl(217.2 91.2% 59.8%);
     --sidebar: hsl(240 5.9% 10%);
+    --scrollbar-track: hsl(0 0% 9%);
+    --scrollbar-thumb: hsl(0 0% 32%);
+    --scrollbar-thumb-hover: hsl(0 0% 48%);
 }
 
 @layer base {
@@ -169,14 +175,57 @@
     body {
         @apply bg-background text-foreground;
     }
+
+    html {
+        scrollbar-gutter: stable;
+    }
+
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    }
+
+    *::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    *::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+    }
+
+    *::-webkit-scrollbar-thumb {
+        min-width: 32px;
+        min-height: 32px;
+        border: 2px solid var(--scrollbar-track);
+        border-radius: 999px;
+        background: var(--scrollbar-thumb);
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+        background: var(--scrollbar-thumb-hover);
+    }
+
+    *::-webkit-scrollbar-corner {
+        background: var(--scrollbar-track);
+    }
 }
 
 @layer components {
-    .admin-select {
-        @apply h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50;
-    }
-
     .admin-textarea {
         @apply min-h-20 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    .admin-date-input {
+        color-scheme: light;
+    }
+
+    .dark .admin-date-input {
+        color-scheme: dark;
+    }
+
+    .admin-date-input::-webkit-calendar-picker-indicator {
+        pointer-events: none;
+        opacity: 0;
     }
 }

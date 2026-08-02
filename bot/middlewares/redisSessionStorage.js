@@ -20,7 +20,7 @@ async function connectedClient() {
 
 async function acquireLock(redis, key, lockTtlMs) {
   const token = randomUUID();
-  const waitMs = positiveInteger("BOT_SESSION_LOCK_WAIT_MS", 5000);
+  const waitMs = positiveInteger("BOT_SESSION_LOCK_WAIT_MS", 30000);
   const deadline = Date.now() + waitMs;
 
   do {

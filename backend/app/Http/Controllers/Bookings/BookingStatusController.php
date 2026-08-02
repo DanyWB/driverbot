@@ -76,6 +76,6 @@ class BookingStatusController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => $message]);
 
-        return $this->bookingShowRedirect($request, $booking);
+        return $this->bookingActionRedirect($request, $booking);
     }
 }

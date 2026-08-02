@@ -14,6 +14,7 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useLocale } from '@/composables/useLocale';
 import type { VehiclePhoto } from '@/types';
 
 const props = defineProps<{
@@ -28,6 +29,7 @@ const primaryId = ref<number | null>(
         null,
 );
 const fileInput = ref<HTMLInputElement | null>(null);
+const { t } = useLocale();
 
 watch(
     () => props.photos,
@@ -98,7 +100,7 @@ function saveArrangement(): void {
 }
 
 function remove(photo: VehiclePhoto): void {
-    if (!window.confirm(`Delete this photo from the vehicle?`)) {
+    if (!window.confirm(t('Delete this photo from the vehicle?'))) {
         return;
     }
 
@@ -114,11 +116,11 @@ function remove(photo: VehiclePhoto): void {
             class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"
         >
             <div>
-                <p class="text-sm text-muted-foreground">Media</p>
-                <h2 class="text-lg font-semibold">Photos</h2>
+                <p class="text-sm text-muted-foreground">{{ t('Media') }}</p>
+                <h2 class="text-lg font-semibold">{{ t('Photos') }}</h2>
             </div>
             <p class="text-sm text-muted-foreground">
-                {{ photos.length }} uploaded
+                {{ t('Uploaded: :count', { count: photos.length }) }}
             </p>
         </div>
 
@@ -127,7 +129,7 @@ function remove(photo: VehiclePhoto): void {
             @submit.prevent="upload"
         >
             <div>
-                <Label for="vehicle_photo">Image</Label>
+                <Label for="vehicle_photo">{{ t('Image') }}</Label>
                 <Input
                     id="vehicle_photo"
                     ref="fileInput"
@@ -139,7 +141,7 @@ function remove(photo: VehiclePhoto): void {
                 <InputError class="mt-1" :message="uploadForm.errors.photo" />
             </div>
             <div>
-                <Label for="photo_alt">Alt text</Label>
+                <Label for="photo_alt">{{ t('Alt text') }}</Label>
                 <Input
                     id="photo_alt"
                     v-model="uploadForm.alt_text"
@@ -153,7 +155,7 @@ function remove(photo: VehiclePhoto): void {
             <Button
                 type="submit"
                 :disabled="!uploadForm.photo || uploadForm.processing"
-                ><ImagePlus />Upload</Button
+                ><ImagePlus />{{ t('Upload') }}</Button
             >
         </form>
 
@@ -180,7 +182,9 @@ function remove(photo: VehiclePhoto): void {
                     <span
                         v-if="primaryId === photo.id"
                         class="absolute top-2 left-2 inline-flex items-center gap-1 rounded bg-background/95 px-2 py-1 text-xs font-medium shadow-sm"
-                        ><Star class="size-3 fill-current" />Primary</span
+                        ><Star class="size-3 fill-current" />{{
+                            t('Primary')
+                        }}</span
                     >
                 </a>
                 <div class="flex items-center justify-between gap-2 px-2 py-2">
@@ -189,23 +193,23 @@ function remove(photo: VehiclePhoto): void {
                             type="button"
                             variant="ghost"
                             size="icon-sm"
-                            title="Move up"
+                            :title="t('Move up')"
                             :disabled="index === 0"
                             @click="move(index, -1)"
-                            ><ArrowUp /><span class="sr-only"
-                                >Move up</span
-                            ></Button
+                            ><ArrowUp /><span class="sr-only">{{
+                                t('Move up')
+                            }}</span></Button
                         >
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon-sm"
-                            title="Move down"
+                            :title="t('Move down')"
                             :disabled="index === ordered.length - 1"
                             @click="move(index, 1)"
-                            ><ArrowDown /><span class="sr-only"
-                                >Move down</span
-                            ></Button
+                            ><ArrowDown /><span class="sr-only">{{
+                                t('Move down')
+                            }}</span></Button
                         >
                         <Button
                             type="button"
@@ -213,15 +217,15 @@ function remove(photo: VehiclePhoto): void {
                                 primaryId === photo.id ? 'secondary' : 'ghost'
                             "
                             size="icon-sm"
-                            title="Set as primary"
+                            :title="t('Set as primary')"
                             @click="primaryId = photo.id"
                             ><Star
                                 :class="
                                     primaryId === photo.id ? 'fill-current' : ''
                                 "
-                            /><span class="sr-only"
-                                >Set as primary</span
-                            ></Button
+                            /><span class="sr-only">{{
+                                t('Set as primary')
+                            }}</span></Button
                         >
                     </div>
                     <div class="flex items-center gap-1">
@@ -229,23 +233,23 @@ function remove(photo: VehiclePhoto): void {
                             as-child
                             variant="ghost"
                             size="icon-sm"
-                            title="Open original"
+                            :title="t('Open original')"
                             ><a :href="photo.url" target="_blank" rel="noopener"
-                                ><ExternalLink /><span class="sr-only"
-                                    >Open original</span
-                                ></a
+                                ><ExternalLink /><span class="sr-only">{{
+                                    t('Open original')
+                                }}</span></a
                             ></Button
                         >
                         <Button
                             type="button"
                             variant="ghost"
                             size="icon-sm"
-                            title="Delete photo"
+                            :title="t('Delete photo')"
                             class="text-destructive"
                             @click="remove(photo)"
-                            ><Trash2 /><span class="sr-only"
-                                >Delete photo</span
-                            ></Button
+                            ><Trash2 /><span class="sr-only">{{
+                                t('Delete photo')
+                            }}</span></Button
                         >
                     </div>
                 </div>
@@ -255,7 +259,7 @@ function remove(photo: VehiclePhoto): void {
             v-else
             class="mt-6 grid min-h-36 place-items-center rounded-md border border-dashed text-sm text-muted-foreground"
         >
-            No photos
+            {{ t('No photos') }}
         </div>
 
         <div v-if="ordered.length" class="mt-4 flex justify-end">
@@ -264,7 +268,7 @@ function remove(photo: VehiclePhoto): void {
                 variant="outline"
                 :disabled="arrangeForm.processing || !primaryId"
                 @click="saveArrangement"
-                ><Save />Save photo order</Button
+                ><Save />{{ t('Save photo order') }}</Button
             >
         </div>
         <InputError

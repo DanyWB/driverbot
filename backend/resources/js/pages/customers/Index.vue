@@ -10,9 +10,11 @@ import {
 } from '@lucide/vue';
 import { reactive } from 'vue';
 import AdminPagination from '@/components/AdminPagination.vue';
+import AdminSelect from '@/components/AdminSelect.vue';
 import BookingStatusBadge from '@/components/bookings/BookingStatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useLocale } from '@/composables/useLocale';
 import { formatDate, formatDateTime } from '@/lib/bookings';
 import type { CustomerContact, PaginatedCustomers } from '@/types';
 
@@ -35,12 +37,13 @@ defineOptions({
 });
 
 const filters = reactive<Filters>({ ...props.filters });
+const { t } = useLocale();
 
 function primaryContact(contacts: CustomerContact[]): string {
     return (
         contacts.find((contact) => contact.is_primary)?.value ??
         contacts[0]?.value ??
-        'No contact'
+        t('No contact')
     );
 }
 
@@ -65,13 +68,13 @@ function resetFilters(): void {
 </script>
 
 <template>
-    <Head title="Customers" />
+    <Head :title="t('Customers')" />
     <div class="flex min-w-0 flex-1 flex-col">
         <header class="border-b px-4 py-5 sm:px-6 lg:px-8">
             <p class="text-sm text-muted-foreground">
-                Contacts and rental history
+                {{ t('Contacts and rental history') }}
             </p>
-            <h1 class="text-2xl font-semibold">Customers</h1>
+            <h1 class="text-2xl font-semibold">{{ t('Customers') }}</h1>
         </header>
 
         <section class="grid border-b sm:grid-cols-3">
@@ -80,7 +83,9 @@ function resetFilters(): void {
             >
                 <Users class="size-5 text-cyan-700" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Total</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Total') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.total }}
                     </p>
@@ -91,7 +96,9 @@ function resetFilters(): void {
             >
                 <CalendarDays class="size-5 text-emerald-700" />
                 <div>
-                    <p class="text-xs text-muted-foreground">With bookings</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('With bookings') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.with_bookings }}
                     </p>
@@ -100,7 +107,9 @@ function resetFilters(): void {
             <div class="flex items-center gap-3 px-4 py-4 lg:px-6">
                 <FileCheck2 class="size-5 text-violet-700" />
                 <div>
-                    <p class="text-xs text-muted-foreground">With documents</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('With documents') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.with_documents }}
                     </p>
@@ -113,40 +122,43 @@ function resetFilters(): void {
             @submit.prevent="applyFilters"
         >
             <label class="relative"
-                ><span class="sr-only">Search customers</span
+                ><span class="sr-only">{{ t('Search customers') }}</span
                 ><Search
                     class="absolute top-2.5 left-3 size-4 text-muted-foreground" /><Input
                     v-model="filters.search"
                     class="pl-9"
-                    placeholder="Name, phone, Telegram or email"
+                    :placeholder="t('Name, phone, Telegram or email')"
             /></label>
-            <select
+            <AdminSelect
                 v-model="filters.documents"
-                class="admin-select"
-                aria-label="Documents"
-            >
-                <option value="all">Any documents</option>
-                <option value="yes">Has documents</option>
-                <option value="no">No documents</option>
-            </select>
-            <select
+                :aria-label="t('Documents')"
+                :options="[
+                    { value: 'all', label: t('Any documents') },
+                    { value: 'yes', label: t('Has documents') },
+                    { value: 'no', label: t('No documents') },
+                ]"
+            />
+            <AdminSelect
                 v-model="filters.sort"
-                class="admin-select"
-                aria-label="Sort customers"
-            >
-                <option value="updated_at">Recently updated</option>
-                <option value="created_at">Recently added</option>
-                <option value="name">Name</option>
-            </select>
+                :aria-label="t('Sort customers')"
+                :options="[
+                    { value: 'updated_at', label: t('Recently updated') },
+                    { value: 'created_at', label: t('Recently added') },
+                    { value: 'name', label: t('Name') },
+                ]"
+            />
             <div class="flex gap-2">
-                <Button type="submit" class="flex-1"><Search />Apply</Button
+                <Button type="submit" class="flex-1"
+                    ><Search />{{ t('Apply') }}</Button
                 ><Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    title="Reset filters"
+                    :title="t('Reset filters')"
                     @click="resetFilters"
-                    ><RotateCcw /><span class="sr-only">Reset</span></Button
+                    ><RotateCcw /><span class="sr-only">{{
+                        t('Reset')
+                    }}</span></Button
                 >
             </div>
         </form>
@@ -157,7 +169,7 @@ function resetFilters(): void {
                 class="flex min-h-72 flex-col items-center justify-center px-6 text-center"
             >
                 <UserRound class="mb-3 size-8 text-muted-foreground" />
-                <h2 class="font-medium">No customers found</h2>
+                <h2 class="font-medium">{{ t('No customers found') }}</h2>
             </div>
             <template v-else>
                 <div class="hidden overflow-x-auto md:block">
@@ -167,19 +179,23 @@ function resetFilters(): void {
                         >
                             <tr>
                                 <th class="px-4 py-3 font-medium lg:px-6">
-                                    Customer
-                                </th>
-                                <th class="px-4 py-3 font-medium">Contacts</th>
-                                <th class="px-4 py-3 text-right font-medium">
-                                    Bookings
+                                    {{ t('Customer') }}
                                 </th>
                                 <th class="px-4 py-3 font-medium">
-                                    Latest booking
+                                    {{ t('Contacts') }}
                                 </th>
                                 <th class="px-4 py-3 text-right font-medium">
-                                    Documents
+                                    {{ t('Bookings') }}
                                 </th>
-                                <th class="px-4 py-3 font-medium">Updated</th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Latest booking') }}
+                                </th>
+                                <th class="px-4 py-3 text-right font-medium">
+                                    {{ t('Documents') }}
+                                </th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Updated') }}
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="divide-y">
@@ -207,7 +223,13 @@ function resetFilters(): void {
                                         v-if="customer.contacts.length > 1"
                                         class="text-xs text-muted-foreground"
                                     >
-                                        +{{ customer.contacts.length - 1 }} more
+                                        {{
+                                            t('More contacts: :count', {
+                                                count:
+                                                    customer.contacts.length -
+                                                    1,
+                                            })
+                                        }}
                                     </p>
                                 </td>
                                 <td
@@ -280,7 +302,11 @@ function resetFilters(): void {
                             </div>
                             <span
                                 class="shrink-0 text-sm font-medium tabular-nums"
-                                >{{ customer.bookings_count }} bookings</span
+                                >{{
+                                    t('Bookings count', {
+                                        count: customer.bookings_count,
+                                    })
+                                }}</span
                             >
                         </div>
                         <div
@@ -300,7 +326,7 @@ function resetFilters(): void {
                 </div>
                 <AdminPagination
                     :paginator="customers"
-                    label="Customer pages"
+                    :label="t('Customer pages')"
                 />
             </template>
         </section>

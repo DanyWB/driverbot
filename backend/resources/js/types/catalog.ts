@@ -46,6 +46,11 @@ export type VehiclePriceCell = {
     updated_at: string | null;
 };
 
+export type PricingTemplateOption = {
+    key: string;
+    label: string;
+};
+
 export type VehicleDetail = VehicleListItem & {
     description: string | null;
     characteristics_text: string | null;

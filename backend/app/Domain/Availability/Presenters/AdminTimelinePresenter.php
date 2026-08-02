@@ -17,20 +17,28 @@ class AdminTimelinePresenter
     /**
      * @param  Collection<int, Vehicle>  $vehicles
      * @param  Collection<int, VehicleOccupancy>  $occupancies
+     * @param  Collection<int, VehicleOccupancy>  $blockingOccupancies
      * @return array{range: array{starts_on: string, ends_on: string, days: int, today: string}, dates: list<array<string, mixed>>, rows: list<array<string, mixed>>, stats: array<string, int>}
      */
-    public function present(Collection $vehicles, Collection $occupancies, string $startsOn, string $endsOn): array
-    {
+    public function present(
+        Collection $vehicles,
+        Collection $occupancies,
+        Collection $blockingOccupancies,
+        string $startsOn,
+        string $endsOn,
+    ): array {
         $timezone = (string) config('business.timezone', 'Asia/Bangkok');
         $rangeStart = CarbonImmutable::parse($startsOn, $timezone)->startOfDay();
         $rangeEnd = CarbonImmutable::parse($endsOn, $timezone)->startOfDay();
         $today = CarbonImmutable::now($timezone)->toDateString();
         $dates = $this->dates($rangeStart, $rangeEnd, $today);
         $byVehicle = $occupancies->groupBy('vehicle_id');
+        $blockingByVehicle = $blockingOccupancies->groupBy('vehicle_id');
         $occupiedVehicles = 0;
 
-        $rows = array_values($vehicles->map(function (Vehicle $vehicle) use ($byVehicle, $rangeStart, $rangeEnd, &$occupiedVehicles): array {
+        $rows = array_values($vehicles->map(function (Vehicle $vehicle) use ($byVehicle, $blockingByVehicle, $rangeStart, $rangeEnd, &$occupiedVehicles): array {
             $vehicleOccupancies = $byVehicle->get($vehicle->id, collect());
+            $vehicleBlockingOccupancies = $blockingByVehicle->get($vehicle->id, collect());
 
             if ($vehicleOccupancies->isNotEmpty()) {
                 $occupiedVehicles++;
@@ -51,6 +59,10 @@ class AdminTimelinePresenter
                 ] : null,
                 'occupancies' => $vehicleOccupancies
                     ->map(fn (VehicleOccupancy $occupancy): array => $this->occupancy($occupancy, $rangeStart, $rangeEnd))
+                    ->values()
+                    ->all(),
+                'blocked_ranges' => $vehicleBlockingOccupancies
+                    ->map(fn (VehicleOccupancy $occupancy): array => $this->blockedRange($occupancy, $rangeStart, $rangeEnd))
                     ->values()
                     ->all(),
             ];
@@ -120,6 +132,23 @@ class AdminTimelinePresenter
             'continues_before' => $start->lessThan($rangeStart),
             'continues_after' => $end->greaterThan($rangeEnd),
             'booking_public_id' => $booking instanceof Booking ? (string) $booking->public_id : null,
+        ];
+    }
+
+    /** @return array{start_index: int, span_days: int} */
+    private function blockedRange(
+        VehicleOccupancy $occupancy,
+        CarbonImmutable $rangeStart,
+        CarbonImmutable $rangeEnd,
+    ): array {
+        $start = $this->date($occupancy, 'starts_on');
+        $end = $this->date($occupancy, 'ends_on');
+        $visibleStart = $start->lessThan($rangeStart) ? $rangeStart : $start;
+        $visibleEnd = $end->greaterThan($rangeEnd) ? $rangeEnd : $end;
+
+        return [
+            'start_index' => (int) $rangeStart->diffInDays($visibleStart),
+            'span_days' => ((int) $visibleStart->diffInDays($visibleEnd)) + 1,
         ];
     }
 

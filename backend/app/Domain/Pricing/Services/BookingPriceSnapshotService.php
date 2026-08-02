@@ -2,21 +2,27 @@
 
 namespace App\Domain\Pricing\Services;
 
+use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Bookings\Services\BookingEventRecorder;
 use App\Domain\Pricing\Data\PriceQuote;
 use App\Domain\Pricing\Enums\PricingSource;
 use App\Domain\Pricing\Exceptions\PricingException;
+use App\Domain\Pricing\ValueObjects\RentalPeriod;
 use App\Domain\Shared\Enums\ActorType;
 use App\Models\AuditLog;
 use App\Models\Booking;
 use App\Models\BookingPriceSnapshot;
 use App\Models\User;
+use App\Models\Vehicle;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class BookingPriceSnapshotService
 {
-    public function __construct(private readonly BookingEventRecorder $bookingEvents) {}
+    public function __construct(
+        private readonly BookingEventRecorder $bookingEvents,
+        private readonly PricingService $pricing,
+    ) {}
 
     public function createAutomatic(Booking $booking, PriceQuote $quote, ?string $requestId = null): BookingPriceSnapshot
     {
@@ -27,22 +33,7 @@ class BookingPriceSnapshotService
         return DB::transaction(function () use ($booking, $quote, $requestId): BookingPriceSnapshot {
             $lockedBooking = Booking::query()->lockForUpdate()->findOrFail($booking->id);
             $previous = $lockedBooking->priceSnapshots()->first();
-
-            $snapshot = $lockedBooking->priceSnapshots()->create([
-                'version' => $this->nextVersion($lockedBooking),
-                'total_days' => $quote->totalDays,
-                'tier_key' => $quote->tier,
-                'calculated_total' => $quote->calculatedTotal,
-                'rounded_total' => $quote->roundedTotal,
-                'manual_total' => null,
-                'final_total' => $quote->finalTotal,
-                'currency' => $quote->currency,
-                'breakdown' => array_map(fn ($item): array => $item->toArray(), $quote->breakdown),
-                'pricing_source' => PricingSource::Automatic,
-                'overridden_by_admin_id' => null,
-                'override_reason' => null,
-                'calculated_at' => now(),
-            ]);
+            $snapshot = $this->storeAutomaticSnapshot($lockedBooking, $quote);
 
             $this->writeAudit(
                 booking: $lockedBooking,
@@ -52,6 +43,41 @@ class BookingPriceSnapshotService
                 requestId: $requestId,
                 previous: $previous,
             );
+
+            return $snapshot;
+        });
+    }
+
+    public function recalculate(
+        Booking $booking,
+        User $admin,
+        ?string $requestId = null,
+    ): BookingPriceSnapshot {
+        return DB::transaction(function () use ($booking, $admin, $requestId): BookingPriceSnapshot {
+            $lockedBooking = Booking::query()->lockForUpdate()->findOrFail($booking->id);
+            $this->assertPriceCanChange($lockedBooking);
+            $vehicle = Vehicle::query()->lockForUpdate()->findOrFail($lockedBooking->vehicle_id);
+            $startsOn = substr((string) $lockedBooking->getRawOriginal('starts_on'), 0, 10);
+            $endsOn = substr((string) $lockedBooking->getRawOriginal('ends_on'), 0, 10);
+            $period = RentalPeriod::fromStrings(
+                $startsOn,
+                $endsOn,
+                (string) config('business.timezone', 'Asia/Bangkok'),
+            );
+            $quote = $this->pricing->quote($vehicle, $period, false);
+            $previous = $lockedBooking->priceSnapshots()->first();
+            $snapshot = $this->storeAutomaticSnapshot($lockedBooking, $quote);
+
+            $this->writeAudit(
+                booking: $lockedBooking,
+                action: 'booking.price_recalculated',
+                snapshot: $snapshot,
+                actorType: ActorType::Admin,
+                requestId: $requestId,
+                previous: $previous,
+                admin: $admin,
+            );
+            $this->bookingEvents->recordPriceChanged($lockedBooking, $snapshot);
 
             return $snapshot;
         });
@@ -77,6 +103,7 @@ class BookingPriceSnapshotService
         return DB::transaction(function () use ($booking, $manualTotal, $reason, $admin, $requestId): BookingPriceSnapshot {
             $lockedBooking = Booking::query()->lockForUpdate()->findOrFail($booking->id);
             $previous = $lockedBooking->priceSnapshots()->first();
+            $this->assertPriceCanChange($lockedBooking);
 
             if (! $previous instanceof BookingPriceSnapshot) {
                 throw new PricingException('price_snapshot_missing', 'Cannot override a booking without a calculated price.', [
@@ -113,6 +140,34 @@ class BookingPriceSnapshotService
 
             return $snapshot;
         });
+    }
+
+    private function assertPriceCanChange(Booking $booking): void
+    {
+        if (! in_array($booking->bookingStatus(), [BookingStatus::Pending, BookingStatus::Approved, BookingStatus::Active], true)) {
+            throw new PricingException('booking_price_locked', 'Price cannot be changed in the current booking status.', [
+                'status' => $booking->bookingStatus()->value,
+            ]);
+        }
+    }
+
+    private function storeAutomaticSnapshot(Booking $booking, PriceQuote $quote): BookingPriceSnapshot
+    {
+        return $booking->priceSnapshots()->create([
+            'version' => $this->nextVersion($booking),
+            'total_days' => $quote->totalDays,
+            'tier_key' => $quote->tier,
+            'calculated_total' => $quote->calculatedTotal,
+            'rounded_total' => $quote->roundedTotal,
+            'manual_total' => null,
+            'final_total' => $quote->finalTotal,
+            'currency' => $quote->currency,
+            'breakdown' => array_map(fn ($item): array => $item->toArray(), $quote->breakdown),
+            'pricing_source' => PricingSource::Automatic,
+            'overridden_by_admin_id' => null,
+            'override_reason' => null,
+            'calculated_at' => now(),
+        ]);
     }
 
     private function nextVersion(Booking $booking): int

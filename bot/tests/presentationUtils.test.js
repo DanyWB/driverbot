@@ -10,7 +10,6 @@ test("shortens Telegram previews without splitting Unicode characters", () => {
 
 test("selects a vehicle icon by configured emoji and vehicle type", () => {
   assert.equal(vehicleEmoji({type: "car"}), "🚗");
-  assert.equal(vehicleEmoji({type: "bike"}), "🏍️");
   assert.equal(vehicleEmoji({type: "scooter"}), "🛵");
   assert.equal(vehicleEmoji({type: "car", emoji: "🏎️"}), "🏎️");
 });

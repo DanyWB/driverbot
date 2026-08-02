@@ -2,9 +2,12 @@
 import { Link } from '@inertiajs/vue3';
 import { ChevronLeft, ChevronRight } from '@lucide/vue';
 import { Button } from '@/components/ui/button';
+import { useLocale } from '@/composables/useLocale';
 import type { PaginatedBookings } from '@/types';
 
 defineProps<{ paginator: PaginatedBookings }>();
+
+const { t } = useLocale();
 </script>
 
 <template>
@@ -13,9 +16,10 @@ defineProps<{ paginator: PaginatedBookings }>();
         class="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
     >
         <p class="text-sm text-muted-foreground">
-            {{ paginator.from }}–{{ paginator.to }} of {{ paginator.total }}
+            {{ paginator.from }}–{{ paginator.to }} {{ t('of') }}
+            {{ paginator.total }}
         </p>
-        <nav class="flex items-center gap-1" aria-label="Booking pages">
+        <nav class="flex items-center gap-1" :aria-label="t('Booking pages')">
             <Button
                 v-for="(link, index) in paginator.links"
                 :key="`${link.label}-${index}`"
@@ -36,11 +40,13 @@ defineProps<{ paginator: PaginatedBookings }>();
                         v-else-if="index === paginator.links.length - 1"
                     />
                     <span v-else>{{ link.label }}</span>
-                    <span class="sr-only" v-if="index === 0">Previous</span>
+                    <span class="sr-only" v-if="index === 0">{{
+                        t('Previous')
+                    }}</span>
                     <span
                         class="sr-only"
                         v-else-if="index === paginator.links.length - 1"
-                        >Next</span
+                        >{{ t('Next') }}</span
                     >
                 </Link>
                 <span v-else>

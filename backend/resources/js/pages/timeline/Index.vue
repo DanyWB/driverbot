@@ -6,14 +6,26 @@ import {
     ChevronRight,
     FilterX,
     Plus,
+    X,
 } from '@lucide/vue';
-import { computed, reactive, ref, watch } from 'vue';
+import {
+    computed,
+    onBeforeUnmount,
+    onMounted,
+    reactive,
+    ref,
+    watch,
+} from 'vue';
+import AdminDateInput from '@/components/AdminDateInput.vue';
+import AdminSelect from '@/components/AdminSelect.vue';
+import TimelineBookingSheet from '@/components/timeline/TimelineBookingSheet.vue';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getActiveLocale, useLocale } from '@/composables/useLocale';
 import { timelineStatusClasses, timelineStatusLabels } from '@/lib/timeline';
 import type {
     TimelineData,
+    TimelineBookingSelection,
     TimelineFilters,
     TimelineOccupancy,
     TimelineOptions,
@@ -36,7 +48,21 @@ const vehicleColumnWidth = 240;
 const dayWidth = 44;
 const loading = ref(false);
 const rangeError = ref('');
+const selectionError = ref('');
+const bookingSheetOpen = ref(false);
+const bookingSelection = ref<TimelineBookingSelection | null>(null);
+const rangeSelection = ref<{
+    vehicleId: number;
+    vehicleName: string;
+    startsOn: string;
+    startIndex: number;
+} | null>(null);
+const hoveredCell = ref<{
+    vehicleId: number;
+    index: number;
+} | null>(null);
 const filterState = reactive<TimelineFilters>({ ...props.filters });
+const { t } = useLocale();
 
 watch(
     () => props.filters,
@@ -74,6 +100,36 @@ const newBookingHref = computed(() => {
 
     return `/bookings/create?${params}`;
 });
+const selectionPreview = computed(() => {
+    const selection = rangeSelection.value;
+
+    if (!selection) {
+        return null;
+    }
+
+    const row = props.timeline.rows.find(
+        (candidate) => candidate.id === selection.vehicleId,
+    );
+    const hovered =
+        hoveredCell.value?.vehicleId === selection.vehicleId &&
+        hoveredCell.value.index >= selection.startIndex
+            ? hoveredCell.value
+            : null;
+    const endIndex = hovered?.index ?? selection.startIndex;
+
+    return {
+        vehicleId: selection.vehicleId,
+        startIndex: selection.startIndex,
+        endIndex,
+        hasEndCandidate: hovered !== null,
+        valid: row ? isRangeFree(row, selection.startIndex, endIndex) : false,
+    };
+});
+
+onMounted(() => document.addEventListener('keydown', onTimelineKeydown));
+onBeforeUnmount(() =>
+    document.removeEventListener('keydown', onTimelineKeydown),
+);
 
 function applyFilters(): void {
     visitTimeline();
@@ -89,6 +145,8 @@ function visitTimeline(): void {
         return;
     }
 
+    clearTimelineSelection();
+
     router.get('/timeline', queryFor(filterState), {
         preserveScroll: true,
         preserveState: true,
@@ -98,7 +156,7 @@ function visitTimeline(): void {
             rangeError.value =
                 typeof errors.ends_on === 'string'
                     ? errors.ends_on
-                    : 'The timeline could not be loaded.';
+                    : t('The timeline could not be loaded.');
         },
         onFinish: () => (loading.value = false),
     });
@@ -212,22 +270,181 @@ function goToToday(): void {
 }
 
 function isCellFree(row: TimelineVehicle, index: number): boolean {
-    return !row.occupancies.some(
-        (occupancy) =>
-            occupancy.start_index <= index &&
-            occupancy.start_index + occupancy.span_days > index,
+    return !row.blocked_ranges.some(
+        (range) =>
+            range.start_index <= index &&
+            range.start_index + range.span_days > index,
     );
 }
 
-function createBookingHref(row: TimelineVehicle, date: string): string {
-    const params = new URLSearchParams({
-        vehicle_id: String(row.id),
-        starts_on: date,
-        ends_on: date,
-        return_to: appliedTimelineHref.value,
-    });
+function isRangeFree(
+    row: TimelineVehicle,
+    startIndex: number,
+    endIndex: number,
+): boolean {
+    if (
+        startIndex < 0 ||
+        endIndex < startIndex ||
+        endIndex >= props.timeline.dates.length
+    ) {
+        return false;
+    }
 
-    return `/bookings/create?${params}`;
+    for (let index = startIndex; index <= endIndex; index += 1) {
+        if (!isCellFree(row, index)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function selectTimelineDate(
+    row: TimelineVehicle,
+    date: string,
+    index: number,
+): void {
+    if (!row.is_active || !isCellFree(row, index)) {
+        return;
+    }
+
+    const current = rangeSelection.value;
+
+    if (
+        !current ||
+        current.vehicleId !== row.id ||
+        index < current.startIndex
+    ) {
+        rangeSelection.value = {
+            vehicleId: row.id,
+            vehicleName: row.name,
+            startsOn: date,
+            startIndex: index,
+        };
+        hoveredCell.value = null;
+        selectionError.value = '';
+        bookingSelection.value = null;
+
+        return;
+    }
+
+    if (!isRangeFree(row, current.startIndex, index)) {
+        selectionError.value = t('The selected range includes occupied dates.');
+
+        return;
+    }
+
+    bookingSelection.value = {
+        vehicleId: row.id,
+        vehicleName: row.name,
+        startsOn: current.startsOn,
+        endsOn: date,
+    };
+    selectionError.value = '';
+    hoveredCell.value = null;
+    bookingSheetOpen.value = true;
+}
+
+function previewTimelineDate(row: TimelineVehicle, index: number): void {
+    const selection = rangeSelection.value;
+
+    if (selection?.vehicleId === row.id && index >= selection.startIndex) {
+        hoveredCell.value = { vehicleId: row.id, index };
+    }
+}
+
+function clearHoveredCell(vehicleId: number): void {
+    if (hoveredCell.value?.vehicleId === vehicleId) {
+        hoveredCell.value = null;
+    }
+}
+
+function clearTimelineSelection(): void {
+    rangeSelection.value = null;
+    hoveredCell.value = null;
+    bookingSelection.value = null;
+    bookingSheetOpen.value = false;
+    selectionError.value = '';
+}
+
+function handleBookingSheetOpen(open: boolean): void {
+    bookingSheetOpen.value = open;
+
+    if (!open) {
+        clearTimelineSelection();
+    }
+}
+
+function onTimelineKeydown(event: KeyboardEvent): void {
+    if (
+        event.key === 'Escape' &&
+        rangeSelection.value &&
+        !bookingSheetOpen.value
+    ) {
+        clearTimelineSelection();
+    }
+}
+
+function cellSelectionClasses(row: TimelineVehicle, index: number): string[] {
+    const preview = selectionPreview.value;
+
+    if (
+        !preview ||
+        preview.vehicleId !== row.id ||
+        index < preview.startIndex ||
+        index > preview.endIndex
+    ) {
+        return [];
+    }
+
+    if (!preview.valid) {
+        return index === preview.startIndex
+            ? [
+                  '!bg-amber-100 ring-2 ring-inset ring-amber-500 dark:!bg-amber-950/60',
+              ]
+            : ['!bg-destructive/15'];
+    }
+
+    if (!preview.hasEndCandidate) {
+        return [
+            '!bg-amber-100 ring-2 ring-inset ring-amber-500 dark:!bg-amber-950/60',
+        ];
+    }
+
+    return index === preview.startIndex || index === preview.endIndex
+        ? [
+              '!bg-emerald-200 ring-2 ring-inset ring-emerald-600 dark:!bg-emerald-900/80',
+          ]
+        : ['!bg-emerald-100 dark:!bg-emerald-950/70'];
+}
+
+function isCellSelected(row: TimelineVehicle, index: number): boolean {
+    const preview = selectionPreview.value;
+
+    return Boolean(
+        preview &&
+        preview.vehicleId === row.id &&
+        index >= preview.startIndex &&
+        index <= preview.endIndex,
+    );
+}
+
+function cellSelectionLabel(
+    row: TimelineVehicle,
+    date: string,
+    index: number,
+): string {
+    const selection = rangeSelection.value;
+
+    return selection?.vehicleId === row.id && index >= selection.startIndex
+        ? t('Select :date as rental end for :vehicle', {
+              date,
+              vehicle: row.name,
+          })
+        : t('Select :date as rental start for :vehicle', {
+              date,
+              vehicle: row.name,
+          });
 }
 
 function bookingHref(publicId: string): string {
@@ -305,15 +522,15 @@ function validateRange(startsOn: string, endsOn: string): string {
     const end = parseIsoDate(endsOn);
 
     if (!start || !end) {
-        return 'Select both dates.';
+        return t('Select both dates.');
     }
 
     if (end < start) {
-        return 'End date must be on or after the start date.';
+        return t('End date must be on or after the start date.');
     }
 
     if (inclusiveDays(start, end) > 93) {
-        return 'The timeline range cannot exceed 93 days.';
+        return t('The timeline range cannot exceed 93 days.');
     }
 
     return '';
@@ -359,35 +576,44 @@ function formatRange(startsOn: string, endsOn: string): string {
         return `${startsOn} - ${endsOn}`;
     }
 
-    const formatter = new Intl.DateTimeFormat('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC',
-    });
+    const formatter = new Intl.DateTimeFormat(
+        getActiveLocale() === 'ru' ? 'ru-RU' : 'en-GB',
+        {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            timeZone: 'UTC',
+        },
+    );
 
     return `${formatter.format(start)} - ${formatter.format(end)}`;
 }
 </script>
 
 <template>
-    <Head title="Availability timeline" />
+    <Head :title="t('Availability timeline')" />
 
     <div class="flex min-w-0 flex-1 flex-col">
         <header
             class="flex flex-col gap-4 border-b px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
         >
             <div class="min-w-0">
-                <p class="text-sm text-muted-foreground">Fleet availability</p>
+                <p class="text-sm text-muted-foreground">
+                    {{ t('Fleet availability') }}
+                </p>
                 <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <h1 class="text-2xl font-semibold">Timeline</h1>
+                    <h1 class="text-2xl font-semibold">
+                        {{ t('Timeline') }}
+                    </h1>
                     <span class="text-sm text-muted-foreground tabular-nums">{{
                         rangeLabel
                     }}</span>
                 </div>
             </div>
             <Button as-child>
-                <Link :href="newBookingHref"><Plus />New booking</Link>
+                <Link :href="newBookingHref"
+                    ><Plus />{{ t('New booking') }}</Link
+                >
             </Button>
         </header>
 
@@ -397,29 +623,29 @@ function formatRange(startsOn: string, endsOn: string): string {
                     <Button
                         variant="outline"
                         size="icon"
-                        title="Previous period"
+                        :title="t('Previous period')"
                         :disabled="loading"
                         @click="shiftPeriod(-1)"
                     >
                         <ChevronLeft />
-                        <span class="sr-only">Previous period</span>
+                        <span class="sr-only">{{ t('Previous period') }}</span>
                     </Button>
                     <Button
                         variant="outline"
                         :disabled="loading"
                         @click="goToToday"
                     >
-                        <CalendarDays />Today
+                        <CalendarDays />{{ t('Today') }}
                     </Button>
                     <Button
                         variant="outline"
                         size="icon"
-                        title="Next period"
+                        :title="t('Next period')"
                         :disabled="loading"
                         @click="shiftPeriod(1)"
                     >
                         <ChevronRight />
-                        <span class="sr-only">Next period</span>
+                        <span class="sr-only">{{ t('Next period') }}</span>
                     </Button>
                 </div>
 
@@ -428,24 +654,24 @@ function formatRange(startsOn: string, endsOn: string): string {
                     @submit.prevent="applyFilters"
                 >
                     <div class="w-full sm:max-w-44">
-                        <Label for="timeline_starts_on">From</Label>
-                        <Input
+                        <Label for="timeline_starts_on">{{ t('From') }}</Label>
+                        <AdminDateInput
                             id="timeline_starts_on"
                             v-model="filterState.starts_on"
                             class="mt-1.5"
-                            type="date"
                         />
                     </div>
                     <div class="w-full sm:max-w-44">
-                        <Label for="timeline_ends_on">To</Label>
-                        <Input
+                        <Label for="timeline_ends_on">{{ t('To') }}</Label>
+                        <AdminDateInput
                             id="timeline_ends_on"
                             v-model="filterState.ends_on"
                             class="mt-1.5"
-                            type="date"
                         />
                     </div>
-                    <Button type="submit" :disabled="loading">Apply</Button>
+                    <Button type="submit" :disabled="loading">{{
+                        t('Apply')
+                    }}</Button>
                     <p
                         v-if="rangeError"
                         class="pb-2 text-sm text-destructive"
@@ -461,90 +687,84 @@ function formatRange(startsOn: string, endsOn: string): string {
                 @submit.prevent="applyFilters"
             >
                 <div>
-                    <Label for="timeline_type">Type</Label>
-                    <select
+                    <Label for="timeline_type">{{ t('Type') }}</Label>
+                    <AdminSelect
                         id="timeline_type"
                         v-model="filterState.vehicle_type"
-                        class="admin-select mt-1.5 w-full"
+                        class="mt-1.5"
+                        :options="[
+                            { value: '', label: t('All types') },
+                            ...options.vehicle_types.map((type) => ({
+                                value: type,
+                                label: t(type),
+                            })),
+                        ]"
                         @change="onVehicleTypeChange"
-                    >
-                        <option value="">All types</option>
-                        <option
-                            v-for="type in options.vehicle_types"
-                            :key="type"
-                            :value="type"
-                            class="capitalize"
-                        >
-                            {{ type }}
-                        </option>
-                    </select>
+                    />
                 </div>
                 <div>
-                    <Label for="timeline_category">Category</Label>
-                    <select
+                    <Label for="timeline_category">{{ t('Category') }}</Label>
+                    <AdminSelect
                         id="timeline_category"
-                        v-model.number="filterState.category_id"
-                        class="admin-select mt-1.5 w-full"
+                        v-model="filterState.category_id"
+                        class="mt-1.5"
+                        :options="[
+                            { value: null, label: t('All categories') },
+                            ...filteredCategories.map((category) => ({
+                                value: category.id,
+                                label: category.name,
+                            })),
+                        ]"
                         @change="onCategoryChange"
-                    >
-                        <option :value="null">All categories</option>
-                        <option
-                            v-for="category in filteredCategories"
-                            :key="category.id"
-                            :value="category.id"
-                        >
-                            {{ category.name }}
-                        </option>
-                    </select>
+                    />
                 </div>
                 <div>
-                    <Label for="timeline_vehicle">Vehicle</Label>
-                    <select
+                    <Label for="timeline_vehicle">{{ t('Vehicle') }}</Label>
+                    <AdminSelect
                         id="timeline_vehicle"
-                        v-model.number="filterState.vehicle_id"
-                        class="admin-select mt-1.5 w-full"
-                    >
-                        <option :value="null">All vehicles</option>
-                        <option
-                            v-for="vehicle in filteredVehicles"
-                            :key="vehicle.id"
-                            :value="vehicle.id"
-                        >
-                            {{ vehicle.name }}
-                        </option>
-                    </select>
+                        v-model="filterState.vehicle_id"
+                        class="mt-1.5"
+                        :options="[
+                            { value: null, label: t('All vehicles') },
+                            ...filteredVehicles.map((vehicle) => ({
+                                value: vehicle.id,
+                                label: vehicle.name,
+                            })),
+                        ]"
+                    />
                 </div>
                 <div>
-                    <Label for="timeline_visibility">Visibility</Label>
-                    <select
+                    <Label for="timeline_visibility">{{
+                        t('Visibility')
+                    }}</Label>
+                    <AdminSelect
                         id="timeline_visibility"
                         v-model="filterState.visibility"
-                        class="admin-select mt-1.5 w-full"
-                    >
-                        <option value="active">All active</option>
-                        <option value="visible">Client-visible</option>
-                        <option value="hidden">Internal only</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="all">All records</option>
-                    </select>
+                        class="mt-1.5"
+                        :options="[
+                            { value: 'active', label: t('All active') },
+                            { value: 'visible', label: t('Client-visible') },
+                            { value: 'hidden', label: t('Internal only') },
+                            { value: 'inactive', label: t('Inactive') },
+                            { value: 'all', label: t('All records') },
+                        ]"
+                    />
                 </div>
                 <div>
-                    <Label for="timeline_status">Occupancy</Label>
-                    <select
+                    <Label for="timeline_status">{{ t('Occupancy') }}</Label>
+                    <AdminSelect
                         id="timeline_status"
                         v-model="filterState.status"
-                        class="admin-select mt-1.5 w-full"
+                        class="mt-1.5"
+                        :options="[
+                            { value: '', label: t('All blocking') },
+                            ...options.statuses.map((status) => ({
+                                value: status,
+                                label: t(timelineStatusLabels[status]),
+                            })),
+                        ]"
                         @change="onStatusChange"
-                    >
-                        <option value="">All blocking</option>
-                        <option
-                            v-for="status in options.statuses"
-                            :key="status"
-                            :value="status"
-                        >
-                            {{ timelineStatusLabels[status] }}
-                        </option>
-                    </select>
+                    />
                 </div>
                 <label
                     class="flex h-9 cursor-pointer items-center gap-2 self-end rounded-md border px-3 text-sm whitespace-nowrap"
@@ -555,25 +775,25 @@ function formatRange(startsOn: string, endsOn: string): string {
                         class="size-4 accent-foreground"
                         @change="onAvailabilityChange"
                     />
-                    Available only
+                    {{ t('Available only') }}
                 </label>
                 <div class="flex items-end gap-1">
                     <Button
                         type="submit"
                         variant="secondary"
                         :disabled="loading"
-                        >Filter</Button
+                        >{{ t('Filter') }}</Button
                     >
                     <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        title="Reset filters"
+                        :title="t('Reset filters')"
                         :disabled="loading"
                         @click="resetFilters"
                     >
                         <FilterX />
-                        <span class="sr-only">Reset filters</span>
+                        <span class="sr-only">{{ t('Reset filters') }}</span>
                     </Button>
                 </div>
             </form>
@@ -583,18 +803,15 @@ function formatRange(startsOn: string, endsOn: string): string {
             class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 text-sm sm:px-6 lg:px-8"
         >
             <div class="flex flex-wrap gap-x-5 gap-y-1 tabular-nums">
-                <span
-                    ><strong>{{ timeline.stats.vehicles }}</strong>
-                    vehicles</span
-                >
-                <span class="text-emerald-700 dark:text-emerald-400"
-                    ><strong>{{ timeline.stats.available }}</strong> fully
-                    free</span
-                >
-                <span class="text-muted-foreground"
-                    ><strong>{{ timeline.stats.occupancies }}</strong>
-                    blocks</span
-                >
+                <span>{{
+                    t('Vehicles count', { count: timeline.stats.vehicles })
+                }}</span>
+                <span class="text-emerald-700 dark:text-emerald-400">{{
+                    t('Fully free count', { count: timeline.stats.available })
+                }}</span>
+                <span class="text-muted-foreground">{{
+                    t('Blocks count', { count: timeline.stats.occupancies })
+                }}</span>
             </div>
             <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span
@@ -606,29 +823,76 @@ function formatRange(startsOn: string, endsOn: string): string {
                         class="size-2.5 rounded-full border"
                         :class="timelineStatusClasses[status]"
                     />
-                    {{ timelineStatusLabels[status] }}
+                    {{ t(timelineStatusLabels[status]) }}
                 </span>
             </div>
         </section>
 
         <section
+            v-if="rangeSelection"
+            class="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 sm:px-6 lg:px-8 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-100"
+            aria-live="polite"
+        >
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex min-w-0 gap-3">
+                    <CalendarDays class="mt-0.5 size-4 shrink-0" />
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold">
+                            {{
+                                t('Start selected: :vehicle, :date', {
+                                    vehicle: rangeSelection.vehicleName,
+                                    date: rangeSelection.startsOn,
+                                })
+                            }}
+                        </p>
+                        <p
+                            class="mt-0.5 text-xs text-amber-800 dark:text-amber-200"
+                        >
+                            {{
+                                t('Choose the rental end date in the same row.')
+                            }}
+                        </p>
+                        <p
+                            v-if="selectionError"
+                            class="mt-1 text-sm font-medium text-destructive"
+                            role="alert"
+                        >
+                            {{ selectionError }}
+                        </p>
+                    </div>
+                </div>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    class="shrink-0"
+                    @click="clearTimelineSelection"
+                >
+                    <X />{{ t('Cancel selection') }}
+                </Button>
+            </div>
+        </section>
+
+        <section
             class="relative min-w-0 flex-1"
-            aria-label="Vehicle availability"
+            :aria-label="t('Vehicle availability')"
         >
             <div
                 v-if="timeline.rows.length === 0"
                 class="flex min-h-80 flex-col items-center justify-center px-6 text-center"
             >
                 <FilterX class="mb-3 size-8 text-muted-foreground" />
-                <h2 class="font-medium">No vehicles match these filters</h2>
+                <h2 class="font-medium">
+                    {{ t('No vehicles match these filters') }}
+                </h2>
                 <Button variant="outline" class="mt-4" @click="resetFilters">
-                    Reset filters
+                    {{ t('Reset filters') }}
                 </Button>
             </div>
 
             <div
                 v-else
-                class="max-h-[70vh] min-h-[360px] max-w-full overflow-auto overscroll-contain [contain:paint]"
+                class="max-h-[70vh] min-h-[360px] max-w-full overflow-auto overscroll-x-contain overscroll-y-auto [contain:paint]"
                 :class="loading ? 'opacity-60' : ''"
                 :aria-busy="loading"
             >
@@ -641,7 +905,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             class="sticky left-0 z-40 flex shrink-0 items-center border-r bg-background px-4 text-xs font-semibold text-muted-foreground"
                             :style="{ width: `${vehicleColumnWidth}px` }"
                         >
-                            Vehicle
+                            {{ t('Vehicle') }}
                         </div>
                         <div
                             v-for="(date, index) in timeline.dates"
@@ -674,6 +938,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                         :key="row.id"
                         class="group relative flex h-13 border-b"
                         :style="{ width: `${gridWidth}px` }"
+                        @mouseleave="clearHoveredCell(row.id)"
                     >
                         <div
                             class="sticky left-0 z-20 flex shrink-0 items-center border-r bg-background px-4 group-hover:bg-muted/30"
@@ -699,10 +964,10 @@ function formatRange(startsOn: string, endsOn: string): string {
                                         · {{ row.inventory_code }}</span
                                     >
                                     <span v-if="!row.is_active">
-                                        · inactive</span
+                                        · {{ t('inactive') }}</span
                                     >
                                     <span v-else-if="!row.is_visible">
-                                        · internal</span
+                                        · {{ t('internal') }}</span
                                     >
                                 </p>
                             </div>
@@ -712,27 +977,37 @@ function formatRange(startsOn: string, endsOn: string): string {
                             v-for="(date, index) in timeline.dates"
                             :key="date.date"
                         >
-                            <Link
-                                v-if="isCellFree(row, index)"
-                                :href="createBookingHref(row, date.date)"
-                                class="relative shrink-0 border-r hover:bg-emerald-50 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-600 dark:hover:bg-emerald-950/40"
+                            <button
+                                v-if="row.is_active && isCellFree(row, index)"
+                                type="button"
+                                class="group/cell relative h-full shrink-0 border-r p-0 hover:bg-emerald-50 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-600 dark:hover:bg-emerald-950/40"
                                 :class="[
                                     date.is_weekend ? 'bg-muted/25' : '',
                                     date.is_today
                                         ? 'bg-cyan-50/50 dark:bg-cyan-950/30'
                                         : '',
+                                    ...cellSelectionClasses(row, index),
                                 ]"
                                 :style="{ width: `${dayWidth}px` }"
-                                :title="`Create booking for ${row.name} on ${date.date}`"
+                                :title="
+                                    cellSelectionLabel(row, date.date, index)
+                                "
+                                :aria-label="
+                                    cellSelectionLabel(row, date.date, index)
+                                "
+                                :aria-pressed="isCellSelected(row, index)"
+                                @mouseenter="previewTimelineDate(row, index)"
+                                @click="
+                                    selectTimelineDate(row, date.date, index)
+                                "
                             >
-                                <span class="sr-only"
-                                    >Create booking for {{ row.name }} on
-                                    {{ date.date }}</span
-                                >
-                            </Link>
+                                <Plus
+                                    class="pointer-events-none absolute top-1/2 left-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover/cell:opacity-50"
+                                />
+                            </button>
                             <div
                                 v-else
-                                class="shrink-0 border-r"
+                                class="h-full shrink-0 border-r"
                                 :class="[
                                     date.is_weekend ? 'bg-muted/25' : '',
                                     date.is_today
@@ -740,6 +1015,13 @@ function formatRange(startsOn: string, endsOn: string): string {
                                         : '',
                                 ]"
                                 :style="{ width: `${dayWidth}px` }"
+                                :title="
+                                    !row.is_active && isCellFree(row, index)
+                                        ? t(
+                                              'Inactive vehicles cannot be booked.',
+                                          )
+                                        : undefined
+                                "
                             />
                         </template>
 
@@ -777,4 +1059,11 @@ function formatRange(startsOn: string, endsOn: string): string {
             </div>
         </section>
     </div>
+
+    <TimelineBookingSheet
+        :open="bookingSheetOpen"
+        :selection="bookingSelection"
+        :return-to="appliedTimelineHref"
+        @update:open="handleBookingSheetOpen"
+    />
 </template>

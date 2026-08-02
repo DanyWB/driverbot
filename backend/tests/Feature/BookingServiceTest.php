@@ -104,6 +104,30 @@ class BookingServiceTest extends TestCase
         $this->assertDatabaseCount('bookings', 0);
     }
 
+    public function test_domain_rejects_a_rental_shorter_than_one_hour(): void
+    {
+        try {
+            $this->bookings->create(
+                new CreateBookingData(
+                    customerId: $this->customer->id,
+                    vehicleId: $this->vehicle->id,
+                    startsOn: '2026-08-10',
+                    endsOn: '2026-08-10',
+                    source: BookingSource::AdminManual,
+                    pickupTime: '10:00',
+                    returnTime: '10:30',
+                ),
+                BookingActor::admin($this->admin->id),
+            );
+            $this->fail('A rental shorter than one hour was accepted.');
+        } catch (BookingException $exception) {
+            $this->assertSame('invalid_booking_time_range', $exception->errorCode);
+            $this->assertSame(422, $exception->httpStatus);
+        }
+
+        $this->assertDatabaseCount('bookings', 0);
+    }
+
     public function test_conflict_returns_409_and_admin_cancellation_releases_dates(): void
     {
         $first = $this->createPending();
@@ -221,6 +245,57 @@ class BookingServiceTest extends TestCase
         $this->assertSame(BookingStatus::Completed, $completed->bookingStatus());
         $this->assertDatabaseMissing('vehicle_occupancies', ['booking_id' => $booking->id]);
         $this->assertSame(4, BookingStatusHistory::query()->where('booking_id', $booking->id)->count());
+    }
+
+    public function test_approved_booking_reminders_are_versioned_reconciled_and_discarded(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-22 12:00:00', 'Asia/Bangkok'));
+
+        try {
+            $booking = $this->createApproved('2026-08-20', '2026-08-22', '10:00');
+            $this->assertSame(1, $booking->reminder_version);
+            $this->assertSame(2, NotificationOutbox::query()
+                ->where('deduplication_key', 'like', "booking:{$booking->public_id}:reminder:v1:%")
+                ->where('status', NotificationOutbox::STATUS_PENDING)
+                ->count());
+            $dayReminder = NotificationOutbox::query()
+                ->where('deduplication_key', "booking:{$booking->public_id}:reminder:v1:pickup_day")
+                ->firstOrFail();
+            $hourReminder = NotificationOutbox::query()
+                ->where('deduplication_key', "booking:{$booking->public_id}:reminder:v1:pickup_one_hour")
+                ->firstOrFail();
+            $this->assertSame('2026-08-20 08:00', $dayReminder->available_at->setTimezone('Asia/Bangkok')->format('Y-m-d H:i'));
+            $this->assertSame('2026-08-20 09:00', $hourReminder->available_at->setTimezone('Asia/Bangkok')->format('Y-m-d H:i'));
+
+            $this->artisan('bookings:reconcile-reminders')->assertSuccessful();
+            $this->artisan('bookings:reconcile-reminders')->assertSuccessful();
+            $this->assertSame(2, NotificationOutbox::query()
+                ->where('deduplication_key', 'like', "booking:{$booking->public_id}:reminder:v1:%")
+                ->count());
+
+            $changed = $this->bookings->changeDates(
+                $booking,
+                new ChangeBookingDatesData('2026-08-25', '2026-08-27', '11:00'),
+                BookingActor::admin($this->admin->id),
+            );
+            $this->assertSame(2, $changed->reminder_version);
+            $this->assertSame(2, NotificationOutbox::query()
+                ->where('deduplication_key', 'like', "booking:{$booking->public_id}:reminder:v1:%")
+                ->where('status', NotificationOutbox::STATUS_DISCARDED)
+                ->count());
+            $this->assertSame(2, NotificationOutbox::query()
+                ->where('deduplication_key', 'like', "booking:{$booking->public_id}:reminder:v2:%")
+                ->where('status', NotificationOutbox::STATUS_PENDING)
+                ->count());
+
+            $this->bookings->cancelByAdmin($changed, BookingActor::admin($this->admin->id), 'Customer request');
+            $this->assertSame(2, NotificationOutbox::query()
+                ->where('deduplication_key', 'like', "booking:{$booking->public_id}:reminder:v2:%")
+                ->where('status', NotificationOutbox::STATUS_DISCARDED)
+                ->count());
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
     }
 
     public function test_process_submission_calculates_price_and_starts_blocking(): void

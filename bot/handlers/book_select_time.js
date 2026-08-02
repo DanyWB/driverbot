@@ -161,10 +161,10 @@ async function handleStartTimeOptional(ctx, booking, lang) {
 
   if (booking.endDate && booking.endTime) {
     const endAt = makeDateTime(booking.endDate, booking.endTime);
-    if (endAt && endAt.isValid() && endAt.isBefore(startAt)) {
+    if (endAt && endAt.isValid() && endAt.isBefore(startAt.add(1, "hour"))) {
       booking.startTime = null;
       return ctx.answerCallbackQuery({
-        text: t(lang, "booking_end_before_start"),
+        text: t(lang, "booking_min_duration"),
         show_alert: true,
       });
     }
@@ -192,10 +192,10 @@ async function handleEndTimeOptional(ctx, booking, lang) {
 
   if (booking.startDate && booking.startTime) {
     const startAt = makeDateTime(booking.startDate, booking.startTime);
-    if (startAt && startAt.isValid() && endAt.isBefore(startAt)) {
+    if (startAt && startAt.isValid() && endAt.isBefore(startAt.add(1, "hour"))) {
       booking.endTime = null;
       return ctx.answerCallbackQuery({
-        text: t(lang, "booking_end_before_start"),
+        text: t(lang, "booking_min_duration"),
         show_alert: true,
       });
     }

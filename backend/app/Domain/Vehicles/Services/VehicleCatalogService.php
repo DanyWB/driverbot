@@ -102,7 +102,9 @@ class VehicleCatalogService
             'is_active' => (bool) ($attributes['is_active'] ?? false),
             'is_visible_for_booking' => (bool) ($attributes['is_visible_for_booking'] ?? false),
             'sort_order' => (int) ($attributes['sort_order'] ?? 0),
-            'pricing_profile' => $this->nullableString($attributes['pricing_profile'] ?? null),
+            'pricing_profile' => $vehicle instanceof Vehicle
+                ? $vehicle->getRawOriginal('pricing_profile')
+                : $this->nullableString($attributes['pricing_profile'] ?? null),
         ];
     }
 

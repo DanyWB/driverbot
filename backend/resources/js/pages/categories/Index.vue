@@ -2,6 +2,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Pencil, Plus, Tags } from '@lucide/vue';
 import { ref } from 'vue';
+import AdminSelect from '@/components/AdminSelect.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useLocale } from '@/composables/useLocale';
 import type { CategoryItem } from '@/types';
 
 defineProps<{ categories: CategoryItem[]; types: string[] }>();
@@ -28,6 +30,7 @@ defineOptions({
 });
 
 const open = ref(false);
+const { t } = useLocale();
 const editing = ref<CategoryItem | null>(null);
 const form = useForm({
     code: '',
@@ -81,7 +84,7 @@ function submit(): void {
 </script>
 
 <template>
-    <Head title="Categories" />
+    <Head :title="t('Categories')" />
     <div class="flex min-w-0 flex-1 flex-col">
         <header
             class="flex flex-col gap-4 border-b px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
@@ -91,17 +94,25 @@ function submit(): void {
                     as-child
                     variant="ghost"
                     size="icon"
-                    title="Back to fleet"
+                    :title="t('Back to fleet')"
                     ><Link href="/vehicles"
-                        ><ArrowLeft /><span class="sr-only">Back</span></Link
+                        ><ArrowLeft /><span class="sr-only">{{
+                            t('Back')
+                        }}</span></Link
                     ></Button
                 >
                 <div>
-                    <p class="text-sm text-muted-foreground">Fleet catalog</p>
-                    <h1 class="text-2xl font-semibold">Categories</h1>
+                    <p class="text-sm text-muted-foreground">
+                        {{ t('Fleet catalog') }}
+                    </p>
+                    <h1 class="text-2xl font-semibold">
+                        {{ t('Categories') }}
+                    </h1>
                 </div>
             </div>
-            <Button @click="createCategory"><Plus />Add category</Button>
+            <Button @click="createCategory"
+                ><Plus />{{ t('Add category') }}</Button
+            >
         </header>
 
         <section class="min-w-0 flex-1">
@@ -110,9 +121,9 @@ function submit(): void {
                 class="flex min-h-72 flex-col items-center justify-center px-6 text-center"
             >
                 <Tags class="mb-3 size-8 text-muted-foreground" />
-                <h2 class="font-medium">No categories</h2>
+                <h2 class="font-medium">{{ t('No categories') }}</h2>
                 <Button class="mt-4" variant="outline" @click="createCategory"
-                    ><Plus />Add category</Button
+                    ><Plus />{{ t('Add category') }}</Button
                 >
             </div>
             <template v-else>
@@ -123,15 +134,21 @@ function submit(): void {
                         >
                             <tr>
                                 <th class="px-4 py-3 font-medium lg:px-6">
-                                    Category
+                                    {{ t('Category') }}
                                 </th>
-                                <th class="px-4 py-3 font-medium">Type</th>
-                                <th class="px-4 py-3 font-medium">State</th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Type') }}
+                                </th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('State') }}
+                                </th>
                                 <th class="px-4 py-3 text-right font-medium">
-                                    Vehicles
+                                    {{ t('Vehicles') }}
                                 </th>
                                 <th class="w-14 px-4 py-3">
-                                    <span class="sr-only">Actions</span>
+                                    <span class="sr-only">{{
+                                        t('Actions')
+                                    }}</span>
                                 </th>
                             </tr>
                         </thead>
@@ -150,7 +167,11 @@ function submit(): void {
                                     </p>
                                 </td>
                                 <td class="px-4 py-3 capitalize">
-                                    {{ category.vehicle_type ?? 'Any' }}
+                                    {{
+                                        category.vehicle_type
+                                            ? t(category.vehicle_type)
+                                            : t('Any')
+                                    }}
                                 </td>
                                 <td class="px-4 py-3">
                                     <span
@@ -161,9 +182,11 @@ function submit(): void {
                                         "
                                         class="rounded border px-2 py-0.5 text-xs"
                                         >{{
-                                            category.is_active
-                                                ? 'Active'
-                                                : 'Inactive'
+                                            t(
+                                                category.is_active
+                                                    ? 'Active'
+                                                    : 'Inactive',
+                                            )
                                         }}</span
                                     >
                                 </td>
@@ -171,18 +194,18 @@ function submit(): void {
                                     {{ category.vehicles_count }}
                                     <p class="text-xs text-muted-foreground">
                                         {{ category.visible_vehicles_count }}
-                                        published
+                                        {{ t('published') }}
                                     </p>
                                 </td>
                                 <td class="px-4 py-3">
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        title="Edit category"
+                                        :title="t('Edit category')"
                                         @click="editCategory(category)"
-                                        ><Pencil /><span class="sr-only"
-                                            >Edit</span
-                                        ></Button
+                                        ><Pencil /><span class="sr-only">{{
+                                            t('Edit')
+                                        }}</span></Button
                                     >
                                 </td>
                             </tr>
@@ -204,14 +227,19 @@ function submit(): void {
                             <p
                                 class="mt-0.5 text-sm text-muted-foreground capitalize"
                             >
-                                {{ category.vehicle_type ?? 'Any type' }} ·
+                                {{
+                                    category.vehicle_type
+                                        ? t(category.vehicle_type)
+                                        : t('Any type')
+                                }}
+                                ·
                                 {{ category.code }}
                             </p>
                         </div>
                         <div class="shrink-0 text-right text-sm tabular-nums">
                             <p>{{ category.vehicles_count }}</p>
                             <p class="text-xs text-muted-foreground">
-                                vehicles
+                                {{ t('vehicles') }}
                             </p>
                         </div>
                     </button>
@@ -224,17 +252,19 @@ function submit(): void {
         <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader
                 ><DialogTitle>{{
-                    editing ? 'Edit category' : 'New category'
+                    t(editing ? 'Edit category' : 'New category')
                 }}</DialogTitle
                 ><DialogDescription>{{
                     editing
-                        ? `${editing.vehicles_count} assigned vehicles`
-                        : 'Catalog grouping for vehicles'
+                        ? t('Assigned vehicles: :count', {
+                              count: editing.vehicles_count,
+                          })
+                        : t('Catalog grouping for vehicles')
                 }}</DialogDescription></DialogHeader
             >
             <form class="space-y-4" @submit.prevent="submit">
                 <div>
-                    <Label for="category_name">Name</Label
+                    <Label for="category_name">{{ t('Name') }}</Label
                     ><Input
                         id="category_name"
                         v-model="form.name"
@@ -242,37 +272,38 @@ function submit(): void {
                     /><InputError class="mt-1" :message="form.errors.name" />
                 </div>
                 <div>
-                    <Label for="category_code">Code</Label
+                    <Label for="category_code">{{ t('Code') }}</Label
                     ><Input
                         id="category_code"
                         v-model="form.code"
                         class="mt-2"
-                        placeholder="Generated when left empty"
+                        :placeholder="t('Generated when left empty')"
                     /><InputError class="mt-1" :message="form.errors.code" />
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <Label for="category_type">Vehicle type</Label
-                        ><select
+                        <Label for="category_type">{{
+                            t('Vehicle type')
+                        }}</Label>
+                        <AdminSelect
                             id="category_type"
                             v-model="form.vehicle_type"
-                            class="admin-select mt-2 w-full capitalize"
-                        >
-                            <option value="">Any type</option>
-                            <option
-                                v-for="type in types"
-                                :key="type"
-                                :value="type"
-                            >
-                                {{ type }}
-                            </option></select
-                        ><InputError
+                            class="mt-2 capitalize"
+                            :options="[
+                                { value: '', label: t('Any type') },
+                                ...types.map((type) => ({
+                                    value: type,
+                                    label: t(type),
+                                })),
+                            ]"
+                        />
+                        <InputError
                             class="mt-1"
                             :message="form.errors.vehicle_type"
                         />
                     </div>
                     <div>
-                        <Label for="category_order">Sort order</Label
+                        <Label for="category_order">{{ t('Sort order') }}</Label
                         ><Input
                             id="category_order"
                             v-model.number="form.sort_order"
@@ -286,7 +317,9 @@ function submit(): void {
                     </div>
                 </div>
                 <div>
-                    <Label for="category_description">Description</Label
+                    <Label for="category_description">{{
+                        t('Description')
+                    }}</Label
                     ><textarea
                         id="category_description"
                         v-model="form.description"
@@ -302,7 +335,9 @@ function submit(): void {
                         v-model="form.is_active"
                         type="checkbox"
                         class="size-4 accent-current"
-                    /><span class="text-sm font-medium">Active</span></label
+                    /><span class="text-sm font-medium">{{
+                        t('Active')
+                    }}</span></label
                 >
                 <InputError :message="form.errors.is_active" />
                 <DialogFooter
@@ -310,9 +345,9 @@ function submit(): void {
                         type="button"
                         variant="outline"
                         @click="open = false"
-                        >Cancel</Button
+                        >{{ t('Cancel') }}</Button
                     ><Button type="submit" :disabled="form.processing">{{
-                        editing ? 'Save category' : 'Create category'
+                        t(editing ? 'Save category' : 'Create category')
                     }}</Button></DialogFooter
                 >
             </form>

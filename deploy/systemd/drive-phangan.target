@@ -1,0 +1,7 @@
+[Unit]
+Description=Drive Phangan application processes
+Wants=drive-phangan-worker-default.service drive-phangan-worker-notifications.service drive-phangan-scheduler.service drive-phangan-bot.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target

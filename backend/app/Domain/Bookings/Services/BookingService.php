@@ -63,6 +63,7 @@ class BookingService
         $period = $this->period($data->startsOn, $data->endsOn);
         $pickupTime = $this->normalizeTime($data->pickupTime);
         $returnTime = $this->normalizeTime($data->returnTime);
+        $this->assertRentalTimeRange($data->startsOn, $data->endsOn, $pickupTime, $returnTime);
 
         try {
             return DB::transaction(function () use ($data, $actor, $requestId, $period, $pickupTime, $returnTime, $deliveryAddress): Booking {
@@ -98,6 +99,7 @@ class BookingService
                     'pending_expires_at' => $data->initialStatus === BookingStatus::Pending
                         ? $now->addHours($this->pendingTtlHours())
                         : null,
+                    'reminder_version' => $data->initialStatus === BookingStatus::Approved ? 1 : 0,
                     'approved_at' => $data->initialStatus === BookingStatus::Approved ? $now : null,
                 ]));
 
@@ -260,6 +262,7 @@ class BookingService
         $period = $this->period($data->startsOn, $data->endsOn);
         $pickupTime = $this->normalizeTime($data->pickupTime);
         $returnTime = $this->normalizeTime($data->returnTime);
+        $this->assertRentalTimeRange($data->startsOn, $data->endsOn, $pickupTime, $returnTime);
 
         try {
             return DB::transaction(function () use ($booking, $data, $actor, $requestId, $period, $pickupTime, $returnTime): Booking {
@@ -276,12 +279,18 @@ class BookingService
                 $quote = $this->pricing->quote($vehicle, $period, false);
                 $oldValues = $this->bookingDateValues($locked);
 
-                $locked->forceFill([
+                $dateAttributes = [
                     'starts_on' => $data->startsOn,
                     'ends_on' => $data->endsOn,
                     'pickup_time' => $pickupTime,
                     'return_time' => $returnTime,
-                ])->save();
+                ];
+
+                if ($locked->bookingStatus() === BookingStatus::Approved) {
+                    $dateAttributes['reminder_version'] = (int) $locked->reminder_version + 1;
+                }
+
+                $locked->forceFill($dateAttributes)->save();
 
                 $this->availability->syncBookingOccupancy($locked);
                 $this->snapshots->createAutomatic($locked, $quote, $requestId);
@@ -292,6 +301,34 @@ class BookingService
         } catch (QueryException $exception) {
             $this->availability->rethrowAsBookingConflict($exception, (int) $booking->vehicle_id, $data->startsOn, $data->endsOn);
         }
+    }
+
+    public function updateAdminNote(
+        Booking $booking,
+        ?string $note,
+        BookingActor $actor,
+        ?string $requestId = null,
+    ): Booking {
+        $this->assertActor($actor, ActorType::Admin);
+        $note = $this->optionalReason($note);
+
+        if ($note !== null && mb_strlen($note) > 5000) {
+            throw new BookingException('booking_admin_note_too_long', 'The internal note cannot exceed 5000 characters.', 422);
+        }
+
+        return DB::transaction(function () use ($booking, $note, $actor, $requestId): Booking {
+            $locked = $this->lockBooking($booking);
+            $oldNote = $this->nullableString($locked->getRawOriginal('admin_note'));
+
+            if ($oldNote === $note) {
+                return $locked;
+            }
+
+            $locked->forceFill(['admin_note' => $note])->save();
+            $this->events->recordAdminNoteChanged($locked, $actor, $oldNote, $note, $requestId);
+
+            return $locked->refresh();
+        }, 3);
     }
 
     /**
@@ -336,6 +373,11 @@ class BookingService
     ): Booking {
         $from = $booking->bookingStatus();
         $this->stateMachine->assertCanTransition($from, $to);
+
+        if ($to === BookingStatus::Approved) {
+            $attributes['reminder_version'] = (int) $booking->reminder_version + 1;
+        }
+
         $this->saveStatus($booking, $to, $attributes);
         $this->availability->syncBookingOccupancy($booking);
         $this->events->recordStatus($booking, $from, $to, $actor, $reason, $context, $requestId);
@@ -453,6 +495,38 @@ class BookingService
         }
 
         throw new BookingException('invalid_booking_time', 'Booking time must use HH:MM or HH:MM:SS format.', 422);
+    }
+
+    private function assertRentalTimeRange(
+        string $startsOn,
+        string $endsOn,
+        ?string $pickupTime,
+        ?string $returnTime,
+    ): void {
+        if ($pickupTime === null || $returnTime === null) {
+            return;
+        }
+
+        $startsAt = CarbonImmutable::createFromFormat(
+            '!Y-m-d H:i:s',
+            "{$startsOn} {$pickupTime}",
+            $this->businessTimezone(),
+        );
+        $endsAt = CarbonImmutable::createFromFormat(
+            '!Y-m-d H:i:s',
+            "{$endsOn} {$returnTime}",
+            $this->businessTimezone(),
+        );
+
+        if (! $startsAt instanceof CarbonImmutable
+            || ! $endsAt instanceof CarbonImmutable
+            || $endsAt->lt($startsAt->addHour())) {
+            throw new BookingException(
+                'invalid_booking_time_range',
+                'Rental return must be at least one hour after pickup.',
+                422,
+            );
+        }
     }
 
     private function requiredReason(string $reason): string

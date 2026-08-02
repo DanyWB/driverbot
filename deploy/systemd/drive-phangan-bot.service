@@ -1,0 +1,29 @@
+[Unit]
+Description=Drive Phangan Telegram bot
+PartOf=drive-phangan.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=drive-phangan
+Group=drive-phangan
+WorkingDirectory=/srv/drive-phangan/current/bot
+Environment=NODE_ENV=production
+ExecStartPre=/usr/bin/npm run check:api
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=drive-phangan.target

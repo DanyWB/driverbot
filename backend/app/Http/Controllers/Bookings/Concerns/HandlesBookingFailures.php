@@ -24,7 +24,27 @@ trait HandlesBookingFailures
         return to_route('bookings.show', $parameters);
     }
 
+    private function bookingActionRedirect(Request $request, Booking $booking): RedirectResponse
+    {
+        $returnTo = $this->safeReturnTo($request);
+
+        if ($returnTo !== null && parse_url($returnTo, PHP_URL_PATH) === '/bookings') {
+            return redirect()->to($returnTo);
+        }
+
+        return $this->bookingShowRedirect($request, $booking);
+    }
+
     private function timelineReturnTo(Request $request): ?string
+    {
+        $returnTo = $this->safeReturnTo($request);
+
+        return $returnTo !== null && parse_url($returnTo, PHP_URL_PATH) === '/timeline'
+            ? $returnTo
+            : null;
+    }
+
+    private function safeReturnTo(Request $request): ?string
     {
         $returnTo = $request->query('return_to');
 
@@ -35,7 +55,7 @@ trait HandlesBookingFailures
         $parts = parse_url($returnTo);
 
         if ($parts === false
-            || ($parts['path'] ?? null) !== '/timeline'
+            || ! in_array(($parts['path'] ?? null), ['/timeline', '/bookings'], true)
             || isset($parts['scheme'])
             || isset($parts['host'])
             || isset($parts['user'])

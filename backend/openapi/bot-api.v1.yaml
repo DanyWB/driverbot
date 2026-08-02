@@ -144,6 +144,7 @@ paths:
     get:
       tags: [Catalog]
       operationId: listAvailableVehicles
+      description: Rental dates use the same rules as quote and booking creation; start cannot be in the past and the period is limited to 366 days by default.
       parameters:
         - $ref: '#/components/parameters/StartDate'
         - $ref: '#/components/parameters/EndDate'
@@ -378,7 +379,7 @@ components:
     VehicleType:
       name: type
       in: query
-      schema: {type: string, enum: [bike, scooter, car]}
+      schema: {type: string, enum: [scooter, car]}
     CategoryId:
       name: category_id
       in: query
@@ -541,7 +542,7 @@ components:
         id: {type: integer}
         code: {type: string}
         name: {type: string}
-        vehicle_type: {type: [string, 'null'], enum: [bike, scooter, car, null]}
+        vehicle_type: {type: [string, 'null'], enum: [scooter, car, null]}
         description: {type: [string, 'null']}
         vehicles_count: {type: integer, minimum: 0}
     Photo:
@@ -558,7 +559,7 @@ components:
       required: [id, type, name, photos]
       properties:
         id: {type: integer}
-        type: {type: string, enum: [bike, scooter, car]}
+        type: {type: string, enum: [scooter, car]}
         name: {type: string}
         year: {type: [integer, 'null']}
         description: {type: [string, 'null']}
@@ -620,6 +621,7 @@ components:
           type: array
           minItems: 1
           maxItems: 10
+          description: Each vehicle_id and client_reference must be unique within the batch.
           items: {$ref: '#/components/schemas/CreateBookingItem'}
     CreateBookingItem:
       type: object
@@ -638,7 +640,10 @@ components:
         starts_on: {type: string, format: date, description: Must not be before the current business date.}
         ends_on: {type: string, format: date, description: Inclusive period; maximum 366 days by default.}
         pickup_time: {type: [string, 'null'], pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
-        return_time: {type: [string, 'null'], pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'}
+        return_time:
+          type: [string, 'null']
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: When both times are provided, return must be at least one hour after pickup across the selected dates.
         helmets_quantity: {type: integer, minimum: 0, maximum: 4}
         delivery_required: {type: boolean}
         delivery_address: {type: [string, 'null'], maxLength: 2000, description: Required and non-blank when delivery is requested.}

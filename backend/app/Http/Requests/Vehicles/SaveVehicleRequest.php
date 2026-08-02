@@ -28,7 +28,6 @@ class SaveVehicleRequest extends FormRequest
             'is_active' => ['required', 'boolean'],
             'is_visible_for_booking' => ['required', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:1000000'],
-            'pricing_profile' => ['nullable', 'string', 'max:64'],
         ];
     }
 }

@@ -13,6 +13,7 @@ import {
     Flag,
     History,
     MessageSquareText,
+    Pencil,
     Play,
     RefreshCw,
     Save,
@@ -22,8 +23,10 @@ import {
     XCircle,
 } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import AdminSelect from '@/components/AdminSelect.vue';
 import BookingStatusBadge from '@/components/bookings/BookingStatusBadge.vue';
 import PriceBreakdown from '@/components/bookings/PriceBreakdown.vue';
+import AdminDateInput from '@/components/AdminDateInput.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,6 +39,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useLocale } from '@/composables/useLocale';
 import {
     bookingSourceLabels,
     bookingStatusLabels,
@@ -59,10 +63,13 @@ defineOptions({
 
 const currentPrice = computed(() => props.booking.price_snapshots[0] ?? null);
 const backHref = computed(() => props.return_to ?? '/bookings');
+const { t } = useLocale();
 
 const actionForm = useForm({});
 const datesOpen = ref(false);
 const priceOpen = ref(false);
+const recalculateOpen = ref(false);
+const noteOpen = ref(false);
 const cancelOpen = ref(false);
 const noShowOpen = ref(false);
 
@@ -75,6 +82,10 @@ const datesForm = useForm({
 const priceForm = useForm({
     manual_total: currentPrice.value?.final_total ?? 0,
     reason: '',
+});
+const recalculateForm = useForm({});
+const noteForm = useForm({
+    admin_note: props.booking.admin_note ?? '',
 });
 const cancelForm = useForm({ reason: '' });
 const noShowForm = useForm({ reason: '' });
@@ -139,8 +150,9 @@ async function loadDateQuote(): Promise<void> {
         const payload = await response.json();
 
         if (!response.ok) {
-            dateQuoteError.value =
-                payload.error?.message || 'Price could not be calculated.';
+            dateQuoteError.value = t(
+                payload.error?.message || 'Price could not be calculated.',
+            );
 
             return;
         }
@@ -149,7 +161,9 @@ async function loadDateQuote(): Promise<void> {
         dateAvailable.value = payload.available;
     } catch (error) {
         if ((error as Error).name !== 'AbortError') {
-            dateQuoteError.value = 'Price preview is temporarily unavailable.';
+            dateQuoteError.value = t(
+                'Price preview is temporarily unavailable.',
+            );
         }
     } finally {
         if (quoteRequest === request) {
@@ -186,6 +200,34 @@ function updatePrice(): void {
                 priceOpen.value = false;
                 priceForm.reason = '';
             },
+        },
+    );
+}
+
+function recalculatePrice(): void {
+    recalculateForm.post(
+        withReturnTo(
+            `/bookings/${props.booking.public_id}/price-recalculations`,
+        ),
+        {
+            preserveScroll: true,
+            onSuccess: () => (recalculateOpen.value = false),
+        },
+    );
+}
+
+function openNoteEditor(): void {
+    noteForm.admin_note = props.booking.admin_note ?? '';
+    noteForm.clearErrors();
+    noteOpen.value = true;
+}
+
+function updateAdminNote(): void {
+    noteForm.patch(
+        withReturnTo(`/bookings/${props.booking.public_id}/admin-note`),
+        {
+            preserveScroll: true,
+            onSuccess: () => (noteOpen.value = false),
         },
     );
 }
@@ -238,7 +280,7 @@ function uploadDocument(): void {
 }
 
 function deleteDocument(id: number): void {
-    if (!window.confirm('Delete this private document?')) {
+    if (!window.confirm(t('Delete this private document?'))) {
         return;
     }
 
@@ -260,13 +302,17 @@ function deleteDocument(id: number): void {
                         variant="ghost"
                         size="icon"
                         :title="
-                            return_to ? 'Back to timeline' : 'Back to bookings'
+                            t(
+                                return_to
+                                    ? 'Back to timeline'
+                                    : 'Back to bookings',
+                            )
                         "
                     >
                         <Link :href="backHref"
-                            ><ArrowLeft /><span class="sr-only"
-                                >Back</span
-                            ></Link
+                            ><ArrowLeft /><span class="sr-only">{{
+                                t('Back')
+                            }}</span></Link
                         >
                     </Button>
                     <div class="min-w-0">
@@ -289,49 +335,56 @@ function deleteDocument(id: number): void {
                         :disabled="actionForm.processing"
                         @click="runAction('approve')"
                     >
-                        <Check />Approve
+                        <Check />{{ t('Approve') }}
                     </Button>
                     <Button
                         v-if="booking.actions.activate"
                         :disabled="actionForm.processing"
                         @click="runAction('activate')"
                     >
-                        <Play />Start rental
+                        <Play />{{ t('Start rental') }}
                     </Button>
                     <Button
                         v-if="booking.actions.complete"
                         :disabled="actionForm.processing"
                         @click="runAction('complete')"
                     >
-                        <SquareCheckBig />Complete
+                        <SquareCheckBig />{{ t('Complete') }}
                     </Button>
                     <Button
                         v-if="booking.actions.change_dates"
                         variant="outline"
                         @click="datesOpen = true"
                     >
-                        <CalendarRange />Dates
+                        <CalendarRange />{{ t('Dates') }}
+                    </Button>
+                    <Button
+                        v-if="booking.actions.recalculate_price"
+                        variant="outline"
+                        @click="recalculateOpen = true"
+                    >
+                        <RefreshCw />{{ t('Recalculate') }}
                     </Button>
                     <Button
                         v-if="booking.actions.override_price"
                         variant="outline"
                         @click="priceOpen = true"
                     >
-                        <Banknote />Price
+                        <Banknote />{{ t('Price') }}
                     </Button>
                     <Button
                         v-if="booking.actions.no_show"
                         variant="outline"
                         @click="noShowOpen = true"
                     >
-                        <Flag />No-show
+                        <Flag />{{ t('No-show') }}
                     </Button>
                     <Button
                         v-if="booking.actions.cancel"
                         variant="destructive"
                         @click="cancelOpen = true"
                     >
-                        <XCircle />Cancel
+                        <XCircle />{{ t('Cancel') }}
                     </Button>
                 </div>
             </div>
@@ -352,7 +405,7 @@ function deleteDocument(id: number): void {
                     <div class="mb-5 flex items-center gap-2">
                         <ClipboardList class="size-5 text-muted-foreground" />
                         <h2 id="rental-details-heading" class="font-semibold">
-                            Rental details
+                            {{ t('Rental details') }}
                         </h2>
                     </div>
                     <dl
@@ -360,7 +413,7 @@ function deleteDocument(id: number): void {
                     >
                         <div>
                             <dt class="text-xs text-muted-foreground">
-                                Vehicle
+                                {{ t('Vehicle') }}
                             </dt>
                             <dd class="mt-1 font-medium">
                                 {{ booking.vehicle.name }}
@@ -368,7 +421,7 @@ function deleteDocument(id: number): void {
                             <dd
                                 class="text-sm text-muted-foreground capitalize"
                             >
-                                {{ booking.vehicle.type
+                                {{ t(booking.vehicle.type)
                                 }}<span v-if="booking.vehicle.inventory_code">
                                     · {{ booking.vehicle.inventory_code }}</span
                                 >
@@ -376,20 +429,26 @@ function deleteDocument(id: number): void {
                         </div>
                         <div>
                             <dt class="text-xs text-muted-foreground">
-                                Rental period
+                                {{ t('Rental period') }}
                             </dt>
                             <dd class="mt-1 font-medium">
                                 {{ formatDate(booking.starts_on) }} –
                                 {{ formatDate(booking.ends_on) }}
                             </dd>
                             <dd class="text-sm text-muted-foreground">
-                                {{ booking.total_days }} calendar days
+                                {{
+                                    t('Calendar days count', {
+                                        count: booking.total_days,
+                                    })
+                                }}
                             </dd>
                         </div>
                         <div>
-                            <dt class="text-xs text-muted-foreground">Time</dt>
+                            <dt class="text-xs text-muted-foreground">
+                                {{ t('Time') }}
+                            </dt>
                             <dd class="mt-1 font-medium">
-                                {{ booking.pickup_time || 'Not set'
+                                {{ booking.pickup_time || t('Not set')
                                 }}<span v-if="booking.return_time">
                                     – {{ booking.return_time }}</span
                                 >
@@ -397,15 +456,15 @@ function deleteDocument(id: number): void {
                         </div>
                         <div>
                             <dt class="text-xs text-muted-foreground">
-                                Source
+                                {{ t('Source') }}
                             </dt>
                             <dd class="mt-1 font-medium">
-                                {{ bookingSourceLabels[booking.source] }}
+                                {{ t(bookingSourceLabels[booking.source]) }}
                             </dd>
                         </div>
                         <div>
                             <dt class="text-xs text-muted-foreground">
-                                Helmets
+                                {{ t('Helmets') }}
                             </dt>
                             <dd class="mt-1 font-medium">
                                 {{ booking.options.helmets_quantity }}
@@ -413,13 +472,13 @@ function deleteDocument(id: number): void {
                         </div>
                         <div>
                             <dt class="text-xs text-muted-foreground">
-                                Delivery
+                                {{ t('Delivery') }}
                             </dt>
                             <dd class="mt-1 font-medium">
                                 {{
                                     booking.options.delivery_required
-                                        ? 'Required'
-                                        : 'Pickup'
+                                        ? t('Required')
+                                        : t('Pickup')
                                 }}
                             </dd>
                             <dd
@@ -431,22 +490,24 @@ function deleteDocument(id: number): void {
                         </div>
                         <div>
                             <dt class="text-xs text-muted-foreground">
-                                Rental terms
+                                {{ t('Rental terms') }}
                             </dt>
                             <dd class="mt-1 font-medium">
-                                {{ booking.terms?.version || 'Not recorded' }}
+                                {{
+                                    booking.terms?.version || t('Not recorded')
+                                }}
                             </dd>
                             <dd
                                 v-if="booking.terms?.accepted_at"
                                 class="text-sm text-muted-foreground"
                             >
-                                Accepted
+                                {{ t('Accepted') }}
                                 {{ formatDateTime(booking.terms.accepted_at) }}
                             </dd>
                         </div>
                         <div>
                             <dt class="text-xs text-muted-foreground">
-                                Created
+                                {{ t('Created') }}
                             </dt>
                             <dd class="mt-1 font-medium">
                                 {{ formatDateTime(booking.created_at) }}
@@ -455,12 +516,13 @@ function deleteDocument(id: number): void {
                                 v-if="booking.created_by_admin"
                                 class="text-sm text-muted-foreground"
                             >
-                                by {{ booking.created_by_admin.name }}
+                                {{ t('by') }}
+                                {{ booking.created_by_admin.name }}
                             </dd>
                         </div>
                         <div v-if="booking.pending_expires_at">
                             <dt class="text-xs text-muted-foreground">
-                                Pending expires
+                                {{ t('Pending expires') }}
                             </dt>
                             <dd class="mt-1 font-medium">
                                 {{ formatDateTime(booking.pending_expires_at) }}
@@ -480,20 +542,20 @@ function deleteDocument(id: number): void {
                                 id="price-details-heading"
                                 class="font-semibold"
                             >
-                                Price
+                                {{ t('Price') }}
                             </h2>
                         </div>
                         <span
                             v-if="currentPrice"
                             class="text-xs text-muted-foreground"
-                            >Version {{ currentPrice.version }}</span
+                            >{{ t('Version') }} {{ currentPrice.version }}</span
                         >
                     </div>
                     <div v-if="currentPrice" class="space-y-5">
                         <div class="grid gap-4 sm:grid-cols-3">
                             <div>
                                 <p class="text-xs text-muted-foreground">
-                                    Calculated
+                                    {{ t('Calculated') }}
                                 </p>
                                 <p
                                     class="mt-1 text-lg font-medium tabular-nums"
@@ -508,7 +570,7 @@ function deleteDocument(id: number): void {
                             </div>
                             <div>
                                 <p class="text-xs text-muted-foreground">
-                                    Final total
+                                    {{ t('Final total') }}
                                 </p>
                                 <p
                                     class="mt-1 text-2xl font-semibold tabular-nums"
@@ -523,11 +585,15 @@ function deleteDocument(id: number): void {
                             </div>
                             <div>
                                 <p class="text-xs text-muted-foreground">
-                                    Rate tier
+                                    {{ t('Rate tier') }}
                                 </p>
                                 <p class="mt-1 font-medium">
-                                    {{ currentPrice.tier_key }} ·
-                                    {{ currentPrice.total_days }} days
+                                    {{ t(currentPrice.tier_key) }} ·
+                                    {{
+                                        t('Days count', {
+                                            count: currentPrice.total_days,
+                                        })
+                                    }}
                                 </p>
                                 <p
                                     v-if="
@@ -536,7 +602,7 @@ function deleteDocument(id: number): void {
                                     "
                                     class="text-sm text-amber-700"
                                 >
-                                    Manual adjustment
+                                    {{ t('Manual adjustment') }}
                                 </p>
                             </div>
                         </div>
@@ -548,7 +614,9 @@ function deleteDocument(id: number): void {
                             v-if="currentPrice.override_reason"
                             class="border-l-2 border-amber-400 pl-3 text-sm"
                         >
-                            <p class="font-medium">Adjustment reason</p>
+                            <p class="font-medium">
+                                {{ t('Adjustment reason') }}
+                            </p>
                             <p class="mt-1 text-muted-foreground">
                                 {{ currentPrice.override_reason }}
                             </p>
@@ -558,7 +626,7 @@ function deleteDocument(id: number): void {
                             class="text-sm"
                         >
                             <summary class="cursor-pointer font-medium">
-                                Previous price versions ({{
+                                {{ t('Previous price versions') }} ({{
                                     booking.price_snapshots.length - 1
                                 }})
                             </summary>
@@ -571,7 +639,8 @@ function deleteDocument(id: number): void {
                                     class="flex items-center justify-between gap-3 px-3 py-2"
                                 >
                                     <span
-                                        >Version {{ snapshot.version }} ·
+                                        >{{ t('Version') }}
+                                        {{ snapshot.version }} ·
                                         {{
                                             formatDateTime(
                                                 snapshot.calculated_at,
@@ -589,7 +658,7 @@ function deleteDocument(id: number): void {
                         </details>
                     </div>
                     <p v-else class="text-sm text-muted-foreground">
-                        No price snapshot.
+                        {{ t('No price snapshot.') }}
                     </p>
                 </section>
 
@@ -600,7 +669,7 @@ function deleteDocument(id: number): void {
                     <div class="mb-5 flex items-center gap-2">
                         <History class="size-5 text-muted-foreground" />
                         <h2 id="history-heading" class="font-semibold">
-                            Status history
+                            {{ t('Status history') }}
                         </h2>
                     </div>
                     <ol class="space-y-4">
@@ -654,7 +723,7 @@ function deleteDocument(id: number): void {
                     <div class="mb-4 flex items-center gap-2">
                         <UserRound class="size-5 text-muted-foreground" />
                         <h2 id="customer-heading" class="font-semibold">
-                            Customer
+                            {{ t('Customer') }}
                         </h2>
                     </div>
                     <Link
@@ -680,16 +749,33 @@ function deleteDocument(id: number): void {
                     class="px-4 py-6 sm:px-6"
                     aria-labelledby="notes-heading"
                 >
-                    <div class="mb-4 flex items-center gap-2">
-                        <MessageSquareText
-                            class="size-5 text-muted-foreground"
-                        />
-                        <h2 id="notes-heading" class="font-semibold">Notes</h2>
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <MessageSquareText
+                                class="size-5 text-muted-foreground"
+                            />
+                            <h2 id="notes-heading" class="font-semibold">
+                                {{ t('Notes') }}
+                            </h2>
+                        </div>
+                        <Button
+                            v-if="booking.actions.edit_note"
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            :title="t('Edit internal note')"
+                            @click="openNoteEditor"
+                        >
+                            <Pencil />
+                            <span class="sr-only">{{
+                                t('Edit internal note')
+                            }}</span>
+                        </Button>
                     </div>
                     <dl class="space-y-4 text-sm">
                         <div v-if="booking.client_comment">
                             <dt class="text-xs text-muted-foreground">
-                                Customer
+                                {{ t('Customer') }}
                             </dt>
                             <dd class="mt-1 whitespace-pre-wrap">
                                 {{ booking.client_comment }}
@@ -697,7 +783,7 @@ function deleteDocument(id: number): void {
                         </div>
                         <div v-if="booking.admin_note">
                             <dt class="text-xs text-muted-foreground">
-                                Internal
+                                {{ t('Internal') }}
                             </dt>
                             <dd class="mt-1 whitespace-pre-wrap">
                                 {{ booking.admin_note }}
@@ -705,7 +791,7 @@ function deleteDocument(id: number): void {
                         </div>
                         <div v-if="booking.deposit_note">
                             <dt class="text-xs text-muted-foreground">
-                                Payment / deposit
+                                {{ t('Payment / deposit') }}
                             </dt>
                             <dd class="mt-1 whitespace-pre-wrap">
                                 {{ booking.deposit_note }}
@@ -718,7 +804,7 @@ function deleteDocument(id: number): void {
                             "
                         >
                             <dt class="text-xs text-muted-foreground">
-                                Closure reason
+                                {{ t('Closure reason') }}
                             </dt>
                             <dd class="mt-1 whitespace-pre-wrap">
                                 {{
@@ -735,7 +821,7 @@ function deleteDocument(id: number): void {
                             "
                             class="text-muted-foreground"
                         >
-                            No notes.
+                            {{ t('No notes.') }}
                         </p>
                     </dl>
                 </section>
@@ -747,22 +833,23 @@ function deleteDocument(id: number): void {
                     <div class="mb-4 flex items-center gap-2">
                         <FileText class="size-5 text-muted-foreground" />
                         <h2 id="documents-heading" class="font-semibold">
-                            Documents
+                            {{ t('Documents') }}
                         </h2>
                     </div>
                     <form class="space-y-3" @submit.prevent="uploadDocument">
-                        <select
+                        <AdminSelect
                             v-model="documentForm.type"
-                            class="admin-select w-full"
-                            aria-label="Document type"
-                        >
-                            <option value="passport">Passport</option>
-                            <option value="driver_license">
-                                Driver license
-                            </option>
-                            <option value="photo">Photo</option>
-                            <option value="other">Other</option>
-                        </select>
+                            :aria-label="t('Document type')"
+                            :options="[
+                                { value: 'passport', label: t('Passport') },
+                                {
+                                    value: 'driver_license',
+                                    label: t('Driver license'),
+                                },
+                                { value: 'photo', label: t('Photo') },
+                                { value: 'other', label: t('Other') },
+                            ]"
+                        />
                         <Input
                             ref="documentInput"
                             type="file"
@@ -778,7 +865,7 @@ function deleteDocument(id: number): void {
                                 !documentForm.document ||
                                 documentForm.processing
                             "
-                            ><FilePlus2 />Upload document</Button
+                            ><FilePlus2 />{{ t('Upload document') }}</Button
                         >
                     </form>
                     <ul
@@ -804,29 +891,29 @@ function deleteDocument(id: number): void {
                                     as-child
                                     variant="ghost"
                                     size="icon-sm"
-                                    title="Download document"
+                                    :title="t('Download document')"
                                     ><a :href="document.download_url"
-                                        ><Download /><span class="sr-only"
-                                            >Download</span
-                                        ></a
+                                        ><Download /><span class="sr-only">{{
+                                            t('Download')
+                                        }}</span></a
                                     ></Button
                                 >
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon-sm"
-                                    title="Delete document"
+                                    :title="t('Delete document')"
                                     class="text-destructive"
                                     @click="deleteDocument(document.id)"
-                                    ><Trash2 /><span class="sr-only"
-                                        >Delete</span
-                                    ></Button
+                                    ><Trash2 /><span class="sr-only">{{
+                                        t('Delete')
+                                    }}</span></Button
                                 >
                             </span>
                         </li>
                     </ul>
                     <p v-else class="mt-4 text-sm text-muted-foreground">
-                        No documents.
+                        {{ t('No documents.') }}
                     </p>
                 </section>
             </aside>
@@ -835,34 +922,37 @@ function deleteDocument(id: number): void {
         <Dialog v-model:open="datesOpen">
             <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Change rental dates</DialogTitle>
-                    <DialogDescription
-                        >Availability and price will be checked again before
-                        saving.</DialogDescription
-                    >
+                    <DialogTitle>{{ t('Change rental dates') }}</DialogTitle>
+                    <DialogDescription>{{
+                        t(
+                            'Availability and price will be checked again before saving.',
+                        )
+                    }}</DialogDescription>
                 </DialogHeader>
                 <form class="space-y-5" @submit.prevent="updateDates">
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <Label for="edit_starts_on">Start date</Label
-                            ><Input
+                            <Label for="edit_starts_on">{{
+                                t('Start date')
+                            }}</Label
+                            ><AdminDateInput
                                 id="edit_starts_on"
                                 v-model="datesForm.starts_on"
-                                type="date"
                                 class="mt-2"
                             />
                         </div>
                         <div>
-                            <Label for="edit_ends_on">End date</Label
-                            ><Input
+                            <Label for="edit_ends_on">{{ t('End date') }}</Label
+                            ><AdminDateInput
                                 id="edit_ends_on"
                                 v-model="datesForm.ends_on"
-                                type="date"
                                 class="mt-2"
                             />
                         </div>
                         <div>
-                            <Label for="edit_pickup_time">Pickup time</Label
+                            <Label for="edit_pickup_time">{{
+                                t('Pickup time')
+                            }}</Label
                             ><Input
                                 id="edit_pickup_time"
                                 v-model="datesForm.pickup_time"
@@ -871,7 +961,9 @@ function deleteDocument(id: number): void {
                             />
                         </div>
                         <div>
-                            <Label for="edit_return_time">Return time</Label
+                            <Label for="edit_return_time">{{
+                                t('Return time')
+                            }}</Label
                             ><Input
                                 id="edit_return_time"
                                 v-model="datesForm.return_time"
@@ -887,7 +979,7 @@ function deleteDocument(id: number): void {
                         v-if="dateQuoteLoading"
                         class="text-sm text-muted-foreground"
                     >
-                        Calculating…
+                        {{ t('Calculating…') }}
                     </div>
                     <div
                         v-else-if="dateQuoteError"
@@ -904,7 +996,7 @@ function deleteDocument(id: number): void {
                             size="sm"
                             @click="loadDateQuote"
                         >
-                            <RefreshCw />Retry
+                            <RefreshCw />{{ t('Retry') }}
                         </Button>
                     </div>
                     <div v-else-if="dateQuote" class="space-y-3">
@@ -919,8 +1011,8 @@ function deleteDocument(id: number): void {
                                 "
                                 >{{
                                     dateAvailable
-                                        ? 'Vehicle available'
-                                        : 'Dates occupied'
+                                        ? t('Vehicle available')
+                                        : t('Dates occupied')
                                 }}</span
                             >
                             <strong class="tabular-nums">{{
@@ -940,14 +1032,14 @@ function deleteDocument(id: number): void {
                             type="button"
                             variant="outline"
                             @click="datesOpen = false"
-                            >Close</Button
+                            >{{ t('Close') }}</Button
                         >
                         <Button
                             type="submit"
                             :disabled="
                                 datesForm.processing || dateAvailable === false
                             "
-                            ><Save />Save dates</Button
+                            ><Save />{{ t('Save dates') }}</Button
                         >
                     </DialogFooter>
                 </form>
@@ -957,15 +1049,16 @@ function deleteDocument(id: number): void {
         <Dialog v-model:open="priceOpen">
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Set final price</DialogTitle>
-                    <DialogDescription
-                        >The automatic calculation remains in
-                        history.</DialogDescription
-                    >
+                    <DialogTitle>{{ t('Set final price') }}</DialogTitle>
+                    <DialogDescription>{{
+                        t('The automatic calculation remains in history.')
+                    }}</DialogDescription>
                 </DialogHeader>
                 <form class="space-y-4" @submit.prevent="updatePrice">
                     <div>
-                        <Label for="manual_total">Final total, THB</Label
+                        <Label for="manual_total">{{
+                            t('Final total, THB')
+                        }}</Label
                         ><Input
                             id="manual_total"
                             v-model="priceForm.manual_total"
@@ -979,7 +1072,7 @@ function deleteDocument(id: number): void {
                         />
                     </div>
                     <div>
-                        <Label for="price_reason">Reason</Label
+                        <Label for="price_reason">{{ t('Reason') }}</Label
                         ><textarea
                             id="price_reason"
                             v-model="priceForm.reason"
@@ -998,11 +1091,82 @@ function deleteDocument(id: number): void {
                             type="button"
                             variant="outline"
                             @click="priceOpen = false"
-                            >Close</Button
+                            >{{ t('Close') }}</Button
                         ><Button type="submit" :disabled="priceForm.processing"
-                            ><Save />Save price</Button
+                            ><Save />{{ t('Save price') }}</Button
                         ></DialogFooter
                     >
+                </form>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog v-model:open="recalculateOpen">
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{{ t('Recalculate price') }}</DialogTitle>
+                    <DialogDescription>
+                        {{
+                            t(
+                                'A new automatic price version will be created from the current dates and tariffs. Any manual final price will remain in history but will no longer be current.',
+                            )
+                        }}
+                    </DialogDescription>
+                </DialogHeader>
+                <InputError
+                    :message="domainError(recalculateForm.errors, 'price')"
+                />
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="recalculateOpen = false"
+                        >{{ t('Keep current price') }}</Button
+                    >
+                    <Button
+                        type="button"
+                        :disabled="recalculateForm.processing"
+                        @click="recalculatePrice"
+                    >
+                        <RefreshCw />{{ t('Recalculate') }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog v-model:open="noteOpen">
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{{ t('Internal note') }}</DialogTitle>
+                    <DialogDescription>
+                        {{ t('This note is visible to administrators only.') }}
+                    </DialogDescription>
+                </DialogHeader>
+                <form class="space-y-4" @submit.prevent="updateAdminNote">
+                    <div>
+                        <Label for="admin_note">{{ t('Note') }}</Label>
+                        <textarea
+                            id="admin_note"
+                            v-model="noteForm.admin_note"
+                            class="admin-textarea mt-2"
+                            rows="6"
+                            maxlength="5000"
+                        />
+                        <InputError
+                            class="mt-1"
+                            :message="noteForm.errors.admin_note"
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            @click="noteOpen = false"
+                            >{{ t('Cancel') }}</Button
+                        >
+                        <Button type="submit" :disabled="noteForm.processing">
+                            <Save />{{ t('Save note') }}
+                        </Button>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -1010,15 +1174,16 @@ function deleteDocument(id: number): void {
         <Dialog v-model:open="cancelOpen">
             <DialogContent>
                 <DialogHeader
-                    ><DialogTitle>Cancel booking</DialogTitle
-                    ><DialogDescription
-                        >The vehicle will be released immediately. This action
-                        is recorded in audit history.</DialogDescription
-                    ></DialogHeader
+                    ><DialogTitle>{{ t('Cancel booking') }}</DialogTitle
+                    ><DialogDescription>{{
+                        t(
+                            'The vehicle will be released immediately. This action is recorded in audit history.',
+                        )
+                    }}</DialogDescription></DialogHeader
                 >
                 <form class="space-y-4" @submit.prevent="cancelBooking">
                     <div>
-                        <Label for="cancel_reason">Reason</Label
+                        <Label for="cancel_reason">{{ t('Reason') }}</Label
                         ><textarea
                             id="cancel_reason"
                             v-model="cancelForm.reason"
@@ -1037,12 +1202,12 @@ function deleteDocument(id: number): void {
                             type="button"
                             variant="outline"
                             @click="cancelOpen = false"
-                            >Keep booking</Button
+                            >{{ t('Keep booking') }}</Button
                         ><Button
                             type="submit"
                             variant="destructive"
                             :disabled="cancelForm.processing"
-                            ><XCircle />Cancel booking</Button
+                            ><XCircle />{{ t('Cancel booking') }}</Button
                         ></DialogFooter
                     >
                 </form>
@@ -1052,15 +1217,18 @@ function deleteDocument(id: number): void {
         <Dialog v-model:open="noShowOpen">
             <DialogContent>
                 <DialogHeader
-                    ><DialogTitle>Mark as no-show</DialogTitle
-                    ><DialogDescription
-                        >The booking must be approved and its pickup time must
-                        have passed.</DialogDescription
-                    ></DialogHeader
+                    ><DialogTitle>{{ t('Mark as no-show') }}</DialogTitle
+                    ><DialogDescription>{{
+                        t(
+                            'The booking must be approved and its pickup time must have passed.',
+                        )
+                    }}</DialogDescription></DialogHeader
                 >
                 <form class="space-y-4" @submit.prevent="markNoShow">
                     <div>
-                        <Label for="no_show_reason">Reason (optional)</Label
+                        <Label for="no_show_reason">{{
+                            t('Reason (optional)')
+                        }}</Label
                         ><textarea
                             id="no_show_reason"
                             v-model="noShowForm.reason"
@@ -1079,9 +1247,9 @@ function deleteDocument(id: number): void {
                             type="button"
                             variant="outline"
                             @click="noShowOpen = false"
-                            >Close</Button
+                            >{{ t('Close') }}</Button
                         ><Button type="submit" :disabled="noShowForm.processing"
-                            ><Flag />Confirm no-show</Button
+                            ><Flag />{{ t('Confirm no-show') }}</Button
                         ></DialogFooter
                     >
                 </form>

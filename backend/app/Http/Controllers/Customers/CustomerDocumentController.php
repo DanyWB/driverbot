@@ -55,7 +55,11 @@ class CustomerDocumentController extends Controller
         return Storage::disk((string) $document->disk)->download(
             (string) $document->file_path,
             (string) $document->original_filename,
-            array_filter(['Content-Type' => $document->mime_type]),
+            array_filter([
+                'Content-Type' => $document->mime_type,
+                'Cache-Control' => 'no-store, private',
+                'X-Content-Type-Options' => 'nosniff',
+            ]),
         );
     }
 
