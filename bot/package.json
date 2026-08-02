@@ -31,7 +31,7 @@
     "dayjs": "^1.11.13",
     "dotenv": "^16.3.1",
     "googleapis": "^173.0.0",
-    "grammy": "^1.17.0",
+    "grammy": "^1.45.1",
     "knex": "^2.5.1",
     "module-alias": "^2.2.3",
     "node-calendar": "^0.1.5",
