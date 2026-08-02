@@ -73,7 +73,7 @@ class ImportPricingWorkbook extends Command
 
     private function absolutePath(string $path): string
     {
-        if (preg_match('/^(?:[A-Za-z]:[\\\\\/]|[\\\\\/]{2})/', $path) === 1) {
+        if (str_starts_with($path, '/') || preg_match('/^(?:[A-Za-z]:[\\\\\/]|\\\\\\\\)/', $path) === 1) {
             return $path;
         }
 
