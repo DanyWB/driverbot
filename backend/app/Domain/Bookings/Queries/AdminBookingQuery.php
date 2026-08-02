@@ -4,6 +4,7 @@ namespace App\Domain\Bookings\Queries;
 
 use App\Domain\Bookings\Enums\BookingStatus;
 use App\Models\Booking;
+use App\Models\Vehicle;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\LazyCollection;
@@ -28,7 +29,14 @@ class AdminBookingQuery
             : 25;
 
         return $query
-            ->orderBy($sort, $direction)
+            ->when(
+                $sort === 'vehicle',
+                fn (Builder $query) => $query->orderBy(
+                    Vehicle::query()->select('name')->whereColumn('vehicles.id', 'bookings.vehicle_id'),
+                    $direction,
+                ),
+                fn (Builder $query) => $query->orderBy($sort, $direction),
+            )
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -48,7 +56,14 @@ class AdminBookingQuery
         [$sort, $direction] = $this->sorting($filters);
 
         return $query
-            ->orderBy($sort, $direction)
+            ->when(
+                $sort === 'vehicle',
+                fn (Builder $query) => $query->orderBy(
+                    Vehicle::query()->select('name')->whereColumn('vehicles.id', 'bookings.vehicle_id'),
+                    $direction,
+                ),
+                fn (Builder $query) => $query->orderBy($sort, $direction),
+            )
             ->orderByDesc('id')
             ->lazy(500);
     }
@@ -129,7 +144,7 @@ class AdminBookingQuery
      */
     private function sorting(array $filters): array
     {
-        $sort = in_array($filters['sort'] ?? null, ['created_at', 'updated_at', 'starts_on', 'ends_on', 'status'], true)
+        $sort = in_array($filters['sort'] ?? null, ['created_at', 'updated_at', 'starts_on', 'ends_on', 'status', 'vehicle'], true)
             ? (string) $filters['sort']
             : 'created_at';
         $direction = ($filters['direction'] ?? null) === 'asc' ? 'asc' : 'desc';

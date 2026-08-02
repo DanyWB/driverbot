@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\HealthController;
+use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\AssignRequestId;
 use App\Http\Middleware\AuthenticateServiceApiClient;
+use App\Http\Middleware\EnsureAdminIsActive;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ResolveTelegramCustomer;
@@ -28,8 +30,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(AssignRequestId::class);
+        $middleware->append(AddSecurityHeaders::class);
+        $middleware->trustHosts(subdomains: false);
 
         $middleware->alias([
+            'admin.active' => EnsureAdminIsActive::class,
             'service.api' => AuthenticateServiceApiClient::class,
             'telegram.customer' => ResolveTelegramCustomer::class,
         ]);

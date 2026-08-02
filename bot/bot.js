@@ -8,7 +8,6 @@ const sessionStorage = require("./middlewares/sessionStorage");
 const resetFlow = require("./middlewares/resetFlow");
 const {t, getCtxLang} = require("./utils/i18n");
 const {isLaravelMode, requireLaravelConfig} = require("./config/runtime");
-const {BotApiError} = require("./services/botApiClient");
 
 requireLaravelConfig();
 
@@ -67,7 +66,6 @@ bot.callbackQuery(
 bot.callbackQuery(/^book:cat:\d+$/, require("./handlers/book_select_category"));
 bot.callbackQuery("book:back_to_bikes", require("./handlers/book_back_to_bikes"));
 bot.callbackQuery("book:show_available_bikes", require("./handlers/book_show_available_bikes"));
-bot.callbackQuery(/^book:select_date:\d{4}-\d{2}-\d{2}$/, require("./handlers/calendar_handler"));
 bot.callbackQuery(["book:calendar_prev", "book:calendar_next", "book:restart", "home"], require("./handlers/navigation"));
 bot.callbackQuery(/^lang:set:(ru|en|ua)$/, require("./handlers/language_select"));
 bot.callbackQuery(
@@ -175,11 +173,20 @@ if (!isLaravelMode()) {
 
 bot.catch(async (err) => {
   console.error("Telegram bot handler error:", err.error || err);
-  if (err.error instanceof BotApiError && err.ctx?.from) {
+  if (!err.ctx?.from) return;
+
+  const message = t(getCtxLang(err.ctx), "booking_service_unavailable");
+  try {
+    if (err.ctx.callbackQuery) {
+      await err.ctx.answerCallbackQuery({text: message, show_alert: true});
+    } else {
+      await err.ctx.reply(message);
+    }
+  } catch (replyError) {
     try {
-      await err.ctx.reply(t(getCtxLang(err.ctx), "booking_service_unavailable"));
-    } catch (replyError) {
-      console.error("Could not send API failure message:", replyError);
+      await err.ctx.reply(message);
+    } catch (fallbackError) {
+      console.error("Could not send handler failure message:", fallbackError);
     }
   }
 });

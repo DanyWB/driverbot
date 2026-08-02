@@ -186,7 +186,7 @@ REDIS_URL=redis://127.0.0.1:6379/1
 BOT_SESSION_PREFIX=drive-phangan:bot:session:v1
 BOT_SESSION_TTL_SECONDS=2592000
 BOT_SESSION_LOCK_TTL_MS=30000
-BOT_SESSION_LOCK_WAIT_MS=5000
+BOT_SESSION_LOCK_WAIT_MS=30000
 BOT_FILE_DOWNLOAD_TIMEOUT_MS=15000
 BOT_DOCUMENT_MAX_MB=10
 BOOKING_TZ=Asia/Bangkok
@@ -228,10 +228,12 @@ private document и cancel. Временный token отозван, созда�
 Финальный срез проверок от 2026-07-22:
 
 - единый `npm run precheck` прошел;
-- Laravel: 155 тестов, 152 passed, 3 PostgreSQL-only skipped, 1020 assertions;
+- Laravel: 166 тестов, 162 passed, 4 PostgreSQL-only skipped, 1074 assertions;
+- отдельный PostgreSQL-набор: 4 tests passed, включая time constraint, exclusion
+  constraint и multi-process race `201 + 409`;
 - Pint и PHPStan прошли без ошибок;
 - Vue: ESLint, Prettier, TypeScript и production build прошли;
-- Node.js: 13 unit tests, syntax check 128 файлов, 317 ключей и совпадающие
+- Node.js: 13 unit tests, syntax check 127 файлов, 317 ключей и совпадающие
   placeholder-наборы в каждой из `ru/en/ua`;
 - Laravel-mode preflight прошел против локальных PostgreSQL, Redis и HTTP API;
 - `npm audit --omit=dev` возвращает 0 известных уязвимостей;
@@ -240,7 +242,7 @@ private document и cancel. Временный token отозван, созда�
 
 ## 10. Cutover и rollback
 
-Cutover выполняется только после этапа 9:
+Этап 9 выполнен. Production cutover выполняется только после этапа 10:
 
 1. Сделать backup обеих БД и persistent storage.
 2. Применить Laravel migrations и проверить `/health/ready`.
@@ -258,8 +260,25 @@ credentials, затем запустить старый процесс. Пост
 
 ## 11. Что остается дальше
 
-Этап 9 должен реализовать worker/outbox delivery, уведомление админа о новой заявке,
-approve/cancel/expired сообщения клиенту, автоexpiry через 24 часа, напоминания в день
-выдачи и за час, retry/backoff и housekeeping. До production обязательно получить
-реальный Telegram username менеджера и утвердить фактический текст условий аренды;
+Этап 9 закрыт и описан в `STAGE_9_AUTOMATION_NOTIFICATIONS.md`. Далее выполняется
+этап 10: process supervision, staging, нагрузка, backup/restore и cutover rehearsal.
+До production обязательно получить Telegram bot token, numeric admin chat ID,
+реальный username менеджера и утвердить фактический текст условий аренды;
 placeholder-контакты и `example.com` использовать нельзя.
+
+## 12. Актуализация после промежуточного аудита
+
+Аудит 2026-07-22 дополнительно закрыл следующие риски Bot API и Node.js-клиента:
+
+- batch create отклоняет повтор одного `vehicle_id`;
+- availability, quote и create используют одинаковые ограничения периода;
+- время возврата не может быть раньше чем через час после выдачи;
+- Redis session lock ожидает до 30 секунд и покрывает API retry window;
+- необработанная ошибка handler получает безопасный ответ клиенту;
+- удален неиспользуемый дублирующий calendar handler;
+- OpenAPI обновлен по фактическим ограничениям;
+- CI проверяет Redis concurrency и Laravel mode, а backend CI - реальные
+  PostgreSQL constraints и race condition.
+
+Полный результат сверки этапов 0-8 находится в
+`INTERMEDIATE_AUDIT_2026-07-22.md`.

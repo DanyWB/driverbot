@@ -194,6 +194,12 @@ class AdminTimelineTest extends TestCase
             '2026-08-12',
             BookingStatus::Approved,
         );
+        $this->createBooking(
+            $this->car,
+            '2026-08-20',
+            '2026-08-20',
+            BookingStatus::Pending,
+        );
         $this->maintenance->create(
             $this->maintenanceVehicle->id,
             '2026-08-15',
@@ -214,7 +220,10 @@ class AdminTimelineTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('timeline.stats.vehicles', 1)
                 ->where('timeline.rows.0.id', $this->car->id)
-                ->where('timeline.rows.0.occupancies.0.booking_public_id', $approved->public_id));
+                ->where('timeline.rows.0.occupancies.0.booking_public_id', $approved->public_id)
+                ->has('timeline.rows.0.occupancies', 1)
+                ->has('timeline.rows.0.blocked_ranges', 2)
+                ->where('timeline.rows.0.blocked_ranges.1.start_index', 19));
 
         $this->actingAs($this->admin)
             ->get(route('timeline.index', [...$period, 'status' => 'maintenance']))
@@ -313,6 +322,27 @@ class AdminTimelineTest extends TestCase
             ]));
     }
 
+    public function test_quick_booking_redirects_back_to_the_same_timeline_after_creation(): void
+    {
+        $returnTo = '/timeline?starts_on=2026-08-01&ends_on=2026-08-31&vehicle_id='.
+            $this->freeVehicle->id;
+
+        $this->actingAs($this->admin)
+            ->post(route('bookings.store', [
+                'return_to' => $returnTo,
+                'return_to_timeline' => 1,
+            ]), $this->manualBookingPayload($this->freeVehicle))
+            ->assertRedirect($returnTo);
+
+        $this->assertDatabaseHas('bookings', [
+            'vehicle_id' => $this->freeVehicle->id,
+            'starts_on' => '2026-08-20 00:00:00',
+            'ends_on' => '2026-08-20 00:00:00',
+            'status' => BookingStatus::Approved->value,
+            'source' => BookingSource::AdminPhone->value,
+        ]);
+    }
+
     public function test_a_slot_that_becomes_occupied_is_rejected_when_the_prefilled_form_is_submitted(): void
     {
         $returnTo = '/timeline?starts_on=2026-08-01&ends_on=2026-08-31';
@@ -355,6 +385,16 @@ class AdminTimelineTest extends TestCase
             ->from($createUrl)
             ->post(route('bookings.store', ['return_to' => $returnTo]), $this->manualBookingPayload($this->freeVehicle))
             ->assertRedirect($createUrl)
+            ->assertSessionHasErrors('booking')
+            ->assertSessionHasInput('starts_on', '2026-08-20');
+
+        $this->actingAs($this->admin)
+            ->from($returnTo)
+            ->post(route('bookings.store', [
+                'return_to' => $returnTo,
+                'return_to_timeline' => 1,
+            ]), $this->manualBookingPayload($this->freeVehicle))
+            ->assertRedirect($returnTo)
             ->assertSessionHasErrors('booking')
             ->assertSessionHasInput('starts_on', '2026-08-20');
 
@@ -415,7 +455,7 @@ class AdminTimelineTest extends TestCase
             'starts_on' => '2026-08-20',
             'ends_on' => '2026-08-20',
             'pickup_time' => '10:00',
-            'return_time' => '10:00',
+            'return_time' => '11:00',
             'source' => BookingSource::AdminPhone->value,
             'initial_status' => BookingStatus::Approved->value,
             'client_comment' => '',

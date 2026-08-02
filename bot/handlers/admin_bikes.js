@@ -315,7 +315,7 @@ async function createBikeFromSession(ctx, lang) {
       category_id: data.category_id,
       description: data.description || null,
       emoji: data.emoji || null,
-      vehicle_type: normalizeVehicleType(data.vehicle_type || VEHICLE_TYPE.BIKE),
+      vehicle_type: normalizeVehicleType(data.vehicle_type || VEHICLE_TYPE.SCOOTER),
       inventory_code: data.inventory_code || null,
       sort_order: Number.isFinite(Number(data.sort_order)) ? Number(data.sort_order) : 0,
       is_active: true,

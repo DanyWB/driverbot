@@ -11,8 +11,19 @@ permissions:
   contents: read
 
 jobs:
-  syntax:
+  checks:
     runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     defaults:
       run:
@@ -34,8 +45,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Scan tracked files for secrets
+        working-directory: .
+        run: node scripts/check-secrets.js
+
+      - name: Validate deployment shell scripts
+        working-directory: .
+        run: bash -n deploy/scripts/*.sh
+
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high
 
       - name: Check JavaScript syntax
         run: npm run check:syntax
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Check translation parity
+        run: npm run check:translations
+
+      - name: Check Laravel data mode boot
+        run: npm run check:laravel-mode
+
+      - name: Check concurrent Redis sessions
+        env:
+          REDIS_URL: redis://127.0.0.1:6379/1
+        run: npm run check:redis-session

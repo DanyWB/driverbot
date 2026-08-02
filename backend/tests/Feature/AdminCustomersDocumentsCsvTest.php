@@ -127,6 +127,8 @@ class AdminCustomersDocumentsCsvTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('documents.download', $document))
             ->assertOk()
+            ->assertHeader('cache-control', 'no-store, private')
+            ->assertHeader('x-content-type-options', 'nosniff')
             ->assertDownload('passport.pdf');
 
         $path = (string) $document->file_path;
@@ -180,7 +182,7 @@ class AdminCustomersDocumentsCsvTest extends TestCase
 
     public function test_csv_uses_current_filters_bom_excel_delimiter_and_formula_protection(): void
     {
-        $matching = $this->bookingForCsv('=Formula Customer', '@Formula Bike', 'admin_phone', '-internal formula');
+        $matching = $this->bookingForCsv('=Formula Customer', '@Formula Bike', 'admin_phone', "\t=internal formula");
         $this->bookingForCsv('Other Customer', 'Other Bike', 'telegram', null);
 
         $response = $this->actingAs($this->admin)->get(route('bookings.export', [
@@ -197,7 +199,7 @@ class AdminCustomersDocumentsCsvTest extends TestCase
         $this->assertStringContainsString((string) $matching->public_id, $csv);
         $this->assertStringContainsString("'=Formula Customer", $csv);
         $this->assertStringContainsString("'@Formula Bike", $csv);
-        $this->assertStringContainsString("'-internal formula", $csv);
+        $this->assertStringContainsString("'\t=internal formula", $csv);
         $this->assertStringNotContainsString('Other Customer', $csv);
     }
 

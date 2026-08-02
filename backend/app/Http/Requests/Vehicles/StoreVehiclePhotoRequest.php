@@ -15,6 +15,7 @@ class StoreVehiclePhotoRequest extends FormRequest
                 'required',
                 File::image()->types(['jpg', 'jpeg', 'png', 'webp'])
                     ->max((int) config('business.vehicle_photo_max_mb') * 1024),
+                'dimensions:max_width=6000,max_height=6000',
             ],
             'alt_text' => ['nullable', 'string', 'max:255'],
         ];

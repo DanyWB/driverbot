@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Bookings\Enums\BookingStatus;
+use App\Domain\Bookings\Services\BookingStatusMutationGuard;
 use App\Domain\Pricing\Data\PriceQuote;
 use App\Domain\Pricing\Enums\PricingSource;
 use App\Domain\Pricing\Enums\PricingTier;
@@ -21,6 +23,9 @@ class BookingPriceSnapshotServiceTest extends TestCase
     public function test_automatic_calculation_and_manual_override_create_separate_versions_and_audit(): void
     {
         $booking = Booking::factory()->create();
+        app(BookingStatusMutationGuard::class)->run(
+            fn () => $booking->forceFill(['status' => BookingStatus::Pending])->save(),
+        );
         $admin = User::factory()->create();
         $quote = new PriceQuote(
             vehicleId: $booking->vehicle_id,

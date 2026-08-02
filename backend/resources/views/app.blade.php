@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
-        <script>
+        <script nonce="{{ Vite::cspNonce() }}">
             (function() {
                 const appearance = '{{ $appearance ?? "system" }}';
 
@@ -20,7 +20,7 @@
         </script>
 
         {{-- Inline style to set the HTML background color based on our theme in app.css --}}
-        <style>
+        <style nonce="{{ Vite::cspNonce() }}">
             html {
                 background-color: oklch(1 0 0);
             }
@@ -40,6 +40,7 @@
         </x-inertia::head>
     </head>
     <body class="font-sans antialiased">
-        <x-inertia::app />
+        <script nonce="{{ Vite::cspNonce() }}" data-page="app" type="application/json">{!! json_encode($page, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
+        <div id="app"></div>
     </body>
 </html>

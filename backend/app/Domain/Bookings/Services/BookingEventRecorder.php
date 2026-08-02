@@ -4,16 +4,16 @@ namespace App\Domain\Bookings\Services;
 
 use App\Domain\Bookings\Data\BookingActor;
 use App\Domain\Bookings\Enums\BookingStatus;
-use App\Domain\Customers\Enums\IdentityProvider;
+use App\Domain\Notifications\Services\NotificationOutboxService;
 use App\Models\AuditLog;
 use App\Models\Booking;
 use App\Models\BookingPriceSnapshot;
 use App\Models\BookingStatusHistory;
-use App\Models\CustomerIdentity;
-use App\Models\NotificationOutbox;
 
 class BookingEventRecorder
 {
+    public function __construct(private readonly NotificationOutboxService $outbox) {}
+
     /** @param array<string, mixed> $context */
     public function recordInitialStatus(
         Booking $booking,
@@ -83,17 +83,23 @@ class BookingEventRecorder
             'request_id' => $requestId,
         ]);
 
-        $this->enqueueCustomer($booking, 'booking.dates_changed', "booking:{$booking->public_id}:dates:{$audit->id}", [
+        $this->outbox->enqueueCustomer($booking, 'booking.dates_changed', "booking:{$booking->public_id}:dates:{$audit->id}", [
             'old_dates' => $oldValues,
             'new_dates' => $newValues,
             'final_total' => $snapshot instanceof BookingPriceSnapshot ? (int) $snapshot->final_total : null,
             'currency' => $snapshot instanceof BookingPriceSnapshot ? (string) $snapshot->currency : null,
         ]);
+
+        if ($booking->bookingStatus() === BookingStatus::Approved) {
+            $this->outbox->schedulePickupReminders($booking);
+        } else {
+            $this->outbox->discardPickupReminders($booking, 'Booking dates changed outside the approved status.');
+        }
     }
 
     public function recordPriceChanged(Booking $booking, BookingPriceSnapshot $snapshot): void
     {
-        $this->enqueueCustomer(
+        $this->outbox->enqueueCustomer(
             $booking,
             'booking.price_changed',
             "booking:{$booking->public_id}:price:{$snapshot->id}",
@@ -103,6 +109,24 @@ class BookingEventRecorder
                 'currency' => (string) $snapshot->currency,
             ],
         );
+    }
+
+    public function recordAdminNoteChanged(
+        Booking $booking,
+        BookingActor $actor,
+        ?string $oldNote,
+        ?string $newNote,
+        ?string $requestId = null,
+    ): void {
+        AuditLog::query()->create([
+            ...$this->auditActor($actor),
+            'subject_type' => Booking::class,
+            'subject_id' => (string) $booking->public_id,
+            'action' => 'booking.admin_note_changed',
+            'old_values' => ['admin_note' => $oldNote],
+            'new_values' => ['admin_note' => $newNote],
+            'request_id' => $requestId,
+        ]);
     }
 
     /** @return array<string, mixed> */
@@ -130,14 +154,14 @@ class BookingEventRecorder
         ];
 
         if (in_array($status, $customerEvents, true)) {
-            $this->enqueueCustomer($booking, "booking.{$status->value}", "booking:{$booking->public_id}:status:{$history->id}:customer", [
+            $this->outbox->enqueueCustomer($booking, "booking.{$status->value}", "booking:{$booking->public_id}:status:{$history->id}:customer", [
                 'status' => $status->value,
                 'reason' => $reason,
             ]);
         }
 
         if (in_array($status, [BookingStatus::Pending, BookingStatus::CancelledByClient], true)) {
-            $this->enqueue(
+            $this->outbox->enqueue(
                 "booking:{$booking->public_id}:status:{$history->id}:admin",
                 "booking.{$status->value}",
                 'internal',
@@ -149,39 +173,11 @@ class BookingEventRecorder
                 ],
             );
         }
-    }
 
-    /** @param array<string, mixed> $payload */
-    private function enqueueCustomer(Booking $booking, string $eventType, string $deduplicationKey, array $payload): void
-    {
-        $identity = CustomerIdentity::query()
-            ->where('customer_id', $booking->customer_id)
-            ->where('provider', IdentityProvider::Telegram->value)
-            ->first();
-
-        if (! $identity instanceof CustomerIdentity) {
-            return;
+        if ($status === BookingStatus::Approved) {
+            $this->outbox->schedulePickupReminders($booking);
+        } elseif ($status !== BookingStatus::Pending) {
+            $this->outbox->discardPickupReminders($booking, "Booking status changed to {$status->value}.");
         }
-
-        $this->enqueue($deduplicationKey, $eventType, 'telegram', (string) $identity->external_id, [
-            'booking_public_id' => $booking->public_id,
-            ...$payload,
-        ]);
-    }
-
-    /** @param array<string, mixed> $payload */
-    private function enqueue(string $deduplicationKey, string $eventType, string $channel, string $recipient, array $payload): void
-    {
-        NotificationOutbox::query()->firstOrCreate([
-            'deduplication_key' => $deduplicationKey,
-        ], [
-            'event_type' => $eventType,
-            'channel' => $channel,
-            'recipient' => $recipient,
-            'payload' => $payload,
-            'status' => 'pending',
-            'attempts' => 0,
-            'available_at' => now(),
-        ]);
     }
 }

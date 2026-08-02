@@ -4,7 +4,7 @@ function vehicleEmoji(vehicle = {}) {
 
   const type = vehicle.type || vehicle.vehicle_type;
   if (type === "car") return "🚗";
-  if (type === "bike") return "🏍️";
+  if (type === "scooter") return "🛵";
   return "🛵";
 }
 

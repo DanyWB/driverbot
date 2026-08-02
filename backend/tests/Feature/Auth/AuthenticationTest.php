@@ -6,6 +6,8 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Fortify\Features;
+use Laravel\Passkeys\Passkey;
+use Laravel\Passkeys\Passkeys;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
@@ -30,6 +32,7 @@ class AuthenticationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
+        $this->assertNotNull($user->fresh()->last_login_at);
     }
 
     public function test_inactive_administrators_cannot_authenticate()
@@ -43,6 +46,28 @@ class AuthenticationTest extends TestCase
 
         $response->assertSessionHasErrors('email');
         $this->assertGuest();
+    }
+
+    public function test_an_authenticated_administrator_is_logged_out_after_being_disabled(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $user->forceFill(['is_active' => false])->save();
+
+        $this->get(route('dashboard'))->assertRedirect(route('login'));
+
+        $this->assertGuest();
+    }
+
+    public function test_passkey_login_authorization_rejects_an_inactive_administrator(): void
+    {
+        $user = User::factory()->create(['is_active' => false]);
+        $passkey = (new Passkey)->setRelation('user', $user);
+
+        $this->assertFalse(Passkeys::allowsLogin(request(), $passkey));
+
+        $user->forceFill(['is_active' => true]);
+        $this->assertTrue(Passkeys::allowsLogin(request(), $passkey));
     }
 
     public function test_users_with_two_factor_enabled_are_redirected_to_two_factor_challenge()

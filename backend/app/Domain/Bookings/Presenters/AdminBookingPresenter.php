@@ -40,9 +40,13 @@ class AdminBookingPresenter
             'starts_on' => $this->date($booking, 'starts_on'),
             'ends_on' => $this->date($booking, 'ends_on'),
             'pickup_time' => $this->time($booking, 'pickup_time'),
+            'return_time' => $this->time($booking, 'return_time'),
             'total_days' => $this->totalDays($booking),
             'price' => $snapshot instanceof BookingPriceSnapshot ? $this->priceSummary($snapshot) : null,
             'documents_count' => (int) $booking->documents_count,
+            'client_comment' => $this->nullableString($booking->client_comment),
+            'admin_note' => $this->nullableString($booking->admin_note),
+            'deposit_note' => $this->nullableString($booking->deposit_note),
             'created_at' => $this->dateTime($booking->created_at),
             'updated_at' => $this->dateTime($booking->updated_at),
         ];
@@ -121,12 +125,8 @@ class AdminBookingPresenter
     {
         return [
             ...$this->listItem($booking),
-            'return_time' => $this->time($booking, 'return_time'),
-            'client_comment' => $this->nullableString($booking->client_comment),
-            'admin_note' => $this->nullableString($booking->admin_note),
             'cancellation_reason' => $this->nullableString($booking->cancellation_reason),
             'no_show_reason' => $this->nullableString($booking->no_show_reason),
-            'deposit_note' => $this->nullableString($booking->deposit_note),
             'options' => [
                 'helmets_quantity' => (int) $booking->helmets_quantity,
                 'delivery_required' => (bool) $booking->delivery_required,
@@ -198,6 +198,8 @@ class AdminBookingPresenter
             'cancel' => in_array($status, [BookingStatus::Pending, BookingStatus::Approved, BookingStatus::Active], true),
             'no_show' => $status === BookingStatus::Approved && ! now($this->timezone())->isBefore($this->startsAt($booking)),
             'change_dates' => in_array($status, [BookingStatus::Pending, BookingStatus::Approved, BookingStatus::Active], true),
+            'edit_note' => true,
+            'recalculate_price' => in_array($status, [BookingStatus::Pending, BookingStatus::Approved, BookingStatus::Active], true),
             'override_price' => in_array($status, [BookingStatus::Pending, BookingStatus::Approved, BookingStatus::Active], true),
         ];
     }

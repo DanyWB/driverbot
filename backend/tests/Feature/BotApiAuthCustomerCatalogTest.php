@@ -7,11 +7,19 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Vehicle;
 use App\Models\VehicleOccupancy;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 
 class BotApiAuthCustomerCatalogTest extends BotApiTestCase
 {
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+
+        parent::tearDown();
+    }
+
     public function test_api_requires_active_token_and_route_ability_with_stable_errors(): void
     {
         $this->getJson('/api/v1/bot/vehicles')
@@ -206,5 +214,21 @@ class BotApiAuthCustomerCatalogTest extends BotApiTestCase
             ->assertOk()
             ->assertJsonPath('data.final_total', 700)
             ->assertJsonPath('data.available', false);
+    }
+
+    public function test_available_vehicle_search_uses_the_same_period_limits_as_booking(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-09 11:00:00', 'Asia/Bangkok'));
+        $this->bookableVehicle();
+
+        $this->withHeaders($this->apiHeaders())
+            ->getJson('/api/v1/bot/vehicles/available?start_date=2026-08-08&end_date=2026-08-08')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['start_date'], 'error.fields');
+
+        $this->withHeaders($this->apiHeaders())
+            ->getJson('/api/v1/bot/vehicles/available?start_date=2026-08-10&end_date=2027-08-11')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['end_date'], 'error.fields');
     }
 }

@@ -13,11 +13,13 @@ import {
 } from '@lucide/vue';
 import { ref } from 'vue';
 import AdminPagination from '@/components/AdminPagination.vue';
+import AdminSelect from '@/components/AdminSelect.vue';
 import BookingStatusBadge from '@/components/bookings/BookingStatusBadge.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useLocale } from '@/composables/useLocale';
 import { formatDate, formatMoney, shortBookingId } from '@/lib/bookings';
 import type { CustomerDetail, PaginatedCustomerBookings } from '@/types';
 
@@ -35,6 +37,7 @@ const documentForm = useForm<{ document: File | null; type: string }>({
     document: null,
     type: 'passport',
 });
+const { t } = useLocale();
 
 function selectFile(event: Event): void {
     documentForm.document =
@@ -56,7 +59,7 @@ function uploadDocument(): void {
 }
 
 function deleteDocument(id: number): void {
-    if (!window.confirm('Delete this private document?')) {
+    if (!window.confirm(t('Delete this private document?'))) {
         return;
     }
 
@@ -65,7 +68,7 @@ function deleteDocument(id: number): void {
 
 function fileSize(bytes: number | null): string {
     if (bytes === null) {
-        return 'Unknown size';
+        return t('Unknown size');
     }
 
     if (bytes < 1024 * 1024) {
@@ -87,14 +90,16 @@ function fileSize(bytes: number | null): string {
                     as-child
                     variant="ghost"
                     size="icon"
-                    title="Back to customers"
+                    :title="t('Back to customers')"
                     ><Link href="/customers"
-                        ><ArrowLeft /><span class="sr-only">Back</span></Link
+                        ><ArrowLeft /><span class="sr-only">{{
+                            t('Back')
+                        }}</span></Link
                     ></Button
                 >
                 <div class="min-w-0">
                     <p class="text-sm text-muted-foreground">
-                        Customer #{{ customer.id }}
+                        {{ t('Customer') }} #{{ customer.id }}
                     </p>
                     <h1 class="truncate text-2xl font-semibold">
                         {{ customer.name }}
@@ -103,7 +108,7 @@ function fileSize(bytes: number | null): string {
             </div>
             <Button as-child
                 ><Link :href="`/bookings/create?customer_id=${customer.id}`"
-                    ><CalendarPlus />New booking</Link
+                    ><CalendarPlus />{{ t('New booking') }}</Link
                 ></Button
             >
         </header>
@@ -112,7 +117,7 @@ function fileSize(bytes: number | null): string {
             <section class="px-4 py-6 sm:px-6 lg:border-r lg:px-8">
                 <div class="flex items-center gap-2">
                     <UserRound class="size-5 text-muted-foreground" />
-                    <h2 class="font-semibold">Contacts</h2>
+                    <h2 class="font-semibold">{{ t('Contacts') }}</h2>
                 </div>
                 <div
                     v-if="customer.contacts.length"
@@ -125,7 +130,9 @@ function fileSize(bytes: number | null): string {
                     >
                         <p class="text-xs text-muted-foreground capitalize">
                             {{ contact.type.replace('_', ' ')
-                            }}{{ contact.is_primary ? ' · primary' : '' }}
+                            }}{{
+                                contact.is_primary ? ' · ' + t('primary') : ''
+                            }}
                         </p>
                         <a
                             v-if="contact.type === 'phone'"
@@ -143,16 +150,20 @@ function fileSize(bytes: number | null): string {
                     </div>
                 </div>
                 <p v-else class="mt-4 text-sm text-muted-foreground">
-                    No contacts.
+                    {{ t('No contacts.') }}
                 </p>
                 <div v-if="customer.passport_number" class="mt-6">
-                    <h3 class="text-sm font-medium">Passport number</h3>
+                    <h3 class="text-sm font-medium">
+                        {{ t('Passport number') }}
+                    </h3>
                     <p class="mt-2 font-mono text-sm">
                         {{ customer.passport_number }}
                     </p>
                 </div>
                 <div v-if="customer.identities.length" class="mt-6">
-                    <h3 class="text-sm font-medium">Channel identities</h3>
+                    <h3 class="text-sm font-medium">
+                        {{ t('Channel identities') }}
+                    </h3>
                     <div class="mt-2 flex flex-wrap gap-2">
                         <span
                             v-for="identity in customer.identities"
@@ -166,7 +177,9 @@ function fileSize(bytes: number | null): string {
                     </div>
                 </div>
                 <div v-if="customer.internal_note" class="mt-6">
-                    <h3 class="text-sm font-medium">Internal note</h3>
+                    <h3 class="text-sm font-medium">
+                        {{ t('Internal note') }}
+                    </h3>
                     <p
                         class="mt-2 text-sm whitespace-pre-wrap text-muted-foreground"
                     >
@@ -178,26 +191,30 @@ function fileSize(bytes: number | null): string {
             <aside class="px-4 py-6 sm:px-6">
                 <div class="flex items-center gap-2">
                     <FileText class="size-5 text-muted-foreground" />
-                    <h2 class="font-semibold">Private documents</h2>
+                    <h2 class="font-semibold">{{ t('Private documents') }}</h2>
                 </div>
                 <form class="mt-4 space-y-3" @submit.prevent="uploadDocument">
                     <div>
-                        <Label for="customer_document_type">Type</Label
-                        ><select
+                        <Label for="customer_document_type">{{
+                            t('Type')
+                        }}</Label>
+                        <AdminSelect
                             id="customer_document_type"
                             v-model="documentForm.type"
-                            class="admin-select mt-2 w-full"
-                        >
-                            <option value="passport">Passport</option>
-                            <option value="driver_license">
-                                Driver license
-                            </option>
-                            <option value="photo">Photo</option>
-                            <option value="other">Other</option>
-                        </select>
+                            class="mt-2"
+                            :options="[
+                                { value: 'passport', label: t('Passport') },
+                                {
+                                    value: 'driver_license',
+                                    label: t('Driver license'),
+                                },
+                                { value: 'photo', label: t('Photo') },
+                                { value: 'other', label: t('Other') },
+                            ]"
+                        />
                     </div>
                     <div>
-                        <Label for="customer_document">File</Label
+                        <Label for="customer_document">{{ t('File') }}</Label
                         ><Input
                             id="customer_document"
                             ref="fileInput"
@@ -217,7 +234,7 @@ function fileSize(bytes: number | null): string {
                         :disabled="
                             !documentForm.document || documentForm.processing
                         "
-                        ><FilePlus2 />Upload document</Button
+                        ><FilePlus2 />{{ t('Upload document') }}</Button
                     >
                 </form>
                 <ul
@@ -244,7 +261,7 @@ function fileSize(bytes: number | null): string {
                                     v-if="document.booking_public_id"
                                     :href="`/bookings/${document.booking_public_id}`"
                                     class="mt-1 block text-xs hover:underline"
-                                    >Booking #{{
+                                    >{{ t('Booking') }} #{{
                                         shortBookingId(
                                             document.booking_public_id,
                                         )
@@ -256,29 +273,29 @@ function fileSize(bytes: number | null): string {
                                     as-child
                                     variant="ghost"
                                     size="icon-sm"
-                                    title="Download document"
+                                    :title="t('Download document')"
                                     ><a :href="document.download_url"
-                                        ><Download /><span class="sr-only"
-                                            >Download</span
-                                        ></a
+                                        ><Download /><span class="sr-only">{{
+                                            t('Download')
+                                        }}</span></a
                                     ></Button
                                 ><Button
                                     type="button"
                                     variant="ghost"
                                     size="icon-sm"
-                                    title="Delete document"
+                                    :title="t('Delete document')"
                                     class="text-destructive"
                                     @click="deleteDocument(document.id)"
-                                    ><Trash2 /><span class="sr-only"
-                                        >Delete</span
-                                    ></Button
+                                    ><Trash2 /><span class="sr-only">{{
+                                        t('Delete')
+                                    }}</span></Button
                                 >
                             </div>
                         </div>
                     </li>
                 </ul>
                 <p v-else class="mt-5 text-sm text-muted-foreground">
-                    No documents.
+                    {{ t('No documents.') }}
                 </p>
             </aside>
         </div>
@@ -287,16 +304,16 @@ function fileSize(bytes: number | null): string {
             <div
                 class="flex items-center justify-between border-b px-4 py-4 sm:px-6 lg:px-8"
             >
-                <h2 class="font-semibold">Booking history</h2>
-                <span class="text-sm text-muted-foreground"
-                    >{{ bookings.total }} total</span
-                >
+                <h2 class="font-semibold">{{ t('Booking history') }}</h2>
+                <span class="text-sm text-muted-foreground">{{
+                    t('Total count', { count: bookings.total })
+                }}</span>
             </div>
             <div
                 v-if="bookings.data.length === 0"
                 class="grid min-h-40 place-items-center text-sm text-muted-foreground"
             >
-                No bookings.
+                {{ t('No bookings.') }}
             </div>
             <template v-else>
                 <div class="hidden overflow-x-auto md:block">
@@ -306,16 +323,20 @@ function fileSize(bytes: number | null): string {
                         >
                             <tr>
                                 <th class="px-4 py-3 font-medium lg:px-6">
-                                    Booking
+                                    {{ t('Booking') }}
                                 </th>
-                                <th class="px-4 py-3 font-medium">Vehicle</th>
                                 <th class="px-4 py-3 font-medium">
-                                    Rental dates
+                                    {{ t('Vehicle') }}
+                                </th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Rental dates') }}
                                 </th>
                                 <th class="px-4 py-3 text-right font-medium">
-                                    Final price
+                                    {{ t('Final price') }}
                                 </th>
-                                <th class="px-4 py-3 font-medium">Source</th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Source') }}
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="divide-y">
@@ -345,7 +366,11 @@ function fileSize(bytes: number | null): string {
                                     {{ formatDate(booking.starts_on) }} –
                                     {{ formatDate(booking.ends_on) }}
                                     <p class="text-xs text-muted-foreground">
-                                        {{ booking.total_days }} days
+                                        {{
+                                            t('Days count', {
+                                                count: booking.total_days,
+                                            })
+                                        }}
                                     </p>
                                 </td>
                                 <td
@@ -390,7 +415,7 @@ function fileSize(bytes: number | null): string {
                 </div>
                 <AdminPagination
                     :paginator="bookings"
-                    label="Customer booking pages"
+                    :label="t('Customer booking pages')"
                 />
             </template>
         </section>

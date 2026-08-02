@@ -159,6 +159,12 @@ class BookingController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Booking created.']);
 
+        $timelineReturnTo = $this->timelineReturnTo($request);
+
+        if ($request->boolean('return_to_timeline') && $timelineReturnTo !== null) {
+            return redirect()->to($timelineReturnTo);
+        }
+
         return $this->bookingShowRedirect($request, $booking);
     }
 

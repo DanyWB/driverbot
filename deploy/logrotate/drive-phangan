@@ -1,0 +1,10 @@
+/srv/drive-phangan/shared/backend/storage/logs/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    create 0640 drive-phangan drive-phangan
+}

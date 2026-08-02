@@ -23,7 +23,7 @@ class ListBookingsRequest extends FormRequest
             'starts_from' => ['nullable', 'date_format:Y-m-d'],
             'starts_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:starts_from'],
             'documents' => ['nullable', Rule::in(['yes', 'no'])],
-            'sort' => ['nullable', Rule::in(['created_at', 'updated_at', 'starts_on', 'ends_on', 'status'])],
+            'sort' => ['nullable', Rule::in(['created_at', 'updated_at', 'starts_on', 'ends_on', 'status', 'vehicle'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', Rule::in([15, 25, 50])],
             'page' => ['nullable', 'integer', 'min:1'],

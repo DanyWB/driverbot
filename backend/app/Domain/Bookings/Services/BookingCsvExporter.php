@@ -36,6 +36,6 @@ class BookingCsvExporter
     {
         $cell = $value === null ? '' : (string) $value;
 
-        return preg_match('/^[=+\-@]/u', $cell) === 1 ? "'{$cell}" : $cell;
+        return preg_match('/^[\x00-\x20]*[=+\-@]/u', $cell) === 1 ? "'{$cell}" : $cell;
     }
 }

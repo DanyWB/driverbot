@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Vehicles;
 
+use App\Domain\Pricing\Services\PricingTemplateService;
 use App\Domain\Shared\Services\AdminAuditService;
 use App\Domain\Vehicles\Enums\VehicleType;
 use App\Domain\Vehicles\Exceptions\VehicleCatalogException;
@@ -102,8 +103,11 @@ class VehicleController extends Controller
         return to_route('vehicles.edit', $vehicle);
     }
 
-    public function edit(Vehicle $vehicle, AdminVehiclePresenter $presenter): Response
-    {
+    public function edit(
+        Vehicle $vehicle,
+        AdminVehiclePresenter $presenter,
+        PricingTemplateService $pricingTemplates,
+    ): Response {
         $vehicle->load(['category', 'photos', 'priceTiers.season'])->loadCount([
             'photos',
             'bookings',
@@ -114,6 +118,7 @@ class VehicleController extends Controller
             'vehicle' => $presenter->detail($vehicle),
             'types' => array_column(VehicleType::cases(), 'value'),
             'categories' => $this->categoryOptions(),
+            'pricing_templates' => $pricingTemplates->options($vehicle->type),
         ]);
     }
 

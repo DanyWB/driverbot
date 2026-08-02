@@ -1,6 +1,7 @@
 const {spawnSync} = require("child_process");
 
 const CHECKS = [
+  ["tracked secrets", "npm", ["run", "check:secrets"]],
   ["Telegram bot", "npm", ["run", "preflight"]],
   ["backend frontend build", "npm", ["run", "backend:build"]],
   ["backend CI", "npm", ["run", "backend:check"]],

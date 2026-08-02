@@ -15,8 +15,10 @@ import {
 } from '@lucide/vue';
 import { reactive } from 'vue';
 import AdminPagination from '@/components/AdminPagination.vue';
+import AdminSelect from '@/components/AdminSelect.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useLocale } from '@/composables/useLocale';
 import { formatDateTime } from '@/lib/bookings';
 import type { CategoryOption, PaginatedVehicles } from '@/types';
 
@@ -52,6 +54,7 @@ defineOptions({
 });
 
 const filters = reactive<Filters>({ ...props.filters });
+const { t } = useLocale();
 
 function query(): Record<string, string | number> {
     return Object.fromEntries(
@@ -84,21 +87,27 @@ function resetFilters(): void {
 </script>
 
 <template>
-    <Head title="Fleet" />
+    <Head :title="t('Fleet')" />
     <div class="flex min-w-0 flex-1 flex-col">
         <header
             class="flex flex-col gap-4 border-b px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
         >
             <div>
-                <p class="text-sm text-muted-foreground">Catalog and pricing</p>
-                <h1 class="text-2xl font-semibold">Fleet</h1>
+                <p class="text-sm text-muted-foreground">
+                    {{ t('Catalog and pricing') }}
+                </p>
+                <h1 class="text-2xl font-semibold">{{ t('Fleet') }}</h1>
             </div>
             <div class="flex flex-wrap gap-2">
                 <Button as-child variant="outline">
-                    <Link href="/categories"><Tags />Categories</Link>
+                    <Link href="/categories"
+                        ><Tags />{{ t('Categories') }}</Link
+                    >
                 </Button>
                 <Button as-child>
-                    <Link href="/vehicles/create"><Plus />Add vehicle</Link>
+                    <Link href="/vehicles/create"
+                        ><Plus />{{ t('Add vehicle') }}</Link
+                    >
                 </Button>
             </div>
         </header>
@@ -109,7 +118,9 @@ function resetFilters(): void {
             >
                 <Bike class="size-5 text-cyan-700" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Total</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Total') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.total }}
                     </p>
@@ -120,7 +131,9 @@ function resetFilters(): void {
             >
                 <Settings2 class="size-5 text-emerald-700" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Active</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Active') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.active }}
                     </p>
@@ -131,7 +144,9 @@ function resetFilters(): void {
             >
                 <Eye class="size-5 text-blue-700" />
                 <div>
-                    <p class="text-xs text-muted-foreground">Published</p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ t('Published') }}
+                    </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.visible }}
                     </p>
@@ -141,7 +156,7 @@ function resetFilters(): void {
                 <TriangleAlert class="size-5 text-amber-700" />
                 <div>
                     <p class="text-xs text-muted-foreground">
-                        Incomplete prices
+                        {{ t('Incomplete prices') }}
                     </p>
                     <p class="text-xl font-semibold tabular-nums">
                         {{ summary.incomplete_pricing }}
@@ -155,78 +170,82 @@ function resetFilters(): void {
             @submit.prevent="applyFilters"
         >
             <label class="relative sm:col-span-2">
-                <span class="sr-only">Search fleet</span>
+                <span class="sr-only">{{ t('Search fleet') }}</span>
                 <Search
                     class="absolute top-2.5 left-3 size-4 text-muted-foreground"
                 />
                 <Input
                     v-model="filters.search"
                     class="pl-9"
-                    placeholder="Name, catalog or inventory code"
+                    :placeholder="t('Name, catalog or inventory code')"
                 />
             </label>
-            <select
+            <AdminSelect
                 v-model="filters.type"
-                class="admin-select capitalize"
-                aria-label="Vehicle type"
-            >
-                <option value="">All types</option>
-                <option v-for="type in options.types" :key="type" :value="type">
-                    {{ type }}
-                </option>
-            </select>
-            <select
-                v-model.number="filters.category_id"
-                class="admin-select"
-                aria-label="Category"
-            >
-                <option :value="null">All categories</option>
-                <option
-                    v-for="category in options.categories"
-                    :key="category.id"
-                    :value="category.id"
-                >
-                    {{ category.name }}
-                </option>
-            </select>
-            <select
+                class="capitalize"
+                :aria-label="t('Vehicle type')"
+                :options="[
+                    { value: '', label: t('All types') },
+                    ...options.types.map((type) => ({
+                        value: type,
+                        label: t(type),
+                    })),
+                ]"
+            />
+            <AdminSelect
+                v-model="filters.category_id"
+                :aria-label="t('Category')"
+                :options="[
+                    { value: null, label: t('All categories') },
+                    ...options.categories.map((category) => ({
+                        value: category.id,
+                        label: category.name,
+                    })),
+                ]"
+            />
+            <AdminSelect
                 v-model="filters.state"
-                class="admin-select"
-                aria-label="Active state"
-            >
-                <option value="all">Any state</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-            </select>
-            <select
+                :aria-label="t('Active state')"
+                :options="[
+                    { value: 'all', label: t('Any state') },
+                    { value: 'active', label: t('Active') },
+                    { value: 'inactive', label: t('Inactive') },
+                ]"
+            />
+            <AdminSelect
                 v-model="filters.visibility"
-                class="admin-select"
-                aria-label="Visibility"
-            >
-                <option value="all">Any visibility</option>
-                <option value="visible">Published</option>
-                <option value="hidden">Hidden</option>
-            </select>
-            <select
+                :aria-label="t('Visibility')"
+                :options="[
+                    { value: 'all', label: t('Any visibility') },
+                    { value: 'visible', label: t('Published') },
+                    { value: 'hidden', label: t('Hidden') },
+                ]"
+            />
+            <AdminSelect
                 v-model="filters.pricing"
-                class="admin-select"
-                aria-label="Pricing completeness"
-            >
-                <option value="all">Any pricing</option>
-                <option value="complete">Complete prices</option>
-                <option value="incomplete">Incomplete prices</option>
-            </select>
+                :aria-label="t('Pricing completeness')"
+                :options="[
+                    { value: 'all', label: t('Any pricing') },
+                    { value: 'complete', label: t('Complete prices') },
+                    {
+                        value: 'incomplete',
+                        label: t('Incomplete prices'),
+                    },
+                ]"
+            />
             <div class="flex gap-2 sm:col-span-2 xl:col-start-6">
-                <Button type="submit" class="flex-1"><Search />Apply</Button>
+                <Button type="submit" class="flex-1"
+                    ><Search />{{ t('Apply') }}</Button
+                >
                 <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    title="Reset filters"
+                    :title="t('Reset filters')"
                     @click="resetFilters"
-                    ><RotateCcw /><span class="sr-only"
-                        >Reset filters</span
-                    ></Button
+                    ><RotateCcw /><span class="sr-only">{{
+                        t('Reset filters')
+                    }}</span></Button
                 >
             </div>
         </form>
@@ -237,10 +256,10 @@ function resetFilters(): void {
                 class="flex min-h-72 flex-col items-center justify-center px-6 text-center"
             >
                 <Bike class="mb-3 size-8 text-muted-foreground" />
-                <h2 class="font-medium">No vehicles found</h2>
+                <h2 class="font-medium">{{ t('No vehicles found') }}</h2>
                 <Button as-child variant="outline" class="mt-4"
                     ><Link href="/vehicles/create"
-                        ><Plus />Add vehicle</Link
+                        ><Plus />{{ t('Add vehicle') }}</Link
                     ></Button
                 >
             </div>
@@ -252,17 +271,27 @@ function resetFilters(): void {
                         >
                             <tr>
                                 <th class="px-4 py-3 font-medium lg:px-6">
-                                    Vehicle
+                                    {{ t('Vehicle') }}
                                 </th>
-                                <th class="px-4 py-3 font-medium">Category</th>
-                                <th class="px-4 py-3 font-medium">State</th>
-                                <th class="px-4 py-3 font-medium">Pricing</th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Category') }}
+                                </th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('State') }}
+                                </th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Pricing') }}
+                                </th>
                                 <th class="px-4 py-3 text-right font-medium">
-                                    History
+                                    {{ t('History') }}
                                 </th>
-                                <th class="px-4 py-3 font-medium">Updated</th>
+                                <th class="px-4 py-3 font-medium">
+                                    {{ t('Updated') }}
+                                </th>
                                 <th class="w-14 px-4 py-3">
-                                    <span class="sr-only">Actions</span>
+                                    <span class="sr-only">{{
+                                        t('Actions')
+                                    }}</span>
                                 </th>
                             </tr>
                         </thead>
@@ -318,13 +347,13 @@ function resetFilters(): void {
                                     <p>
                                         {{
                                             vehicle.category?.name ??
-                                            'Uncategorized'
+                                            t('Uncategorized')
                                         }}
                                     </p>
                                     <p
                                         class="text-xs text-muted-foreground capitalize"
                                     >
-                                        {{ vehicle.type }}
+                                        {{ t(vehicle.type) }}
                                     </p>
                                 </td>
                                 <td class="px-4 py-3">
@@ -332,26 +361,26 @@ function resetFilters(): void {
                                         <span
                                             v-if="vehicle.is_active"
                                             class="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800"
-                                            >Active</span
+                                            >{{ t('Active') }}</span
                                         >
                                         <span
                                             v-else
                                             class="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs text-muted-foreground"
-                                            ><CircleOff
-                                                class="size-3"
-                                            />Inactive</span
+                                            ><CircleOff class="size-3" />{{
+                                                t('Inactive')
+                                            }}</span
                                         >
                                         <span
                                             v-if="
                                                 vehicle.is_visible_for_booking
                                             "
                                             class="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-800"
-                                            >Published</span
+                                            >{{ t('Published') }}</span
                                         >
                                         <span
                                             v-else
                                             class="rounded border px-2 py-0.5 text-xs text-muted-foreground"
-                                            >Hidden</span
+                                            >{{ t('Hidden') }}</span
                                         >
                                     </div>
                                 </td>
@@ -368,17 +397,17 @@ function resetFilters(): void {
                                         }}/15</span
                                     >
                                     <p class="text-xs text-muted-foreground">
-                                        {{ vehicle.photos_count }} photo{{
-                                            vehicle.photos_count === 1
-                                                ? ''
-                                                : 's'
+                                        {{
+                                            t('Photos count', {
+                                                count: vehicle.photos_count,
+                                            })
                                         }}
                                     </p>
                                 </td>
                                 <td class="px-4 py-3 text-right tabular-nums">
                                     {{ vehicle.bookings_count }}
                                     <p class="text-xs text-muted-foreground">
-                                        bookings
+                                        {{ t('bookings') }}
                                     </p>
                                 </td>
                                 <td
@@ -391,12 +420,12 @@ function resetFilters(): void {
                                         as-child
                                         variant="ghost"
                                         size="icon"
-                                        title="Edit vehicle"
+                                        :title="t('Edit vehicle')"
                                         ><Link
                                             :href="`/vehicles/${vehicle.id}/edit`"
-                                            ><Pencil /><span class="sr-only"
-                                                >Edit</span
-                                            ></Link
+                                            ><Pencil /><span class="sr-only">{{
+                                                t('Edit')
+                                            }}</span></Link
                                         ></Button
                                     >
                                 </td>
@@ -452,19 +481,22 @@ function resetFilters(): void {
                             </p>
                             <div class="mt-2 flex gap-2 text-xs">
                                 <span>{{
-                                    vehicle.is_active ? 'Active' : 'Inactive'
+                                    t(vehicle.is_active ? 'Active' : 'Inactive')
                                 }}</span
                                 ><span>·</span
                                 ><span>{{
                                     vehicle.is_visible_for_booking
-                                        ? 'Published'
-                                        : 'Hidden'
+                                        ? t('Published')
+                                        : t('Hidden')
                                 }}</span>
                             </div>
                         </div>
                     </Link>
                 </div>
-                <AdminPagination :paginator="vehicles" label="Fleet pages" />
+                <AdminPagination
+                    :paginator="vehicles"
+                    :label="t('Fleet pages')"
+                />
             </template>
         </section>
     </div>

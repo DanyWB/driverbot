@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Bookings\BookingAdminNoteController;
 use App\Http\Controllers\Bookings\BookingController;
 use App\Http\Controllers\Bookings\BookingCsvExportController;
 use App\Http\Controllers\Bookings\BookingDatesController;
 use App\Http\Controllers\Bookings\BookingPriceOverrideController;
+use App\Http\Controllers\Bookings\BookingPriceRecalculationController;
 use App\Http\Controllers\Bookings\BookingQuoteController;
 use App\Http\Controllers\Bookings\BookingStatusController;
 use App\Http\Controllers\Bookings\CustomerLookupController;
@@ -19,7 +21,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard')->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'admin.active', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('timeline', TimelineController::class)->name('timeline.index');
 
@@ -32,6 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('vehicles/{vehicle}/photos', [VehiclePhotoController::class, 'arrange'])->name('vehicles.photos.arrange');
     Route::delete('vehicles/{vehicle}/photos/{photo}', [VehiclePhotoController::class, 'destroy'])->name('vehicles.photos.destroy');
     Route::patch('vehicles/{vehicle}/pricing', [VehiclePricingController::class, 'update'])->name('vehicles.pricing.update');
+    Route::get('vehicles/{vehicle}/pricing/generate', [VehiclePricingController::class, 'generate'])->name('vehicles.pricing.generate');
     Route::get('vehicles/{vehicle}/pricing/quote', [VehiclePricingController::class, 'quote'])->name('vehicles.pricing.quote');
 
     Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
@@ -54,6 +57,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('bookings/{booking}', [BookingController::class, 'show'])->name('bookings.show');
     Route::get('bookings/{booking}/quote', [BookingQuoteController::class, 'booking'])->name('bookings.booking-quote');
     Route::patch('bookings/{booking}/dates', [BookingDatesController::class, 'update'])->name('bookings.dates.update');
+    Route::patch('bookings/{booking}/admin-note', [BookingAdminNoteController::class, 'update'])->name('bookings.admin-note.update');
+    Route::post('bookings/{booking}/price-recalculations', [BookingPriceRecalculationController::class, 'store'])->name('bookings.price-recalculations.store');
     Route::post('bookings/{booking}/price-overrides', [BookingPriceOverrideController::class, 'store'])->name('bookings.price-overrides.store');
     Route::post('bookings/{booking}/approve', [BookingStatusController::class, 'approve'])->name('bookings.approve');
     Route::post('bookings/{booking}/activate', [BookingStatusController::class, 'activate'])->name('bookings.activate');

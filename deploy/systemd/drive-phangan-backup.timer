@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Drive Phangan backup every day
+
+[Timer]
+OnCalendar=*-*-* 02:15:00 Asia/Bangkok
+Persistent=true
+RandomizedDelaySec=300
+Unit=drive-phangan-backup.service
+
+[Install]
+WantedBy=timers.target

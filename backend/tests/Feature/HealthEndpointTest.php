@@ -24,6 +24,7 @@ class HealthEndpointTest extends TestCase
                 'checks' => [
                     'database' => 'ok',
                     'redis' => 'skipped',
+                    'scheduler' => 'skipped',
                 ],
             ]);
 

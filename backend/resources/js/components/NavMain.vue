@@ -8,6 +8,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
+import { useLocale } from '@/composables/useLocale';
 import type { NavItem } from '@/types';
 
 defineProps<{
@@ -15,21 +16,22 @@ defineProps<{
 }>();
 
 const { isCurrentUrl } = useCurrentUrl();
+const { t } = useLocale();
 </script>
 
 <template>
     <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>Platform</SidebarGroupLabel>
+        <SidebarGroupLabel>{{ t('Platform') }}</SidebarGroupLabel>
         <SidebarMenu>
             <SidebarMenuItem v-for="item in items" :key="item.title">
                 <SidebarMenuButton
                     as-child
                     :is-active="isCurrentUrl(item.href)"
-                    :tooltip="item.title"
+                    :tooltip="t(item.title)"
                 >
                     <Link :href="item.href">
                         <component :is="item.icon" />
-                        <span>{{ item.title }}</span>
+                        <span>{{ t(item.title) }}</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>

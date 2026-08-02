@@ -264,6 +264,70 @@ class AdminBookingManagementTest extends TestCase
         $this->assertSame(4, BookingStatusHistory::query()->where('booking_id', $booking->id)->count());
     }
 
+    public function test_admin_can_recalculate_price_and_edit_internal_note_but_cannot_price_archived_booking(): void
+    {
+        $booking = $this->createBooking();
+
+        $this->actingAs($this->admin)
+            ->post(route('bookings.price-overrides.store', $booking), [
+                'manual_total' => 700,
+                'reason' => 'Temporary discount',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->admin)
+            ->post(route('bookings.price-recalculations.store', $booking))
+            ->assertSessionHasNoErrors();
+        $this->assertSame(900, $booking->priceSnapshots()->firstOrFail()->final_total);
+        $this->assertDatabaseHas('audit_logs', [
+            'subject_id' => $booking->public_id,
+            'action' => 'booking.price_recalculated',
+            'actor_admin_id' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patch(route('bookings.admin-note.update', $booking), [
+                'admin_note' => 'Customer requested an early pickup.',
+            ])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('Customer requested an early pickup.', $booking->fresh()->admin_note);
+        $this->assertDatabaseHas('audit_logs', [
+            'subject_id' => $booking->public_id,
+            'action' => 'booking.admin_note_changed',
+        ]);
+
+        $booking = $this->bookings->approve($booking, BookingActor::admin($this->admin->id));
+        $booking = $this->bookings->activate($booking, BookingActor::admin($this->admin->id));
+        $booking = $this->bookings->complete($booking, BookingActor::admin($this->admin->id));
+        $snapshotCount = $booking->priceSnapshots()->count();
+
+        $this->actingAs($this->admin)
+            ->post(route('bookings.price-overrides.store', $booking), [
+                'manual_total' => 500,
+                'reason' => 'Invalid archive edit',
+            ])
+            ->assertSessionHasErrors('price');
+        $this->actingAs($this->admin)
+            ->post(route('bookings.price-recalculations.store', $booking))
+            ->assertSessionHasErrors('price');
+        $this->assertSame($snapshotCount, $booking->priceSnapshots()->count());
+    }
+
+    public function test_manual_booking_rejects_a_rental_shorter_than_one_hour(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('bookings.store'), [
+                ...$this->manualBookingPayload(),
+                'starts_on' => '2026-08-10',
+                'ends_on' => '2026-08-10',
+                'pickup_time' => '10:00',
+                'return_time' => '10:30',
+            ])
+            ->assertSessionHasErrors('return_time');
+
+        $this->assertDatabaseCount('bookings', 0);
+    }
+
     public function test_admin_can_cancel_and_mark_an_approved_booking_as_no_show(): void
     {
         $cancelled = $this->createBooking(startsOn: '2026-08-15', endsOn: '2026-08-15');
@@ -287,6 +351,21 @@ class AdminBookingManagementTest extends TestCase
             ->assertRedirect(route('bookings.show', $noShow));
         $this->assertSame(BookingStatus::NoShow, $noShow->fresh()->bookingStatus());
         $this->assertDatabaseMissing('vehicle_occupancies', ['booking_id' => $noShow->id]);
+    }
+
+    public function test_quick_list_action_returns_to_the_validated_booking_list_url(): void
+    {
+        $booking = $this->createBooking();
+        $returnTo = '/bookings?scope=all&sort=starts_on';
+
+        $this->actingAs($this->admin)
+            ->post(route('bookings.approve', [
+                'booking' => $booking,
+                'return_to' => $returnTo,
+            ]))
+            ->assertRedirect($returnTo);
+
+        $this->assertSame(BookingStatus::Approved, $booking->fresh()->bookingStatus());
     }
 
     public function test_quote_endpoint_reports_conflicts_but_excludes_the_current_booking(): void

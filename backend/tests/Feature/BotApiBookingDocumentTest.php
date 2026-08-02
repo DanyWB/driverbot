@@ -129,6 +129,32 @@ class BotApiBookingDocumentTest extends BotApiTestCase
         $this->assertDatabaseCount('bookings', 0);
     }
 
+    public function test_batch_rejects_duplicate_vehicles_and_invalid_time_ranges(): void
+    {
+        $this->syncCustomer('200010');
+        $vehicle = $this->bookableVehicle();
+        $duplicate = $this->bookingPayload($vehicle);
+        $secondItem = $duplicate['items'][0];
+        $secondItem['client_reference'] = 'second-reference';
+        $duplicate['items'][] = $secondItem;
+
+        $this->withHeaders($this->apiHeaders('200010', 'duplicate-vehicle'))
+            ->postJson('/api/v1/bot/bookings', $duplicate)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['items.1.vehicle_id'], 'error.fields');
+
+        $invalidTime = $this->bookingPayload($vehicle);
+        $invalidTime['items'][0]['ends_on'] = '2026-08-10';
+        $invalidTime['items'][0]['return_time'] = '10:30';
+
+        $this->withHeaders($this->apiHeaders('200010', 'invalid-time-range'))
+            ->postJson('/api/v1/bot/bookings', $invalidTime)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['items.0.return_time'], 'error.fields');
+
+        $this->assertDatabaseCount('bookings', 0);
+    }
+
     public function test_delivery_booking_requires_a_non_blank_address(): void
     {
         $this->syncCustomer('200009');

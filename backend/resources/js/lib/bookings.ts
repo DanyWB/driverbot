@@ -1,4 +1,5 @@
 import type { BookingSource, BookingStatus } from '@/types';
+import { getActiveLocale } from '@/composables/useLocale';
 
 export const bookingStatusLabels: Record<BookingStatus, string> = {
     process: 'Draft',
@@ -42,20 +43,26 @@ export const bookingSourceLabels: Record<BookingSource, string> = {
 };
 
 export function formatMoney(value: number | string, currency = 'THB'): string {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency,
-        maximumFractionDigits: 0,
-    }).format(Number(value));
+    return new Intl.NumberFormat(
+        getActiveLocale() === 'ru' ? 'ru-RU' : 'en-US',
+        {
+            style: 'currency',
+            currency,
+            maximumFractionDigits: 0,
+        },
+    ).format(Number(value));
 }
 
 export function formatDate(value: string): string {
-    return new Intl.DateTimeFormat('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC',
-    }).format(new Date(`${value}T00:00:00Z`));
+    return new Intl.DateTimeFormat(
+        getActiveLocale() === 'ru' ? 'ru-RU' : 'en-GB',
+        {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            timeZone: 'UTC',
+        },
+    ).format(new Date(`${value}T00:00:00Z`));
 }
 
 export function formatDateTime(value: string | null): string {
@@ -63,16 +70,19 @@ export function formatDateTime(value: string | null): string {
         return '—';
     }
 
-    return new Intl.DateTimeFormat('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Bangkok',
-    }).format(new Date(value));
+    return new Intl.DateTimeFormat(
+        getActiveLocale() === 'ru' ? 'ru-RU' : 'en-GB',
+        {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Asia/Bangkok',
+        },
+    ).format(new Date(value));
 }
 
 export function shortBookingId(value: string): string {
-    return value.slice(0, 8).toUpperCase();
+    return value.replaceAll('-', '').slice(-12).toUpperCase();
 }

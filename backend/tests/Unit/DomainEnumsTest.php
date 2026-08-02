@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Pricing\Enums\PricingTier;
+use App\Domain\Vehicles\Enums\VehicleType;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -54,5 +55,10 @@ class DomainEnumsTest extends TestCase
         ], $blocking);
         $this->assertTrue(BookingStatus::Approved->canBecomeNoShow());
         $this->assertFalse(BookingStatus::Active->canBecomeNoShow());
+    }
+
+    public function test_vehicle_types_match_the_business_catalog(): void
+    {
+        $this->assertSame(['scooter', 'car'], array_column(VehicleType::cases(), 'value'));
     }
 }

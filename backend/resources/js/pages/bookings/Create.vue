@@ -13,11 +13,14 @@ import {
     X,
 } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import AdminSelect from '@/components/AdminSelect.vue';
 import PriceBreakdown from '@/components/bookings/PriceBreakdown.vue';
+import AdminDateInput from '@/components/AdminDateInput.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useLocale } from '@/composables/useLocale';
 import { formatMoney } from '@/lib/bookings';
 import type { PriceQuote } from '@/types';
 
@@ -81,6 +84,7 @@ const customerResults = ref<CustomerOption[]>([]);
 const selectedCustomer = ref<CustomerOption | null>(props.default_customer);
 const customerSearchError = ref('');
 const customerSearchLoading = ref(false);
+const { t } = useLocale();
 let quoteTimer: ReturnType<typeof setTimeout> | undefined;
 let quoteRequest: AbortController | undefined;
 let customerTimer: ReturnType<typeof setTimeout> | undefined;
@@ -167,8 +171,9 @@ async function loadQuote(): Promise<void> {
         const payload = await response.json();
 
         if (!response.ok) {
-            quoteError.value =
-                payload.error?.message || 'Price could not be calculated.';
+            quoteError.value = t(
+                payload.error?.message || 'Price could not be calculated.',
+            );
 
             return;
         }
@@ -181,7 +186,7 @@ async function loadQuote(): Promise<void> {
         }
     } catch (error) {
         if ((error as Error).name !== 'AbortError') {
-            quoteError.value = 'Price preview is temporarily unavailable.';
+            quoteError.value = t('Price preview is temporarily unavailable.');
         }
     } finally {
         if (quoteRequest === request) {
@@ -208,7 +213,7 @@ async function loadCustomers(): Promise<void> {
         const payload = await response.json();
 
         if (!response.ok) {
-            customerSearchError.value = 'Customer search is unavailable.';
+            customerSearchError.value = t('Customer search is unavailable.');
 
             return;
         }
@@ -216,7 +221,7 @@ async function loadCustomers(): Promise<void> {
         customerResults.value = payload.data;
     } catch (error) {
         if ((error as Error).name !== 'AbortError') {
-            customerSearchError.value = 'Customer search is unavailable.';
+            customerSearchError.value = t('Customer search is unavailable.');
         }
     } finally {
         if (customerRequest === request) {
@@ -257,7 +262,7 @@ function domainError(key: string): string | undefined {
 </script>
 
 <template>
-    <Head title="New booking" />
+    <Head :title="t('New booking')" />
 
     <div class="flex min-w-0 flex-1 flex-col">
         <header
@@ -267,15 +272,19 @@ function domainError(key: string): string | undefined {
                 as-child
                 variant="ghost"
                 size="icon"
-                :title="return_to ? 'Back to timeline' : 'Back to bookings'"
+                :title="t(return_to ? 'Back to timeline' : 'Back to bookings')"
             >
                 <Link :href="backHref"
-                    ><ArrowLeft /><span class="sr-only">Back</span></Link
+                    ><ArrowLeft /><span class="sr-only">{{
+                        t('Back')
+                    }}</span></Link
                 >
             </Button>
             <div>
-                <p class="text-sm text-muted-foreground">Manual reservation</p>
-                <h1 class="text-2xl font-semibold">New booking</h1>
+                <p class="text-sm text-muted-foreground">
+                    {{ t('Manual reservation') }}
+                </p>
+                <h1 class="text-2xl font-semibold">{{ t('New booking') }}</h1>
             </div>
         </header>
 
@@ -291,7 +300,7 @@ function domainError(key: string): string | undefined {
                     <div class="mb-5 flex items-center gap-2">
                         <UserRound class="size-5 text-muted-foreground" />
                         <h2 id="customer-heading" class="font-semibold">
-                            Customer
+                            {{ t('Customer') }}
                         </h2>
                     </div>
 
@@ -310,7 +319,7 @@ function domainError(key: string): string | undefined {
                             "
                             @click="form.customer_mode = mode"
                         >
-                            {{ mode }} customer
+                            {{ t(mode + ' customer') }}
                         </button>
                     </div>
 
@@ -337,15 +346,19 @@ function domainError(key: string): string | undefined {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                title="Change customer"
+                                :title="t('Change customer')"
                                 @click="clearCustomer"
                             >
                                 <X />
-                                <span class="sr-only">Change customer</span>
+                                <span class="sr-only">{{
+                                    t('Change customer')
+                                }}</span>
                             </Button>
                         </div>
                         <template v-else>
-                            <Label for="customer_search">Customer</Label>
+                            <Label for="customer_search">{{
+                                t('Customer')
+                            }}</Label>
                             <div class="relative mt-2">
                                 <Search
                                     class="absolute top-2.5 left-3 size-4 text-muted-foreground"
@@ -355,14 +368,14 @@ function domainError(key: string): string | undefined {
                                     v-model="customerSearch"
                                     class="pl-9"
                                     autocomplete="off"
-                                    placeholder="Name, phone or Telegram"
+                                    :placeholder="t('Name, phone or Telegram')"
                                 />
                             </div>
                             <p
                                 v-if="customerSearchLoading"
                                 class="mt-2 text-sm text-muted-foreground"
                             >
-                                Searching...
+                                {{ t('Searching...') }}
                             </p>
                             <div
                                 v-else-if="customerSearchError"
@@ -375,7 +388,7 @@ function domainError(key: string): string | undefined {
                                     size="sm"
                                     @click="loadCustomers"
                                 >
-                                    <RefreshCw />Retry
+                                    <RefreshCw />{{ t('Retry') }}
                                 </Button>
                             </div>
                             <div
@@ -404,7 +417,7 @@ function domainError(key: string): string | undefined {
                                 v-else-if="customerSearch.trim().length >= 2"
                                 class="mt-2 text-sm text-muted-foreground"
                             >
-                                No customers found.
+                                {{ t('No customers found.') }}
                             </p>
                         </template>
                         <InputError
@@ -415,7 +428,9 @@ function domainError(key: string): string | undefined {
 
                     <div v-else class="grid max-w-3xl gap-4 sm:grid-cols-2">
                         <div class="sm:col-span-2">
-                            <Label for="customer_name">Full name</Label>
+                            <Label for="customer_name">{{
+                                t('Full name')
+                            }}</Label>
                             <Input
                                 id="customer_name"
                                 v-model="form.customer_name"
@@ -428,7 +443,7 @@ function domainError(key: string): string | undefined {
                             />
                         </div>
                         <div>
-                            <Label for="phone">Phone</Label>
+                            <Label for="phone">{{ t('Phone') }}</Label>
                             <Input
                                 id="phone"
                                 v-model="form.phone"
@@ -442,9 +457,9 @@ function domainError(key: string): string | undefined {
                             />
                         </div>
                         <div>
-                            <Label for="telegram_username"
-                                >Telegram username</Label
-                            >
+                            <Label for="telegram_username">{{
+                                t('Telegram username')
+                            }}</Label>
                             <Input
                                 id="telegram_username"
                                 v-model="form.telegram_username"
@@ -466,50 +481,49 @@ function domainError(key: string): string | undefined {
                     <div class="mb-5 flex items-center gap-2">
                         <Clock3 class="size-5 text-muted-foreground" />
                         <h2 id="rental-heading" class="font-semibold">
-                            Rental
+                            {{ t('Rental') }}
                         </h2>
                     </div>
                     <div class="grid max-w-3xl gap-4 sm:grid-cols-2">
                         <div class="sm:col-span-2">
-                            <Label for="vehicle_id">Vehicle</Label>
-                            <select
+                            <Label for="vehicle_id">{{ t('Vehicle') }}</Label>
+                            <AdminSelect
                                 id="vehicle_id"
-                                v-model.number="form.vehicle_id"
-                                class="admin-select mt-2 w-full"
-                            >
-                                <option :value="null" disabled>
-                                    Select vehicle
-                                </option>
-                                <option
-                                    v-for="vehicle in vehicles"
-                                    :key="vehicle.id"
-                                    :value="vehicle.id"
-                                    :disabled="!vehicle.has_complete_pricing"
-                                >
-                                    {{ vehicle.name }} · {{ vehicle.type
-                                    }}{{
-                                        !vehicle.is_visible
-                                            ? ' · internal'
-                                            : ''
-                                    }}{{
-                                        !vehicle.has_complete_pricing
-                                            ? ' · incomplete price'
-                                            : ''
-                                    }}
-                                </option>
-                            </select>
+                                v-model="form.vehicle_id"
+                                class="mt-2"
+                                :options="[
+                                    {
+                                        value: null,
+                                        label: t('Select vehicle'),
+                                        disabled: true,
+                                    },
+                                    ...vehicles.map((vehicle) => ({
+                                        value: vehicle.id,
+                                        label:
+                                            vehicle.name +
+                                            ' · ' +
+                                            t(vehicle.type) +
+                                            (!vehicle.is_visible
+                                                ? ' · ' + t('internal')
+                                                : '') +
+                                            (!vehicle.has_complete_pricing
+                                                ? ' · ' + t('incomplete price')
+                                                : ''),
+                                        disabled: !vehicle.has_complete_pricing,
+                                    })),
+                                ]"
+                            />
                             <InputError
                                 class="mt-1"
                                 :message="form.errors.vehicle_id"
                             />
                         </div>
                         <div>
-                            <Label for="starts_on">Start date</Label>
-                            <Input
+                            <Label for="starts_on">{{ t('Start date') }}</Label>
+                            <AdminDateInput
                                 id="starts_on"
                                 v-model="form.starts_on"
                                 class="mt-2"
-                                type="date"
                             />
                             <InputError
                                 class="mt-1"
@@ -517,12 +531,11 @@ function domainError(key: string): string | undefined {
                             />
                         </div>
                         <div>
-                            <Label for="ends_on">End date</Label>
-                            <Input
+                            <Label for="ends_on">{{ t('End date') }}</Label>
+                            <AdminDateInput
                                 id="ends_on"
                                 v-model="form.ends_on"
                                 class="mt-2"
-                                type="date"
                             />
                             <InputError
                                 class="mt-1"
@@ -530,7 +543,9 @@ function domainError(key: string): string | undefined {
                             />
                         </div>
                         <div>
-                            <Label for="pickup_time">Pickup time</Label>
+                            <Label for="pickup_time">{{
+                                t('Pickup time')
+                            }}</Label>
                             <Input
                                 id="pickup_time"
                                 v-model="form.pickup_time"
@@ -543,7 +558,9 @@ function domainError(key: string): string | undefined {
                             />
                         </div>
                         <div>
-                            <Label for="return_time">Return time</Label>
+                            <Label for="return_time">{{
+                                t('Return time')
+                            }}</Label>
                             <Input
                                 id="return_time"
                                 v-model="form.return_time"
@@ -556,31 +573,51 @@ function domainError(key: string): string | undefined {
                             />
                         </div>
                         <div>
-                            <Label for="source">Source</Label>
-                            <select
+                            <Label for="source">{{ t('Source') }}</Label>
+                            <AdminSelect
                                 id="source"
                                 v-model="form.source"
-                                class="admin-select mt-2 w-full"
-                            >
-                                <option value="admin_phone">Phone</option>
-                                <option value="admin_whatsapp">WhatsApp</option>
-                                <option value="admin_instagram">
-                                    Instagram
-                                </option>
-                                <option value="telegram">Telegram</option>
-                                <option value="admin_manual">Manual</option>
-                            </select>
+                                class="mt-2"
+                                :options="[
+                                    {
+                                        value: 'admin_phone',
+                                        label: t('Phone'),
+                                    },
+                                    {
+                                        value: 'admin_whatsapp',
+                                        label: 'WhatsApp',
+                                    },
+                                    {
+                                        value: 'admin_instagram',
+                                        label: 'Instagram',
+                                    },
+                                    { value: 'telegram', label: 'Telegram' },
+                                    {
+                                        value: 'admin_manual',
+                                        label: t('Manual'),
+                                    },
+                                ]"
+                            />
                         </div>
                         <div>
-                            <Label for="initial_status">Initial status</Label>
-                            <select
+                            <Label for="initial_status">{{
+                                t('Initial status')
+                            }}</Label>
+                            <AdminSelect
                                 id="initial_status"
                                 v-model="form.initial_status"
-                                class="admin-select mt-2 w-full"
-                            >
-                                <option value="approved">Approved</option>
-                                <option value="pending">Pending review</option>
-                            </select>
+                                class="mt-2"
+                                :options="[
+                                    {
+                                        value: 'approved',
+                                        label: t('Approved'),
+                                    },
+                                    {
+                                        value: 'pending',
+                                        label: t('Pending review'),
+                                    },
+                                ]"
+                            />
                         </div>
                     </div>
                 </section>
@@ -589,10 +626,14 @@ function domainError(key: string): string | undefined {
                     class="px-4 py-6 sm:px-6 lg:px-8"
                     aria-labelledby="notes-heading"
                 >
-                    <h2 id="notes-heading" class="mb-5 font-semibold">Notes</h2>
+                    <h2 id="notes-heading" class="mb-5 font-semibold">
+                        {{ t('Notes') }}
+                    </h2>
                     <div class="grid max-w-3xl gap-4 sm:grid-cols-2">
                         <div>
-                            <Label for="client_comment">Customer comment</Label>
+                            <Label for="client_comment">{{
+                                t('Customer comment')
+                            }}</Label>
                             <textarea
                                 id="client_comment"
                                 v-model="form.client_comment"
@@ -601,7 +642,9 @@ function domainError(key: string): string | undefined {
                             />
                         </div>
                         <div>
-                            <Label for="admin_note">Internal note</Label>
+                            <Label for="admin_note">{{
+                                t('Internal note')
+                            }}</Label>
                             <textarea
                                 id="admin_note"
                                 v-model="form.admin_note"
@@ -610,9 +653,9 @@ function domainError(key: string): string | undefined {
                             />
                         </div>
                         <div class="sm:col-span-2">
-                            <Label for="deposit_note"
-                                >Payment / deposit note</Label
-                            >
+                            <Label for="deposit_note">{{
+                                t('Payment / deposit note')
+                            }}</Label>
                             <Input
                                 id="deposit_note"
                                 v-model="form.deposit_note"
@@ -631,7 +674,7 @@ function domainError(key: string): string | undefined {
                     <div class="flex items-center gap-2">
                         <Calculator class="size-5 text-muted-foreground" />
                         <h2 id="price-heading" class="font-semibold">
-                            Price preview
+                            {{ t('Price preview') }}
                         </h2>
                     </div>
                     <p
@@ -648,7 +691,7 @@ function domainError(key: string): string | undefined {
                         <span
                             class="size-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent"
                         />
-                        Calculating
+                        {{ t('Calculating') }}
                     </div>
                     <div
                         v-else-if="quoteError"
@@ -665,7 +708,7 @@ function domainError(key: string): string | undefined {
                             size="sm"
                             @click="loadQuote"
                         >
-                            <RefreshCw />Retry
+                            <RefreshCw />{{ t('Retry') }}
                         </Button>
                     </div>
                     <div v-else-if="quote" class="mt-6 space-y-4">
@@ -674,7 +717,7 @@ function domainError(key: string): string | undefined {
                         >
                             <div>
                                 <p class="text-xs text-muted-foreground">
-                                    Automatic total
+                                    {{ t('Automatic total') }}
                                 </p>
                                 <p
                                     class="mt-1 text-2xl font-semibold tabular-nums"
@@ -688,8 +731,10 @@ function domainError(key: string): string | undefined {
                                 </p>
                             </div>
                             <span class="text-sm text-muted-foreground"
-                                >{{ quote.total_days }} days ·
-                                {{ quote.tier_key }}</span
+                                >{{
+                                    t('Days count', { count: quote.total_days })
+                                }}
+                                · {{ t(quote.tier_key) }}</span
                             >
                         </div>
                         <div
@@ -707,8 +752,8 @@ function domainError(key: string): string | undefined {
                             <AlertTriangle v-else class="size-4" />
                             {{
                                 quoteAvailable
-                                    ? 'Available for these dates'
-                                    : 'Dates are already occupied'
+                                    ? t('Available for these dates')
+                                    : t('Dates are already occupied')
                             }}
                         </div>
                         <PriceBreakdown
@@ -717,7 +762,7 @@ function domainError(key: string): string | undefined {
                         />
                     </div>
                     <p v-else class="mt-6 text-sm text-muted-foreground">
-                        Select a vehicle and rental dates.
+                        {{ t('Select a vehicle and rental dates.') }}
                     </p>
 
                     <div class="mt-6 border-t pt-5">
@@ -729,13 +774,13 @@ function domainError(key: string): string | undefined {
                                 type="checkbox"
                                 class="size-4 rounded border-input accent-foreground"
                             />
-                            Set final price manually
+                            {{ t('Set final price manually') }}
                         </label>
                         <div v-if="manualPrice" class="mt-4 space-y-4">
                             <div>
-                                <Label for="manual_total"
-                                    >Final total, THB</Label
-                                >
+                                <Label for="manual_total">{{
+                                    t('Final total, THB')
+                                }}</Label>
                                 <Input
                                     id="manual_total"
                                     v-model="form.manual_total"
@@ -750,7 +795,9 @@ function domainError(key: string): string | undefined {
                                 />
                             </div>
                             <div>
-                                <Label for="override_reason">Reason</Label>
+                                <Label for="override_reason">{{
+                                    t('Reason')
+                                }}</Label>
                                 <textarea
                                     id="override_reason"
                                     v-model="form.override_reason"
@@ -779,7 +826,7 @@ function domainError(key: string): string | undefined {
                         :disabled="form.processing || quoteAvailable === false"
                     >
                         <Save />
-                        {{ form.processing ? 'Saving…' : 'Create booking' }}
+                        {{ t(form.processing ? 'Saving…' : 'Create booking') }}
                     </Button>
                 </div>
             </aside>

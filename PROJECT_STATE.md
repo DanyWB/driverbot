@@ -17,27 +17,48 @@ Telegram-бота как клиентского интерфейса.
 - Будущий клиентский сайт будет использовать те же Laravel-сервисы; его разработка
   не входит в текущий релиз, но архитектурная готовность входит.
 
-Текущий статус реализации: этапы 0-8 roadmap закрыты. Созданы Laravel foundation,
+Текущий статус реализации: этапы 0-9 roadmap закрыты; инженерная и локально проверяемая
+часть этапа 10 выполнена 2026-07-22. Этапы 0-8 прошли промежуточный аудит. Созданы Laravel foundation,
 целевая доменная схема, импорт техники и цен, транзакционный booking/availability core
 и web-админка бронирований с timeline занятости, каталогом техники и категорий,
 фотографиями, редактором сезонных тарифов, клиентскими карточками, приватными
 документами и CSV-экспортом. Администратор может создать бронь без Telegram,
 проверить цену и доступность, выполнить статусные действия, изменить даты или
-финальную цену, управлять публикацией техники и открыть историю клиента. Реализован
+финальную цену, явно пересчитать цену по актуальным тарифам, вести внутреннюю заметку,
+управлять публикацией техники и открыть историю клиента. Реализован
 versioned Laravel Bot API, Node.js-бот переведен на него под feature flag, временная
 корзина хранится в Redis, а прямой доступ к legacy PostgreSQL в новом режиме запрещен.
-Цены, доступность и атомарное создание броней выполняет только Laravel. Следующий
-этап - надежная доставка notification outbox, автоexpiry и напоминания.
+Цены, доступность и атомарное создание броней выполняет только Laravel. Реализованы
+Redis queue delivery notification outbox, локализованные Telegram-шаблоны,
+retry/backoff, autoexpiry pending, reminders, reconciliation, monitoring и
+housekeeping. Для production подготовлены strict release preflight, scheduler heartbeat,
+security headers, secret scan, Nginx/PHP-FPM/systemd configs, immutable deployment,
+backup/verify/restore, smoke/load scripts, rollback и operations runbook.
 
 Dependency risk legacy Google API закрыт обновлением до `googleapis@173`; текущий
 `npm audit --omit=dev` возвращает 0 известных уязвимостей. До production cutover
-остаются функциональные блокеры этапа 9 и обязательные runtime-значения: реальный
-контакт менеджера и утвержденная версия/текст условий аренды.
+остается внешний acceptance gate этапа 10: реальный сервер/DNS/TLS/SMTP, Telegram bot token,
+numeric admin chat ID, реальный контакт менеджера, утвержденная версия условий, production
+admin/service client, primary photo, подтверждение финального каталога, online Telegram smoke,
+production-like load/rollback rehearsal и staging-приемка заказчиком.
 
-Финальный precheck этапа 8 прошел: Laravel 155 тестов / 1020 assertions, Pint и
-PHPStan без ошибок, Vue lint/types/build без ошибок, Node.js 13 unit tests, проверки
-128 JS-файлов и 317 ключей переводов, оба профиля bot preflight и реальный Laravel
-HTTP/Redis smoke. `npm audit --omit=dev` сообщает 0 известных уязвимостей.
+Финальный precheck этапа 10 прошел: Laravel 182 теста / 1159 assertions (5 PostgreSQL-only
+ожидаемо skipped в SQLite suite), отдельно
+5 PostgreSQL constraint/concurrency tests / 8 assertions, Pint и PHPStan без ошибок,
+Vue lint/types/build без ошибок, Node.js 15/15 unit tests, 317 ключей переводов,
+Laravel-mode boot и Redis concurrency check. PostgreSQL и Redis отвечают `ok` на
+`/health/ready`; notification probe обработан реальным Redis worker. Composer audit
+и оба `npm audit --omit=dev` не обнаружили известных
+production-уязвимостей. Реальный Telegram smoke будет выполнен на staging после
+получения token и admin chat ID.
+
+Локальная репетиция этапа 10 создала и проверила production-format backup, реально восстановила
+его в отдельную PostgreSQL БД (29 public tables), подняла изолированный HTTP staging и прошла
+Bot API E2E. Гонка 10 клиентов завершилась как `1x201 + 9x409`; после cleanup осталось 0
+blocking occupancy и 0 failed jobs. Реальные scheduler heartbeat и Redis queue probe прошли,
+error/critical logs отсутствовали. Текущий каталог содержит 29 active visible vehicles с полной
+матрицей цен, но все 29 пока без primary photo. Локальный `artisan serve` дал p95 5798 ms и не
+является production benchmark; обязательный p95 gate проверяется на Nginx/PHP-FPM.
 
 Актуальные документы по новому направлению:
 
@@ -59,6 +80,14 @@ HTTP/Redis smoke. `npm audit --omit=dev` сообщает 0 известных �
   документы и CSV-экспорт.
 - `STAGE_8_BOT_API.md` - реализованный Bot API, Redis-session, перевод Node.js-бота,
   security/cutover/rollback и acceptance gate.
+- `STAGE_9_AUTOMATION_NOTIFICATIONS.md` - delivery outbox, Telegram templates,
+  expiry, reminders, retry/backoff, monitoring и operations runbook.
+- `STAGE_10_RELEASE_HARDENING.md` - production-контур, security, локальная backup/restore и
+  HTTP staging-репетиция, точная граница внешнего acceptance gate.
+- `OPERATIONS_RUNBOOK.md` - установка, release, monitoring, queue, backup/restore и rollback.
+- `RELEASE_ACCEPTANCE_CHECKLIST.md` - обязательная приемка production-релиза.
+- `INTERMEDIATE_AUDIT_2026-07-22.md` - сверка этапов 0-8 с ТЗ, исправленные риски,
+  UI-аудит и точная граница работ до production.
 
 Ключевые подтвержденные решения:
 
@@ -77,6 +106,13 @@ HTTP/Redis smoke. `npm audit --omit=dev` сообщает 0 известных �
   из админки;
 - админ редактирует итоговые суммы тарифов `1/7/14/21/month`, а backend считает
   дневные ставки и итог;
+- технический `pricing_profile` скрыт из формы техники; для первичного заполнения
+  цен есть необязательный генератор по шаблону скидок и трем базовым дневным
+  ценам high/middle/low;
+- генератор рассчитывается только в Laravel: `1 day` равен базовой цене сезона,
+  пакеты `7/14/21/month` округляются вниз до 100 бат; генератор заполняет черновик,
+  и до сохранения админ может изменить любую ячейку вручную;
+- схема скидок запоминается только при сохранении сгенерированной таблицы;
 - тарифный уровень выбирается по общей длительности аренды, `30+` дней использует
   месячный тариф;
 - если аренда пересекает сезоны, цена считается по дням: каждый день берет сезон
@@ -85,7 +121,9 @@ HTTP/Redis smoke. `npm audit --omit=dev` сообщает 0 известных �
 - старые брони из Excel не импортируются как боевые данные, проект стартует с нуля;
 - timeline/шахматка занятости входит в первый production-релиз;
 - цвета из Excel переводятся в системные статусы/категории;
-- ручное создание брони из web-админки обязательно для клиентов без Telegram.
+- ручное создание брони из web-админки обязательно для клиентов без Telegram;
+- в timeline период выбирается двумя кликами в строке техники, после чего ручная
+  бронь создается в боковой форме без потери календарного контекста;
 - первый релиз делает один тип администратора с полным доступом;
 - разработка начинается локально, production будет на сервере позже;
 - клиента уведомляем, если админ вручную изменил даты или цену;
@@ -559,7 +597,7 @@ Checkpoint-коммит: `06c273b Stabilize rental flow before admin update`.
 Состояние после стабилизационной пачки:
 
 - Миграции применены до `024_add_vehicle_type_to_bikes.js`.
-- Таблица `bikes` остается историческим storage-именем, но теперь имеет `vehicle_type` (`bike`/`car`), `inventory_code`, `sort_order`.
+- Таблица `bikes` остается историческим storage-именем, но теперь имеет `vehicle_type` (`scooter`/`car`), `inventory_code`, `sort_order`.
 - Добавлены DB-инварианты: уникальный `booking_public_id`, уникальные price keys, CHECK по rental statuses, CHECK по обязательным диапазонам дат/времени, CHECK по `vehicle_type`.
 - Rental route вынесен в `services/rentalService.js`.
 - Inventory abstraction добавлена в `services/vehicleService.js`.

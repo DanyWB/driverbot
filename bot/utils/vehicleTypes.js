@@ -1,10 +1,10 @@
 const VEHICLE_TYPE = Object.freeze({
-  BIKE: "bike",
+  SCOOTER: "scooter",
   CAR: "car",
 });
 
 const KNOWN_VEHICLE_TYPES = Object.values(VEHICLE_TYPE);
-const DEFAULT_VEHICLE_TYPE = VEHICLE_TYPE.BIKE;
+const DEFAULT_VEHICLE_TYPE = VEHICLE_TYPE.SCOOTER;
 
 function normalizeVehicleType(type) {
   return KNOWN_VEHICLE_TYPES.includes(type) ? type : DEFAULT_VEHICLE_TYPE;
