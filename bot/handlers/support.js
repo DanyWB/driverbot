@@ -1,8 +1,9 @@
 const {t, getCtxLang} = require("../utils/i18n");
-const {getAdminTelegramUrl} = require("../utils/constants");
+const {getConfiguration} = require("../services/laravelGateway");
+const {telegramUsernameUrl} = require("../utils/constants");
 
-function supportKeyboard(lang, backTarget = "menu") {
-  const adminUrl = getAdminTelegramUrl();
+function supportKeyboard(lang, backTarget = "menu", managerTelegram = null) {
+  const adminUrl = telegramUsernameUrl(managerTelegram);
   const rows = [
     [{text: t(lang, "support_btn_call"), callback_data: "support:call"}],
     [{text: t(lang, "support_btn_faq"), callback_data: "support:faq"}],
@@ -25,11 +26,21 @@ function supportKeyboard(lang, backTarget = "menu") {
   };
 }
 
+async function configuredSupportKeyboard(lang, backTarget) {
+  let managerTelegram = null;
+  try {
+    managerTelegram = (await getConfiguration()).manager_telegram;
+  } catch (error) {
+    console.warn("[support] Manager Telegram contact is temporarily unavailable.");
+  }
+  return supportKeyboard(lang, backTarget, managerTelegram);
+}
+
 async function sendSupportMenu(ctx, langOverride) {
   const lang = langOverride || getCtxLang(ctx);
   return ctx.reply(t(lang, "support_info"), {
     parse_mode: "HTML",
-    reply_markup: supportKeyboard(lang, "start"),
+    reply_markup: await configuredSupportKeyboard(lang, "start"),
   });
 }
 
@@ -71,16 +82,16 @@ async function handleSupportAction(ctx) {
   if (action === "support:faq") {
     return ctx.editMessageText(t(lang, "support_faq_text"), {
       parse_mode: "HTML",
-      reply_markup: supportKeyboard(lang, "menu"),
+      reply_markup: await configuredSupportKeyboard(lang, "menu"),
     });
   }
 
   if (action === "support:find") {
     return ctx.editMessageText(t(lang, "support_find_text"), {
       parse_mode: "HTML",
-      reply_markup: supportKeyboard(lang, "menu"),
+      reply_markup: await configuredSupportKeyboard(lang, "menu"),
     });
   }
 }
 
-module.exports = {sendSupportMenu, handleSupportAction};
+module.exports = {sendSupportMenu, handleSupportAction, supportKeyboard};
