@@ -1,11 +1,10 @@
-const ADMIN_USERNAME = "danykrasniy";
 const DEFAULT_BIKE_EMOJI = "🟢";
 
-function getAdminTelegramUrl() {
-  if (!ADMIN_USERNAME) return null;
-  const handle = String(ADMIN_USERNAME).replace(/^@/, "").trim();
+function telegramUsernameUrl(username) {
+  if (!username) return null;
+  const handle = String(username).replace(/^@/, "").trim();
   if (!handle) return null;
   return `https://t.me/${handle}`;
 }
 
-module.exports = {ADMIN_USERNAME, DEFAULT_BIKE_EMOJI, getAdminTelegramUrl};
+module.exports = {DEFAULT_BIKE_EMOJI, telegramUsernameUrl};
