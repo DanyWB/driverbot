@@ -35,7 +35,7 @@
     "knex": "^2.5.1",
     "module-alias": "^2.2.3",
     "node-calendar": "^0.1.5",
-    "pg": "^8.11.0",
+    "pg": "^8.22.0",
     "redis": "^5.12.1"
   },
   "devDependencies": {
