@@ -98,7 +98,7 @@ class AdminTimelineTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_timeline_requires_authentication_and_defaults_to_the_business_month(): void
+    public function test_timeline_requires_authentication_and_defaults_to_two_business_months(): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-07-21 14:00:00', 'Asia/Bangkok'));
 
@@ -110,11 +110,12 @@ class AdminTimelineTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('timeline/Index')
                 ->where('filters.starts_on', '2026-07-01')
-                ->where('filters.ends_on', '2026-07-31')
+                ->where('filters.ends_on', '2026-08-31')
                 ->where('timeline.range.today', '2026-07-21')
-                ->where('timeline.range.days', 31)
+                ->where('timeline.range.days', 62)
                 ->where('timeline.dates.0.date', '2026-07-01')
                 ->where('timeline.dates.30.date', '2026-07-31')
+                ->where('timeline.dates.61.date', '2026-08-31')
                 ->where('timeline.rows.0.id', $this->longNameVehicle->id)
                 ->where('timeline.rows.0.name', $this->longNameVehicle->name)
                 ->where('timeline.stats.vehicles', 4)

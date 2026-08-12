@@ -327,6 +327,8 @@ const russianMessages: Record<string, string> = {
     'Blocks count': 'Блокировок: :count',
     'Expand calendar': 'Развернуть календарь',
     'Collapse calendar': 'Свернуть календарь',
+    'Calendar range': 'Период календаря',
+    'Show :count days from today': 'Показать :count дней от сегодня',
     'Rental operations': 'Управление арендой',
     'Export CSV': 'Экспорт CSV',
     active: 'активные',

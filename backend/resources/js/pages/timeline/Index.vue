@@ -33,6 +33,13 @@ import { getActiveLocale, useLocale } from '@/composables/useLocale';
 import { lockBodyScroll } from '@/lib/bodyScrollLock';
 import { timelineEscapeAction } from '@/lib/timelineInteraction';
 import { timelineStatusClasses, timelineStatusLabels } from '@/lib/timeline';
+import {
+    shiftTimelineRange,
+    timelineQuickRangeDays,
+    timelineRangeFromToday,
+    timelineTwoMonthRange,
+} from '@/lib/timelinePeriod';
+import type { TimelineQuickRangeDays } from '@/lib/timelinePeriod';
 import type {
     TimelineData,
     TimelineBookingSelection,
@@ -94,6 +101,16 @@ const gridWidth = computed(
 const rangeLabel = computed(() =>
     formatRange(props.timeline.range.starts_on, props.timeline.range.ends_on),
 );
+const activeQuickRangeDays = computed(() => {
+    if (filterState.starts_on !== props.timeline.range.today) {
+        return null;
+    }
+
+    const start = parseIsoDate(filterState.starts_on);
+    const end = parseIsoDate(filterState.ends_on);
+
+    return start && end ? inclusiveDays(start, end) : null;
+});
 const filteredCategories = computed(() =>
     props.options.categories.filter(
         (category) =>
@@ -264,55 +281,43 @@ function onAvailabilityChange(): void {
     }
 }
 
-function shiftPeriod(direction: -1 | 1): void {
-    const start = parseIsoDate(filterState.starts_on);
-    const end = parseIsoDate(filterState.ends_on);
+function applyQuickRange(days: TimelineQuickRangeDays): void {
+    const range = timelineRangeFromToday(props.timeline.range.today, days);
 
-    if (!start || !end) {
+    if (!range) {
         return;
     }
 
-    if (isFullMonth(start, end)) {
-        const nextStart = new Date(
-            Date.UTC(
-                start.getUTCFullYear(),
-                start.getUTCMonth() + direction,
-                1,
-            ),
-        );
-        const nextEnd = new Date(
-            Date.UTC(
-                nextStart.getUTCFullYear(),
-                nextStart.getUTCMonth() + 1,
-                0,
-            ),
-        );
-        filterState.starts_on = toIsoDate(nextStart);
-        filterState.ends_on = toIsoDate(nextEnd);
-    } else {
-        const days = inclusiveDays(start, end);
-        start.setUTCDate(start.getUTCDate() + days * direction);
-        end.setUTCDate(end.getUTCDate() + days * direction);
-        filterState.starts_on = toIsoDate(start);
-        filterState.ends_on = toIsoDate(end);
+    filterState.starts_on = range.startsOn;
+    filterState.ends_on = range.endsOn;
+    visitTimeline();
+}
+
+function shiftPeriod(direction: -1 | 1): void {
+    const range = shiftTimelineRange(
+        filterState.starts_on,
+        filterState.ends_on,
+        direction,
+    );
+
+    if (!range) {
+        return;
     }
 
+    filterState.starts_on = range.startsOn;
+    filterState.ends_on = range.endsOn;
     visitTimeline();
 }
 
 function goToToday(): void {
-    const today = parseIsoDate(props.timeline.range.today);
+    const range = timelineTwoMonthRange(props.timeline.range.today);
 
-    if (!today) {
+    if (!range) {
         return;
     }
 
-    filterState.starts_on = toIsoDate(
-        new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)),
-    );
-    filterState.ends_on = toIsoDate(
-        new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)),
-    );
+    filterState.starts_on = range.startsOn;
+    filterState.ends_on = range.endsOn;
     visitTimeline();
 }
 
@@ -625,19 +630,6 @@ function toIsoDate(value: Date): string {
 
 function inclusiveDays(start: Date, end: Date): number {
     return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
-}
-
-function isFullMonth(start: Date, end: Date): boolean {
-    const lastDay = new Date(
-        Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0),
-    );
-
-    return (
-        start.getUTCDate() === 1 &&
-        start.getUTCFullYear() === end.getUTCFullYear() &&
-        start.getUTCMonth() === end.getUTCMonth() &&
-        end.getUTCDate() === lastDay.getUTCDate()
-    );
 }
 
 function formatRange(startsOn: string, endsOn: string): string {
@@ -1025,6 +1017,34 @@ function formatRange(startsOn: string, endsOn: string): string {
             </Tooltip>
 
             <div
+                v-if="isFullscreen"
+                class="absolute top-2 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-background/90 p-1 shadow-md backdrop-blur-sm"
+                data-timeline-fullscreen-range
+                role="group"
+                :aria-label="t('Calendar range')"
+            >
+                <Button
+                    v-for="days in timelineQuickRangeDays"
+                    :key="days"
+                    type="button"
+                    size="sm"
+                    class="h-8 min-w-9 px-2 text-xs tabular-nums"
+                    :variant="
+                        activeQuickRangeDays === days ? 'default' : 'outline'
+                    "
+                    :disabled="loading"
+                    :aria-pressed="activeQuickRangeDays === days"
+                    :aria-label="
+                        t('Show :count days from today', { count: days })
+                    "
+                    :title="t('Show :count days from today', { count: days })"
+                    @click="applyQuickRange(days)"
+                >
+                    {{ days }}
+                </Button>
+            </div>
+
+            <div
                 v-if="timeline.rows.length === 0"
                 class="flex h-full min-h-80 flex-col items-center justify-center px-6 text-center"
             >
@@ -1044,7 +1064,7 @@ function formatRange(startsOn: string, endsOn: string): string {
 
             <div
                 v-else
-                class="max-w-full overflow-auto overscroll-x-contain overscroll-y-auto [contain:paint]"
+                class="timeline-scroll-area max-w-full overflow-auto overscroll-x-contain overscroll-y-auto [contain:paint]"
                 :class="[
                     isFullscreen
                         ? 'h-full max-h-none min-h-0'

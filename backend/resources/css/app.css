@@ -228,4 +228,18 @@
         pointer-events: none;
         opacity: 0;
     }
+
+    .timeline-scroll-area {
+        scrollbar-width: auto;
+    }
+
+    .timeline-scroll-area::-webkit-scrollbar {
+        width: 10px;
+        height: 18px;
+    }
+
+    .timeline-scroll-area::-webkit-scrollbar-thumb {
+        min-width: 64px;
+        border-width: 3px;
+    }
 }
