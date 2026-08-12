@@ -51,6 +51,9 @@ module.exports = {
     "💸 Prices are shown for each bike when you pick dates.\nTap “My Rent” to choose dates and see totals.",
   prices_choose_season:
     "Choose a season:\n\n🔺 High season (December, January, February, March)\n🟠 Mid season (April, May, October, November)\n🔻 Low season (June, July, August, September)",
+  prices_choose_type: "Choose a vehicle type to view prices.",
+  prices_type_bikes: "🛵 Motorbikes",
+  prices_type_cars: "🚗 Cars",
   prices_season_high: "🔺 High season",
   prices_season_middle: "🟠 Mid season",
   prices_season_low: "🔻 Low season",

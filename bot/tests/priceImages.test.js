@@ -40,3 +40,37 @@ test("missing price images produce a null fallback without throwing", () => {
   );
   assert.equal(resolvePriceImage("unknown", "ru", {existsSync: () => true}), null);
 });
+
+test("vehicle-specific price images use localized-first and universal fallback", () => {
+  const root = path.join("tmp", "prices");
+  const localizedCar = path.join(root, "ru", "cars_high.PNG");
+  const universalBike = path.join(root, "bikes_middle.PNG");
+
+  assert.equal(
+    resolvePriceImage("high", "ru", {
+      root,
+      type: "cars",
+      existsSync: (candidate) => candidate === localizedCar,
+    }),
+    localizedCar
+  );
+  assert.equal(
+    resolvePriceImage("middle", "en", {
+      root,
+      type: "bikes",
+      existsSync: (candidate) => candidate === universalBike,
+    }),
+    universalBike
+  );
+});
+
+test("all supplied universal bike and car price images resolve", () => {
+  for (const type of ["bikes", "cars"]) {
+    for (const season of ["high", "middle", "low"]) {
+      assert.match(
+        resolvePriceImage(season, "en", {type}),
+        new RegExp(`${type}_${season}\\.PNG$`)
+      );
+    }
+  }
+});

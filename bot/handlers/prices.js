@@ -8,6 +8,10 @@ const SEASON_LABELS = {
   middle: "prices_season_middle",
   high: "prices_season_high",
 };
+const TYPE_LABELS = {
+  bikes: "prices_type_bikes",
+  cars: "prices_type_cars",
+};
 
 // Telegram file_id values are scoped to this bot. Keying by the resolved path
 // keeps localized and universal assets independent and invalidates naturally
@@ -17,18 +21,38 @@ const PRICE_FILE_IDS = new Map();
 function getPricesMenuKeyboard(lang) {
   return {
     inline_keyboard: [
-      [{text: t(lang, SEASON_LABELS.high), callback_data: "prices:season:high"}],
-      [{text: t(lang, SEASON_LABELS.middle), callback_data: "prices:season:middle"}],
-      [{text: t(lang, SEASON_LABELS.low), callback_data: "prices:season:low"}],
+      [{text: t(lang, TYPE_LABELS.bikes), callback_data: "prices:type:bikes"}],
+      [{text: t(lang, TYPE_LABELS.cars), callback_data: "prices:type:cars"}],
       [{text: t(lang, "btn_main_menu"), callback_data: "menu:main"}],
     ],
   };
 }
 
-function pricesBackKeyboard(lang) {
+function getSeasonMenuKeyboard(lang, type) {
   return {
     inline_keyboard: [
+      [{
+        text: t(lang, SEASON_LABELS.high),
+        callback_data: `prices:season:high:${type}`,
+      }],
+      [{
+        text: t(lang, SEASON_LABELS.middle),
+        callback_data: `prices:season:middle:${type}`,
+      }],
+      [{
+        text: t(lang, SEASON_LABELS.low),
+        callback_data: `prices:season:low:${type}`,
+      }],
       [{text: t(lang, "btn_back"), callback_data: "prices:menu"}],
+      [{text: t(lang, "btn_main_menu"), callback_data: "menu:main"}],
+    ],
+  };
+}
+
+function pricesBackKeyboard(lang, type) {
+  return {
+    inline_keyboard: [
+      [{text: t(lang, "btn_back"), callback_data: `prices:type:${type}`}],
       [{text: t(lang, "btn_main_menu"), callback_data: "menu:main"}],
     ],
   };
@@ -39,9 +63,21 @@ async function sendPricesMenu(ctx, langOverride, options = {}) {
   const renderer = options.renderer || botScreenRenderer;
   return renderer.renderText(ctx, {
     screen: "prices_menu",
-    text: t(lang, "prices_choose_season"),
+    text: t(lang, "prices_choose_type"),
     replyMarkup: getPricesMenuKeyboard(lang),
     returnContext: {origin: options.origin || "main_menu"},
+    navigationMode: options.navigationMode || "push",
+  });
+}
+
+async function sendSeasonMenu(ctx, type, langOverride, options = {}) {
+  const lang = langOverride || getCtxLang(ctx);
+  const renderer = options.renderer || botScreenRenderer;
+  return renderer.renderText(ctx, {
+    screen: `prices_${type}_seasons`,
+    text: t(lang, "prices_choose_season"),
+    replyMarkup: getSeasonMenuKeyboard(lang, type),
+    returnContext: {origin: "prices_menu", type},
     navigationMode: options.navigationMode || "push",
   });
 }
@@ -71,29 +107,41 @@ async function handlePricesActionWithDeps(ctx, dependencies = {}) {
     });
   }
 
-  const match = action.match(/^prices:season:(low|middle|high)$/);
+  const typeMatch = action.match(/^prices:type:(bikes|cars)$/);
+  if (typeMatch) {
+    return sendSeasonMenu(ctx, typeMatch[1], lang, {
+      renderer,
+      navigationMode: "back",
+    });
+  }
+
+  const match = action.match(
+    /^prices:season:(low|middle|high)(?::(bikes|cars))?$/
+  );
   if (!match) return undefined;
 
   const season = match[1];
-  const filePath = resolveImage(season, lang);
+  // Keep old season-only inline keyboards valid after this release.
+  const type = match[2] || "bikes";
+  const filePath = resolveImage(season, lang, {type});
   if (!filePath) {
-    logger.warn?.("[prices] Price image is missing.", {season, lang});
+    logger.warn?.("[prices] Price image is missing.", {season, type, lang});
     return renderer.renderText(ctx, {
-      screen: `prices_${season}_missing`,
+      screen: `prices_${type}_${season}_missing`,
       text: t(lang, "prices_image_missing"),
-      replyMarkup: pricesBackKeyboard(lang),
-      returnContext: {origin: "prices_menu", season},
+      replyMarkup: pricesBackKeyboard(lang, type),
+      returnContext: {origin: "prices_menu", season, type},
     });
   }
 
   const cachedFileId = PRICE_FILE_IDS.get(filePath);
   try {
     const rendered = await renderer.renderPhoto(ctx, {
-      screen: `prices_${season}`,
+      screen: `prices_${type}_${season}`,
       photo: cachedFileId || createInputFile(filePath),
-      caption: t(lang, SEASON_LABELS[season]),
-      replyMarkup: pricesBackKeyboard(lang),
-      returnContext: {origin: "prices_menu", season, filePath},
+      caption: `${t(lang, TYPE_LABELS[type])} · ${t(lang, SEASON_LABELS[season])}`,
+      replyMarkup: pricesBackKeyboard(lang, type),
+      returnContext: {origin: "prices_menu", season, type, filePath},
     });
     if (!cachedFileId) {
       const fileId = largestPhotoFileId(rendered?.result);
@@ -103,15 +151,16 @@ async function handlePricesActionWithDeps(ctx, dependencies = {}) {
   } catch (error) {
     logger.error?.("[prices] Telegram could not render the price image.", {
       season,
+      type,
       lang,
       filePath,
       error: error?.description || error?.message || String(error),
     });
     return renderer.renderText(ctx, {
-      screen: `prices_${season}_missing`,
+      screen: `prices_${type}_${season}_missing`,
       text: t(lang, "prices_image_missing"),
-      replyMarkup: pricesBackKeyboard(lang),
-      returnContext: {origin: "prices_menu", season},
+      replyMarkup: pricesBackKeyboard(lang, type),
+      returnContext: {origin: "prices_menu", season, type},
       navigationMode: "replace",
     });
   }
@@ -129,9 +178,11 @@ module.exports = {
   PRICE_FILE_IDS,
   clearPriceFileIdCache,
   getPricesMenuKeyboard,
+  getSeasonMenuKeyboard,
   handlePricesAction,
   handlePricesActionWithDeps,
   largestPhotoFileId,
   pricesBackKeyboard,
+  sendSeasonMenu,
   sendPricesMenu,
 };
