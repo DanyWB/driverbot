@@ -670,16 +670,14 @@ function formatRange(startsOn: string, endsOn: string): string {
         class="flex min-w-0 flex-1 flex-col bg-background transition-colors duration-150 motion-reduce:transition-none"
         :class="
             isFullscreen
-                ? 'fixed inset-0 z-40 h-dvh min-h-0 overflow-y-auto sm:overflow-hidden'
+                ? 'fixed inset-0 z-40 h-dvh min-h-0 w-screen overflow-hidden'
                 : ''
         "
         :data-fullscreen="isFullscreen ? 'true' : undefined"
     >
         <header
+            v-if="!isFullscreen"
             class="flex flex-col gap-4 border-b px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
-            :class="
-                isFullscreen ? 'sticky top-0 z-30 shrink-0 bg-background' : ''
-            "
         >
             <div class="min-w-0">
                 <p class="text-sm text-muted-foreground">
@@ -725,8 +723,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             "
                             @click="toggleFullscreen"
                         >
-                            <Minimize v-if="isFullscreen" />
-                            <Expand v-else />
+                            <Expand />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -742,7 +739,10 @@ function formatRange(startsOn: string, endsOn: string): string {
             </div>
         </header>
 
-        <section class="border-b px-4 py-4 sm:px-6 lg:px-8">
+        <section
+            v-if="!isFullscreen"
+            class="border-b px-4 py-4 sm:px-6 lg:px-8"
+        >
             <div class="flex flex-col gap-3 xl:flex-row xl:items-end">
                 <div class="flex items-center gap-1">
                     <Button
@@ -925,6 +925,7 @@ function formatRange(startsOn: string, endsOn: string): string {
         </section>
 
         <section
+            v-if="!isFullscreen"
             class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 text-sm sm:px-6 lg:px-8"
         >
             <div class="flex flex-wrap gap-x-5 gap-y-1 tabular-nums">
@@ -954,7 +955,7 @@ function formatRange(startsOn: string, endsOn: string): string {
         </section>
 
         <section
-            v-if="rangeSelection"
+            v-if="!isFullscreen && rangeSelection"
             class="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 sm:px-6 lg:px-8 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-100"
             aria-live="polite"
         >
@@ -1000,18 +1001,43 @@ function formatRange(startsOn: string, endsOn: string): string {
 
         <section
             class="relative min-h-0 min-w-0 flex-1"
-            :class="isFullscreen ? 'min-h-[360px] shrink-0 sm:min-h-0' : ''"
+            :class="isFullscreen ? 'h-dvh' : ''"
             :aria-label="t('Vehicle availability')"
         >
+            <Tooltip v-if="isFullscreen">
+                <TooltipTrigger as-child>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        class="absolute top-2 right-2 z-50 border bg-background/90 shadow-md backdrop-blur-sm"
+                        data-timeline-fullscreen-toggle
+                        aria-keyshortcuts="Escape"
+                        :aria-label="t('Collapse calendar')"
+                        :aria-pressed="true"
+                        :title="t('Collapse calendar')"
+                        @click="exitFullscreen(true)"
+                    >
+                        <Minimize />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>{{ t('Collapse calendar') }}</TooltipContent>
+            </Tooltip>
+
             <div
                 v-if="timeline.rows.length === 0"
-                class="flex min-h-80 flex-col items-center justify-center px-6 text-center"
+                class="flex h-full min-h-80 flex-col items-center justify-center px-6 text-center"
             >
                 <FilterX class="mb-3 size-8 text-muted-foreground" />
                 <h2 class="font-medium">
                     {{ t('No vehicles match these filters') }}
                 </h2>
-                <Button variant="outline" class="mt-4" @click="resetFilters">
+                <Button
+                    v-if="!isFullscreen"
+                    variant="outline"
+                    class="mt-4"
+                    @click="resetFilters"
+                >
                     {{ t('Reset filters') }}
                 </Button>
             </div>
