@@ -1,5 +1,32 @@
 # Текущее состояние проекта
 
+## Актуализация от 2026-08-12
+
+Кодовая часть change request `CR-01`–`CR-11` реализована. Бот получил двухкнопочную
+нижнюю клавиатуру, отдельное inline-меню, единый renderer активного UI-сообщения,
+контекстную навигацию, календарные хвостовые дни, стабильное представление категорий,
+локализуемые изображения цен, историю с пагинацией и возвратом на сохраненную страницу.
+Laravel остается единственным владельцем цены, доступности и статусов; Bot API теперь
+отдает публичную причину отказа и точные pagination metadata. Notification outbox дополнен
+административным событием auto-expired и actor-aware защитой от self-notification.
+
+В каталоге добавлена frontend/backend-валидация кратности 50 THB и округление генератора
+вниз до 50. Формула цены конкретной брони и ручная итоговая корректировка не менялись.
+Административный timeline стал компактнее и получил fullscreen на том же DOM с Escape,
+focus/body-scroll cleanup и сохранением состояния.
+
+Полный локальный backend CI после изменений: 209 тестов, 204 passed, 5 ожидаемо skipped
+PostgreSQL-only, 1281 assertions; Pint, PHPStan, Vue lint/format/types и frontend unit tests
+прошли. Отдельные PostgreSQL constraints/concurrency: 5/5, 8 assertions. Bot suite:
+58/58, 333 ключа переводов, Laravel-mode, Redis session, живой Bot API read smoke и
+полный HTTP E2E прошли. Подробности и внешние gate'ы зафиксированы в
+`CHANGE_REQUEST_IMPLEMENTATION_2026-08.md`.
+
+Открытый acceptance gate: визуальная Browser/Playwright-матрица timeline
+desktop/mobile × light/dark × normal/fullscreen. В текущей QA-сессии browser runtime не
+обнаружил ни одной подключенной браузерной сессии, поэтому проверка не подменялась
+standalone-инструментом. Production deploy, push и commit не выполнялись.
+
 ## Актуализация от 2026-07-22
 
 После обсуждения новых задач с заказчиком выбран новый целевой вектор разработки:

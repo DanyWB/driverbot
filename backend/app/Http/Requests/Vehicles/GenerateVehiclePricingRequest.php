@@ -17,9 +17,21 @@ class GenerateVehiclePricingRequest extends FormRequest
         return [
             'template' => ['required', 'string', Rule::in(is_array($templates) ? array_keys($templates) : [])],
             'base_prices' => ['required', 'array'],
-            'base_prices.high' => ['required', 'integer', 'min:100', 'max:10000000'],
-            'base_prices.middle' => ['required', 'integer', 'min:100', 'max:10000000'],
-            'base_prices.low' => ['required', 'integer', 'min:100', 'max:10000000'],
+            'base_prices.high' => ['bail', 'required', 'integer', 'min:1', 'multiple_of:50', 'max:10000000'],
+            'base_prices.middle' => ['bail', 'required', 'integer', 'min:1', 'multiple_of:50', 'max:10000000'],
+            'base_prices.low' => ['bail', 'required', 'integer', 'min:1', 'multiple_of:50', 'max:10000000'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        $message = $this->pricingStepMessage();
+
+        return [
+            'base_prices.*.integer' => $message,
+            'base_prices.*.min' => $message,
+            'base_prices.*.multiple_of' => $message,
         ];
     }
 
@@ -38,5 +50,12 @@ class GenerateVehiclePricingRequest extends FormRequest
                 $validator->errors()->add('template', 'The selected pricing template does not match the vehicle type.');
             }
         }];
+    }
+
+    private function pricingStepMessage(): string
+    {
+        return $this->cookie('admin_locale') === 'ru'
+            ? 'Цена должна быть положительным целым числом и кратна 50 THB.'
+            : 'Price must be a positive whole number divisible by 50 THB.';
     }
 }

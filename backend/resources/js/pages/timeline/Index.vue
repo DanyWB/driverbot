@@ -4,12 +4,15 @@ import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
+    Expand,
     FilterX,
+    Minimize,
     Plus,
     X,
 } from '@lucide/vue';
 import {
     computed,
+    nextTick,
     onBeforeUnmount,
     onMounted,
     reactive,
@@ -21,7 +24,14 @@ import AdminSelect from '@/components/AdminSelect.vue';
 import TimelineBookingSheet from '@/components/timeline/TimelineBookingSheet.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { getActiveLocale, useLocale } from '@/composables/useLocale';
+import { lockBodyScroll } from '@/lib/bodyScrollLock';
+import { timelineEscapeAction } from '@/lib/timelineInteraction';
 import { timelineStatusClasses, timelineStatusLabels } from '@/lib/timeline';
 import type {
     TimelineData,
@@ -47,6 +57,8 @@ defineOptions({
 const vehicleColumnWidth = 240;
 const dayWidth = 44;
 const loading = ref(false);
+const isFullscreen = ref(false);
+const timelineContainer = ref<HTMLElement | null>(null);
 const rangeError = ref('');
 const selectionError = ref('');
 const bookingSheetOpen = ref(false);
@@ -63,12 +75,18 @@ const hoveredCell = ref<{
 } | null>(null);
 const filterState = reactive<TimelineFilters>({ ...props.filters });
 const { t } = useLocale();
+let releaseBodyScroll: (() => void) | undefined;
 
 watch(
     () => props.filters,
     (filters) => Object.assign(filterState, filters),
     { deep: true },
 );
+
+watch(isFullscreen, (fullscreen) => {
+    releaseBodyScroll?.();
+    releaseBodyScroll = fullscreen ? lockBodyScroll(document) : undefined;
+});
 
 const gridWidth = computed(
     () => vehicleColumnWidth + props.timeline.dates.length * dayWidth,
@@ -127,9 +145,38 @@ const selectionPreview = computed(() => {
 });
 
 onMounted(() => document.addEventListener('keydown', onTimelineKeydown));
-onBeforeUnmount(() =>
-    document.removeEventListener('keydown', onTimelineKeydown),
-);
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', onTimelineKeydown);
+    releaseBodyScroll?.();
+});
+
+function toggleFullscreen(): void {
+    if (isFullscreen.value) {
+        exitFullscreen();
+
+        return;
+    }
+
+    isFullscreen.value = true;
+}
+
+function exitFullscreen(restoreFocus = false): void {
+    if (!isFullscreen.value) {
+        return;
+    }
+
+    isFullscreen.value = false;
+
+    if (restoreFocus) {
+        void nextTick(() => {
+            timelineContainer.value
+                ?.querySelector<HTMLButtonElement>(
+                    '[data-timeline-fullscreen-toggle]',
+                )
+                ?.focus();
+        });
+    }
+}
 
 function applyFilters(): void {
     visitTimeline();
@@ -376,11 +423,25 @@ function handleBookingSheetOpen(open: boolean): void {
 }
 
 function onTimelineKeydown(event: KeyboardEvent): void {
-    if (
-        event.key === 'Escape' &&
-        rangeSelection.value &&
-        !bookingSheetOpen.value
-    ) {
+    const action = timelineEscapeAction({
+        key: event.key,
+        fullscreen: isFullscreen.value,
+        bookingSheetOpen: bookingSheetOpen.value,
+        hasRangeSelection: Boolean(rangeSelection.value),
+    });
+
+    if (!action) {
+        return;
+    }
+
+    if (action === 'exit_fullscreen') {
+        event.preventDefault();
+        exitFullscreen(true);
+
+        return;
+    }
+
+    if (action === 'clear_selection') {
         clearTimelineSelection();
     }
 }
@@ -472,6 +533,17 @@ function occupancyClass(occupancy: TimelineOccupancy): string[] {
 
 function occupancyTitle(occupancy: TimelineOccupancy): string {
     return `${occupancy.label} - ${timelineStatusLabels[occupancy.status]} - ${formatRange(occupancy.starts_on, occupancy.ends_on)}`;
+}
+
+function vehicleDetails(row: TimelineVehicle): string {
+    return [
+        t(row.type),
+        row.category?.name,
+        row.inventory_code,
+        !row.is_active ? t('inactive') : !row.is_visible ? t('internal') : null,
+    ]
+        .filter((part): part is string => Boolean(part))
+        .join(' · ');
 }
 
 function monthLabel(index: number): string {
@@ -593,9 +665,21 @@ function formatRange(startsOn: string, endsOn: string): string {
 <template>
     <Head :title="t('Availability timeline')" />
 
-    <div class="flex min-w-0 flex-1 flex-col">
+    <div
+        ref="timelineContainer"
+        class="flex min-w-0 flex-1 flex-col bg-background transition-colors duration-150 motion-reduce:transition-none"
+        :class="
+            isFullscreen
+                ? 'fixed inset-0 z-40 h-dvh min-h-0 overflow-y-auto sm:overflow-hidden'
+                : ''
+        "
+        :data-fullscreen="isFullscreen ? 'true' : undefined"
+    >
         <header
             class="flex flex-col gap-4 border-b px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8"
+            :class="
+                isFullscreen ? 'sticky top-0 z-30 shrink-0 bg-background' : ''
+            "
         >
             <div class="min-w-0">
                 <p class="text-sm text-muted-foreground">
@@ -610,11 +694,52 @@ function formatRange(startsOn: string, endsOn: string): string {
                     }}</span>
                 </div>
             </div>
-            <Button as-child>
-                <Link :href="newBookingHref"
-                    ><Plus />{{ t('New booking') }}</Link
-                >
-            </Button>
+            <div class="flex items-center gap-2 self-end sm:self-auto">
+                <Button as-child>
+                    <Link :href="newBookingHref"
+                        ><Plus />{{ t('New booking') }}</Link
+                    >
+                </Button>
+                <Tooltip>
+                    <TooltipTrigger as-child>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            data-timeline-fullscreen-toggle
+                            aria-keyshortcuts="Escape"
+                            :aria-label="
+                                t(
+                                    isFullscreen
+                                        ? 'Collapse calendar'
+                                        : 'Expand calendar',
+                                )
+                            "
+                            :aria-pressed="isFullscreen"
+                            :title="
+                                t(
+                                    isFullscreen
+                                        ? 'Collapse calendar'
+                                        : 'Expand calendar',
+                                )
+                            "
+                            @click="toggleFullscreen"
+                        >
+                            <Minimize v-if="isFullscreen" />
+                            <Expand v-else />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        {{
+                            t(
+                                isFullscreen
+                                    ? 'Collapse calendar'
+                                    : 'Expand calendar',
+                            )
+                        }}
+                    </TooltipContent>
+                </Tooltip>
+            </div>
         </header>
 
         <section class="border-b px-4 py-4 sm:px-6 lg:px-8">
@@ -874,7 +999,8 @@ function formatRange(startsOn: string, endsOn: string): string {
         </section>
 
         <section
-            class="relative min-w-0 flex-1"
+            class="relative min-h-0 min-w-0 flex-1"
+            :class="isFullscreen ? 'min-h-[360px] shrink-0 sm:min-h-0' : ''"
             :aria-label="t('Vehicle availability')"
         >
             <div
@@ -892,8 +1018,13 @@ function formatRange(startsOn: string, endsOn: string): string {
 
             <div
                 v-else
-                class="max-h-[70vh] min-h-[360px] max-w-full overflow-auto overscroll-x-contain overscroll-y-auto [contain:paint]"
-                :class="loading ? 'opacity-60' : ''"
+                class="max-w-full overflow-auto overscroll-x-contain overscroll-y-auto [contain:paint]"
+                :class="[
+                    isFullscreen
+                        ? 'h-full max-h-none min-h-0'
+                        : 'max-h-[70vh] min-h-[360px]',
+                    loading ? 'opacity-60' : '',
+                ]"
                 :aria-busy="loading"
             >
                 <div class="relative" :style="{ width: `${gridWidth}px` }">
@@ -936,7 +1067,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                     <div
                         v-for="row in timeline.rows"
                         :key="row.id"
-                        class="group relative flex h-13 border-b"
+                        class="group relative flex h-10 border-b"
                         :style="{ width: `${gridWidth}px` }"
                         @mouseleave="clearHoveredCell(row.id)"
                     >
@@ -944,32 +1075,40 @@ function formatRange(startsOn: string, endsOn: string): string {
                             class="sticky left-0 z-20 flex shrink-0 items-center border-r bg-background px-4 group-hover:bg-muted/30"
                             :style="{ width: `${vehicleColumnWidth}px` }"
                         >
-                            <div class="min-w-0">
-                                <p
-                                    class="truncate text-sm font-medium"
-                                    :title="row.name"
+                            <div class="flex min-w-0 flex-1 items-center gap-2">
+                                <div class="min-w-0 flex-1">
+                                    <p
+                                        class="truncate text-sm font-medium"
+                                        :title="row.name"
+                                    >
+                                        {{ row.name }}
+                                    </p>
+                                    <p
+                                        class="truncate text-[11px] text-muted-foreground"
+                                        :title="vehicleDetails(row)"
+                                    >
+                                        <span>{{ t(row.type) }}</span>
+                                        <span v-if="row.category">
+                                            · {{ row.category.name }}</span
+                                        >
+                                        <span v-if="row.inventory_code">
+                                            · {{ row.inventory_code }}</span
+                                        >
+                                    </p>
+                                </div>
+                                <span
+                                    v-if="!row.is_active || !row.is_visible"
+                                    class="shrink-0 rounded border px-1 py-0.5 text-[9px] leading-none font-medium text-muted-foreground"
+                                    :title="vehicleDetails(row)"
                                 >
-                                    {{ row.name }}
-                                </p>
-                                <p
-                                    class="truncate text-[11px] text-muted-foreground"
-                                >
-                                    <span class="capitalize">{{
-                                        row.type
-                                    }}</span>
-                                    <span v-if="row.category">
-                                        · {{ row.category.name }}</span
-                                    >
-                                    <span v-if="row.inventory_code">
-                                        · {{ row.inventory_code }}</span
-                                    >
-                                    <span v-if="!row.is_active">
-                                        · {{ t('inactive') }}</span
-                                    >
-                                    <span v-else-if="!row.is_visible">
-                                        · {{ t('internal') }}</span
-                                    >
-                                </p>
+                                    {{
+                                        t(
+                                            !row.is_active
+                                                ? 'inactive'
+                                                : 'internal',
+                                        )
+                                    }}
+                                </span>
                             </div>
                         </div>
 
@@ -1032,7 +1171,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             <Link
                                 v-if="occupancy.booking_public_id"
                                 :href="bookingHref(occupancy.booking_public_id)"
-                                class="absolute top-1.5 z-10 flex h-10 items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                                class="absolute top-1 z-10 flex h-8 items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
                                 :class="occupancyClass(occupancy)"
                                 :style="occupancyStyle(occupancy)"
                                 :title="occupancyTitle(occupancy)"
@@ -1044,7 +1183,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             </Link>
                             <div
                                 v-else
-                                class="absolute top-1.5 z-10 flex h-10 items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs"
+                                class="absolute top-1 z-10 flex h-8 items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs"
                                 :class="occupancyClass(occupancy)"
                                 :style="occupancyStyle(occupancy)"
                                 :title="occupancyTitle(occupancy)"

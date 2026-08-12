@@ -50,15 +50,15 @@ class PricingTemplateService
             throw new InvalidArgumentException('The selected pricing template is not configured.');
         }
 
-        $step = max(1, (int) config('pricing_templates.rounding_step', 100));
+        $step = max(1, (int) config('pricing_templates.rounding_step', 50));
         $prices = [];
         $enabled = [];
 
         foreach (PricingSeasonKey::cases() as $season) {
             $basePrice = (int) ($basePrices[$season->value] ?? 0);
 
-            if ($basePrice < $step) {
-                throw new InvalidArgumentException("Base price for {$season->value} season must be at least {$step}.");
+            if ($basePrice < $step || $basePrice % $step !== 0) {
+                throw new InvalidArgumentException("Base price for {$season->value} season must be a positive multiple of {$step}.");
             }
 
             foreach (PricingTier::cases() as $tier) {

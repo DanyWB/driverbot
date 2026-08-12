@@ -10,6 +10,7 @@ use App\Models\PricingSeason;
 use App\Models\ServiceApiClient;
 use App\Models\Vehicle;
 use App\Models\VehiclePriceTier;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -25,6 +26,7 @@ abstract class BotApiTestCase extends TestCase
     {
         parent::setUp();
 
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-09 11:00:00', 'Asia/Bangkok'));
         $this->seed();
         $this->serviceClient = ServiceApiClient::query()->create([
             'name' => 'Feature test bot',
@@ -32,6 +34,13 @@ abstract class BotApiTestCase extends TestCase
             'abilities' => ['bot:read', 'bot:write', 'bot:documents'],
             'is_active' => true,
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+
+        parent::tearDown();
     }
 
     /** @return array<string, string> */

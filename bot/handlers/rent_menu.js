@@ -11,6 +11,7 @@ const {
 } = require("../utils/rentalStatus");
 const {isLaravelMode} = require("../config/runtime");
 const {handleLaravelRentMenuAction} = require("./laravel_rent_menu");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 function getRentMenuKeyboard(lang) {
   return {
@@ -28,16 +29,20 @@ function getRentMenuKeyboard(lang) {
         {text: t(lang, "rent_btn_settings"), callback_data: "rent:settings"},
         {text: t(lang, "rent_btn_support"), callback_data: "rent:support"},
       ],
-      [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
+      [{text: t(lang, "btn_main_menu"), callback_data: "menu:main"}],
     ],
   };
 }
 
-async function sendRentMenu(ctx, langOverride) {
+async function sendRentMenu(ctx, langOverride, options = {}) {
   const lang = langOverride || getCtxLang(ctx);
-  return ctx.reply(t(lang, "rent_intro"), {
-    parse_mode: "HTML",
-    reply_markup: getRentMenuKeyboard(lang),
+  return (options.renderer || botScreenRenderer).renderText(ctx, {
+    screen: "rent_menu",
+    text: t(lang, "rent_intro"),
+    parseMode: "HTML",
+    replyMarkup: getRentMenuKeyboard(lang),
+    returnContext: {origin: options.origin || "main_menu"},
+    navigationMode: options.navigationMode || "push",
   });
 }
 
@@ -102,7 +107,7 @@ async function sendDepositInfo(ctx, langOverride) {
 
 async function handleRentMenuAction(ctx) {
   if (isLaravelMode()) {
-    return handleLaravelRentMenuAction(ctx, getRentMenuKeyboard);
+    return handleLaravelRentMenuAction(ctx);
   }
   const lang = getCtxLang(ctx);
   const action = ctx.callbackQuery?.data;

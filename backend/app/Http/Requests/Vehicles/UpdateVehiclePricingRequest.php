@@ -26,12 +26,31 @@ class UpdateVehiclePricingRequest extends FormRequest
             $rules["enabled.{$season->value}"] = ['required', 'array'];
 
             foreach (PricingTier::cases() as $tier) {
-                $rules["prices.{$season->value}.{$tier->value}"] = ['nullable', 'integer', 'min:1', 'max:100000000'];
+                $rules["prices.{$season->value}.{$tier->value}"] = [
+                    'bail',
+                    'nullable',
+                    'integer',
+                    'min:1',
+                    'multiple_of:50',
+                    'max:100000000',
+                ];
                 $rules["enabled.{$season->value}.{$tier->value}"] = ['required', 'boolean'];
             }
         }
 
         return $rules;
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        $message = $this->pricingStepMessage();
+
+        return [
+            'prices.*.*.integer' => $message,
+            'prices.*.*.min' => $message,
+            'prices.*.*.multiple_of' => $message,
+        ];
     }
 
     /** @return list<callable(Validator): void> */
@@ -67,5 +86,12 @@ class UpdateVehiclePricingRequest extends FormRequest
                 }
             }
         }];
+    }
+
+    private function pricingStepMessage(): string
+    {
+        return $this->cookie('admin_locale') === 'ru'
+            ? 'Цена должна быть положительным целым числом и кратна 50 THB.'
+            : 'Price must be a positive whole number divisible by 50 THB.';
     }
 }

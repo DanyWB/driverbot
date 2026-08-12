@@ -66,6 +66,7 @@
             "npm run lint:check",
             "npm run format:check",
             "npm run types:check",
+            "npm run test:frontend",
             "@test"
         ],
         "types:check": [
@@ -75,7 +76,7 @@
             "@php artisan config:clear --ansi",
             "@lint:check",
             "@types:check",
-            "@php artisan test"
+            "@php -d sys_temp_dir=storage/framework/testing -d upload_tmp_dir=storage/framework/testing vendor/bin/phpunit"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

@@ -75,6 +75,22 @@ class BotApiOpenApiContractTest extends TestCase
             array_column(BookingStatus::cases(), 'value'),
             $document['components']['schemas']['Booking']['properties']['status']['enum'] ?? null,
         );
+        $this->assertSame(
+            2000,
+            $document['components']['schemas']['Booking']['properties']['cancellation']['properties']['reason']['maxLength'] ?? null,
+        );
+        $this->assertSame(
+            ['request_id', 'idempotency_replayed'],
+            $document['components']['schemas']['ResponseMeta']['required'] ?? null,
+        );
+        $this->assertSame(
+            ['total', 'limit', 'offset', 'has_more'],
+            $document['components']['schemas']['PaginationResponseMeta']['allOf'][1]['required'] ?? null,
+        );
+        $this->assertSame(
+            '#/components/schemas/PaginationResponseMeta',
+            $document['components']['responses']['BookingListSuccess']['content']['application/json']['schema']['allOf'][1]['properties']['meta']['$ref'] ?? null,
+        );
 
         $bookingListParameters = collect(
             $document['paths']['/customers/me/bookings']['get']['parameters'] ?? [],

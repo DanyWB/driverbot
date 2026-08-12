@@ -1,6 +1,7 @@
 const {t, getCtxLang} = require("../utils/i18n");
 const {escapeHtml, tHtml} = require("../utils/html");
 const {getUserByTelegramId} = require("../services/userService");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 function normalizeMeta(meta) {
   if (!meta) return {};
@@ -41,16 +42,22 @@ function formatAccountText(user, lang) {
   ].join("\n");
 }
 
-async function sendAccountMenu(ctx, langOverride) {
+async function sendAccountMenu(ctx, langOverride, options = {}) {
   const lang = langOverride || getCtxLang(ctx);
+  const origin = options.origin === "rent_menu" ? "rent_menu" : "main_menu";
   const user = await getUserByTelegramId(ctx.from.id);
   if (!user) {
-    return ctx.reply(t(lang, "not_registered"));
+    return (options.renderer || botScreenRenderer).renderText(ctx, {
+      screen: "account_missing",
+      text: t(lang, "not_registered"),
+    });
   }
 
-  return ctx.reply(formatAccountText(user, lang), {
-    parse_mode: "HTML",
-    reply_markup: {
+  return (options.renderer || botScreenRenderer).renderText(ctx, {
+    screen: "account",
+    text: formatAccountText(user, lang),
+    parseMode: "HTML",
+    replyMarkup: {
       inline_keyboard: [
         [{text: t(lang, "menu_update_name"), callback_data: "update:name"}],
         [{text: t(lang, "menu_update_tel"), callback_data: "update:tel"}],
@@ -60,22 +67,23 @@ async function sendAccountMenu(ctx, langOverride) {
             callback_data: "update:passport",
           },
         ],
-        [{text: t(lang, "btn_main_menu"), callback_data: "account:back"}],
+        [{
+          text: origin === "rent_menu" ? t(lang, "btn_back") : t(lang, "btn_main_menu"),
+          callback_data: `account:back:${origin}`,
+        }],
       ],
     },
+    returnContext: {origin},
   });
 }
 
 async function handleAccountAction(ctx) {
   const action = ctx.callbackQuery?.data || "";
-  if (action === "account:back") {
-    await ctx.answerCallbackQuery();
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // ignore delete errors
+  if (action.startsWith("account:back")) {
+    if (action.split(":")[2] === "rent_menu") {
+      return require("./rent_menu").sendRentMenu(ctx);
     }
-    return require("../commands/start")(ctx);
+    return require("./main_menu").showMainMenu(ctx);
   }
 }
 

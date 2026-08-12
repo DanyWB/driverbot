@@ -5,6 +5,7 @@ const {isLaravelMode} = require("../config/runtime");
 const {getUserByTelegramId} = require("../services/userService");
 const gateway = require("../services/laravelGateway");
 const sessionCart = require("../services/sessionCartService");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 module.exports = async (ctx) => {
   const booking = ctx.session.booking;
@@ -26,7 +27,11 @@ module.exports = async (ctx) => {
       ? await getUserByTelegramId(telegramId)
       : await db("users").where({telegram_id: telegramId}).first();
     if (!user) {
-      return ctx.reply(t(lang, "not_registered"));
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_not_registered",
+        text: t(lang, "not_registered"),
+        navigationMode: "replace",
+      });
     }
 
     if (isLaravelMode()) {
@@ -44,29 +49,43 @@ module.exports = async (ctx) => {
       await createDraftRental(db, {user, booking});
     }
 
-    const {buildDraftMenuPayload} = require("./booking_draft_menu");
-    const payload = await buildDraftMenuPayload(ctx, {lang, user, backAction: "home"});
-
-    if (payload?.error) {
-      return ctx.reply(payload.error);
-    }
-    if (payload?.empty) {
-      return ctx.reply(t(lang, "booking_no_bikes_in_process"));
-    }
-
-    await ctx.editMessageText(payload.text, {
-      parse_mode: "HTML",
-      reply_markup: payload.reply_markup,
+    return require("./book_draft").showBookingDraft(ctx, {
+      lang,
+      user,
+      backAction: "menu:main",
+      navigationMode: "replace",
     });
   } catch (error) {
     if (error.code === "BOT_API_UNAVAILABLE") throw error;
     if (error.code === "bike_not_found") {
-      return ctx.reply(t(lang, "booking_bike_not_found"));
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_bike_missing",
+        text: t(lang, "booking_bike_not_found"),
+        navigationMode: "replace",
+      });
     }
     if (error.code === "overlap_conflict") {
-      return ctx.reply(t(lang, "booking_bike_busy", {name: booking.selectedBikeId || ""}));
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_bike_unavailable",
+        text: t(lang, "booking_bike_busy", {
+          name: booking.selectedBikeId || "",
+        }),
+        replyMarkup: {inline_keyboard: [[{
+          text: t(lang, "btn_back"),
+          callback_data: "book:back_to_bikes",
+        }]]},
+        navigationMode: "replace",
+      });
     }
     console.error("Ошибка при добавлении аренды:", error);
-    return ctx.reply(t(lang, "booking_add_error"));
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_error",
+      text: t(lang, "booking_add_error"),
+      replyMarkup: {inline_keyboard: [[{
+        text: t(lang, "btn_back"),
+        callback_data: `book:select_bike:${booking.selectedBikeId}`,
+      }]]},
+      navigationMode: "replace",
+    });
   }
 };

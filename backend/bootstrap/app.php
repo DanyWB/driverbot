@@ -43,7 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             AuthenticateServiceApiClient::class,
         );
 
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        $middleware->encryptCookies(except: ['admin_locale', 'appearance', 'sidebar_state']);
 
         $middleware->web(append: [
             HandleAppearance::class,

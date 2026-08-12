@@ -171,7 +171,7 @@ class BotApiPresenter
         return $contact instanceof CustomerContact ? (string) $contact->value : null;
     }
 
-    /** @return array{can_cancel: bool, requires_manager: bool, manager_telegram: mixed} */
+    /** @return array{can_cancel: bool, requires_manager: bool, manager_telegram: mixed, reason: string|null} */
     private function cancellation(Booking $booking): array
     {
         $status = $booking->bookingStatus();
@@ -190,7 +190,15 @@ class BotApiPresenter
             'can_cancel' => $status === BookingStatus::Pending || ($status === BookingStatus::Approved && ! $requiresManager),
             'requires_manager' => $requiresManager,
             'manager_telegram' => config('business.manager_telegram'),
+            'reason' => $this->nullableString($booking->cancellation_reason),
         ];
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        $value = is_string($value) ? trim($value) : '';
+
+        return $value === '' ? null : $value;
     }
 
     private function date(mixed $value): ?string

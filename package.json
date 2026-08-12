@@ -12,7 +12,7 @@
     "check:environment": "node scripts/check-environment.js",
     "setup:laravel-local": "node scripts/setup-laravel-local.js",
     "backend:build": "npm --prefix backend run build",
-    "backend:check": "composer --working-dir=backend ci:check",
+    "backend:check": "node scripts/backend-check.js",
     "release:preflight": "php backend/artisan operations:release-preflight --strict",
     "release:bot": "npm --prefix bot run release:preflight"
   }

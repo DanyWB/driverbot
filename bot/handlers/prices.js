@@ -1,14 +1,7 @@
-const fs = require("fs");
-const path = require("path");
 const {InputFile} = require("grammy");
 const {t, getCtxLang} = require("../utils/i18n");
-const {isLaravelMode} = require("../config/runtime");
-
-const PRICE_IMAGES = {
-  low: ["low.png"],
-  middle: ["middle.png", "miggle.png"],
-  high: ["high.png"],
-};
+const {resolvePriceImage} = require("../utils/priceImages");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 const SEASON_LABELS = {
   low: "prices_season_low",
@@ -16,145 +9,129 @@ const SEASON_LABELS = {
   high: "prices_season_high",
 };
 
-const PRICE_FILE_IDS = {};
+// Telegram file_id values are scoped to this bot. Keying by the resolved path
+// keeps localized and universal assets independent and invalidates naturally
+// when an operator changes the configured file layout.
+const PRICE_FILE_IDS = new Map();
 
 function getPricesMenuKeyboard(lang) {
   return {
     inline_keyboard: [
       [{text: t(lang, SEASON_LABELS.high), callback_data: "prices:season:high"}],
-      [
-        {
-          text: t(lang, SEASON_LABELS.middle),
-          callback_data: "prices:season:middle",
-        },
-      ],
+      [{text: t(lang, SEASON_LABELS.middle), callback_data: "prices:season:middle"}],
       [{text: t(lang, SEASON_LABELS.low), callback_data: "prices:season:low"}],
-      [{text: t(lang, "btn_main_menu"), callback_data: "prices:back"}],
+      [{text: t(lang, "btn_main_menu"), callback_data: "menu:main"}],
     ],
   };
 }
 
-async function sendPricesMenu(ctx, langOverride) {
+function pricesBackKeyboard(lang) {
+  return {
+    inline_keyboard: [
+      [{text: t(lang, "btn_back"), callback_data: "prices:menu"}],
+      [{text: t(lang, "btn_main_menu"), callback_data: "menu:main"}],
+    ],
+  };
+}
+
+async function sendPricesMenu(ctx, langOverride, options = {}) {
   const lang = langOverride || getCtxLang(ctx);
-  if (isLaravelMode()) {
-    return ctx.reply(t(lang, "prices_dynamic_hint"), {
-      reply_markup: {
-        inline_keyboard: [
-          [{text: t(lang, "conditions_book_btn"), callback_data: "book:start"}],
-          [{text: t(lang, "btn_main_menu"), callback_data: "prices:back"}],
-        ],
-      },
-    });
-  }
-  return ctx.reply(t(lang, "prices_choose_season"), {
-    reply_markup: getPricesMenuKeyboard(lang),
+  const renderer = options.renderer || botScreenRenderer;
+  return renderer.renderText(ctx, {
+    screen: "prices_menu",
+    text: t(lang, "prices_choose_season"),
+    replyMarkup: getPricesMenuKeyboard(lang),
+    returnContext: {origin: options.origin || "main_menu"},
+    navigationMode: options.navigationMode || "push",
   });
 }
 
-async function safeAnswer(ctx, text) {
+function largestPhotoFileId(result) {
+  const photos = result?.photo;
+  if (!Array.isArray(photos) || photos.length === 0) return null;
+  return photos[photos.length - 1]?.file_id || null;
+}
+
+async function handlePricesActionWithDeps(ctx, dependencies = {}) {
+  const lang = getCtxLang(ctx);
+  const action = ctx.callbackQuery?.data || "";
+  const renderer = dependencies.renderer || botScreenRenderer;
+  const resolveImage = dependencies.resolveImage || resolvePriceImage;
+  const createInputFile = dependencies.createInputFile || ((filePath) => new InputFile(filePath));
+  const logger = dependencies.logger || console;
+
+  if (action === "prices:back") {
+    return require("./main_menu").showMainMenu(ctx, lang);
+  }
+  if (action === "prices:menu") {
+    return sendPricesMenu(ctx, lang, {
+      renderer,
+      origin: ctx.session?.returnContext?.origin || "main_menu",
+      navigationMode: "back",
+    });
+  }
+
+  const match = action.match(/^prices:season:(low|middle|high)$/);
+  if (!match) return undefined;
+
+  const season = match[1];
+  const filePath = resolveImage(season, lang);
+  if (!filePath) {
+    logger.warn?.("[prices] Price image is missing.", {season, lang});
+    return renderer.renderText(ctx, {
+      screen: `prices_${season}_missing`,
+      text: t(lang, "prices_image_missing"),
+      replyMarkup: pricesBackKeyboard(lang),
+      returnContext: {origin: "prices_menu", season},
+    });
+  }
+
+  const cachedFileId = PRICE_FILE_IDS.get(filePath);
   try {
-    if (text) {
-      await ctx.answerCallbackQuery({text});
-      return;
+    const rendered = await renderer.renderPhoto(ctx, {
+      screen: `prices_${season}`,
+      photo: cachedFileId || createInputFile(filePath),
+      caption: t(lang, SEASON_LABELS[season]),
+      replyMarkup: pricesBackKeyboard(lang),
+      returnContext: {origin: "prices_menu", season, filePath},
+    });
+    if (!cachedFileId) {
+      const fileId = largestPhotoFileId(rendered?.result);
+      if (fileId) PRICE_FILE_IDS.set(filePath, fileId);
     }
-    await ctx.answerCallbackQuery();
-  } catch (e) {
-    // ignore expired or invalid queries
+    return rendered;
+  } catch (error) {
+    logger.error?.("[prices] Telegram could not render the price image.", {
+      season,
+      lang,
+      filePath,
+      error: error?.description || error?.message || String(error),
+    });
+    return renderer.renderText(ctx, {
+      screen: `prices_${season}_missing`,
+      text: t(lang, "prices_image_missing"),
+      replyMarkup: pricesBackKeyboard(lang),
+      returnContext: {origin: "prices_menu", season},
+      navigationMode: "replace",
+    });
   }
 }
 
 async function handlePricesAction(ctx) {
-  const lang = getCtxLang(ctx);
-  const action = ctx.callbackQuery?.data || "";
-
-  if (action === "prices:back") {
-    await safeAnswer(ctx);
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // ignore delete errors
-    }
-    return require("../commands/start")(ctx);
-  }
-
-  if (action === "prices:menu") {
-    await safeAnswer(ctx);
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // ignore delete errors
-    }
-    return sendPricesMenu(ctx, lang);
-  }
-
-  if (isLaravelMode()) {
-    await safeAnswer(ctx);
-    return sendPricesMenu(ctx, lang);
-  }
-
-  const match = action.match(/^prices:season:(low|middle|high)$/);
-  if (!match) return;
-
-  const season = match[1];
-  await safeAnswer(ctx, t(lang, "prices_loading"));
-
-  const candidates = PRICE_IMAGES[season] || [];
-  let filePath = "";
-  for (const filename of candidates) {
-    const candidatePath = path.join(
-      __dirname,
-      "..",
-      "images",
-      "prices",
-      filename
-    );
-    if (!filePath || fs.existsSync(candidatePath)) {
-      filePath = candidatePath;
-    }
-    if (fs.existsSync(candidatePath)) break;
-  }
-  const caption = t(lang, SEASON_LABELS[season]);
-
-  if (!filePath || !fs.existsSync(filePath)) {
-    return ctx.reply(t(lang, "prices_image_missing"), {
-      reply_markup: {
-        inline_keyboard: [
-          [{text: t(lang, "btn_back"), callback_data: "prices:menu"}],
-        ],
-      },
-    });
-  }
-
-  const cachedFileId = PRICE_FILE_IDS[season];
-
-  try {
-    const photoPayload = cachedFileId ? cachedFileId : new InputFile(filePath);
-    const result = await ctx.replyWithPhoto(photoPayload, {
-      caption,
-      reply_markup: {
-        inline_keyboard: [
-          [{text: t(lang, "btn_back"), callback_data: "prices:menu"}],
-        ],
-      },
-    });
-    if (!cachedFileId && Array.isArray(result.photo) && result.photo.length) {
-      PRICE_FILE_IDS[season] = result.photo[result.photo.length - 1].file_id;
-    }
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // ignore delete errors
-    }
-    return result;
-  } catch (e) {
-    return ctx.reply(t(lang, "prices_image_missing"), {
-      reply_markup: {
-        inline_keyboard: [
-          [{text: t(lang, "btn_back"), callback_data: "prices:menu"}],
-        ],
-      },
-    });
-  }
+  return handlePricesActionWithDeps(ctx);
 }
 
-module.exports = {sendPricesMenu, handlePricesAction};
+function clearPriceFileIdCache() {
+  PRICE_FILE_IDS.clear();
+}
+
+module.exports = {
+  PRICE_FILE_IDS,
+  clearPriceFileIdCache,
+  getPricesMenuKeyboard,
+  handlePricesAction,
+  handlePricesActionWithDeps,
+  largestPhotoFileId,
+  pricesBackKeyboard,
+  sendPricesMenu,
+};

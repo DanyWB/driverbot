@@ -196,8 +196,14 @@ const russianMessages: Record<string, string> = {
     'THB package totals': 'Пакетные цены в THB',
     'Seasonal pricing': 'Сезонные цены',
     'Price generator': 'Генератор цен',
-    'The 1-day tariff equals the seasonal base price. Packages from 7 days are calculated by the discount formula and rounded down to 100 THB.':
-        'Тариф на 1 день равен базовой цене сезона. Пакеты от 7 дней рассчитываются по формуле скидок и округляются вниз до 100 бат.',
+    'The 1-day tariff equals the seasonal base price. Packages from 7 days are calculated by the discount formula and rounded down to 50 THB.':
+        'Тариф на 1 день равен базовой цене сезона. Пакеты от 7 дней рассчитываются по формуле скидок и округляются вниз до 50 бат.',
+    'Price must be a multiple of 50 THB.': 'Цена должна быть кратна 50 бат.',
+    'Price must be a positive whole number.':
+        'Цена должна быть положительным целым числом.',
+    'Price must be a positive whole number divisible by 50 THB.':
+        'Цена должна быть положительным целым числом и кратна 50 THB.',
+    'Enter a price.': 'Укажите цену.',
     'Discount template': 'Шаблон скидок',
     'Light scooters / Click': 'Лёгкие скутеры / Click',
     'Comfort scooters / Aerox': 'Комфортные скутеры / Aerox',
@@ -319,6 +325,8 @@ const russianMessages: Record<string, string> = {
     'Vehicles count': 'Техники: :count',
     'Fully free count': 'Полностью свободно: :count',
     'Blocks count': 'Блокировок: :count',
+    'Expand calendar': 'Развернуть календарь',
+    'Collapse calendar': 'Свернуть календарь',
     'Rental operations': 'Управление арендой',
     'Export CSV': 'Экспорт CSV',
     active: 'активные',

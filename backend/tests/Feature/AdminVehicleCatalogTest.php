@@ -15,6 +15,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -146,6 +147,63 @@ class AdminVehicleCatalogTest extends TestCase
         $this->assertDatabaseCount('vehicle_price_tiers', 0);
     }
 
+    #[DataProvider('validCatalogPriceValues')]
+    public function test_catalog_price_update_accepts_positive_multiples_of_fifty(int $value): void
+    {
+        $vehicle = Vehicle::factory()->create();
+        $payload = $this->pricePayload();
+        $payload['prices']['low']['7d'] = $value;
+
+        $this->actingAs($this->admin)
+            ->patch(route('vehicles.pricing.update', $vehicle), $payload)
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('vehicle_price_tiers', [
+            'vehicle_id' => $vehicle->id,
+            'tier_key' => '7d',
+            'package_total' => $value,
+        ]);
+    }
+
+    /** @return array<string, array{int}> */
+    public static function validCatalogPriceValues(): array
+    {
+        return [
+            '100' => [100],
+            '150' => [150],
+            '1250' => [1250],
+            '2300' => [2300],
+        ];
+    }
+
+    #[DataProvider('invalidCatalogPriceValues')]
+    public function test_catalog_price_update_rejects_non_multiples_on_the_exact_cell(int $value): void
+    {
+        $vehicle = Vehicle::factory()->create();
+        $payload = $this->pricePayload();
+        $payload['prices']['low']['7d'] = $value;
+
+        $this->actingAs($this->admin)
+            ->withUnencryptedCookie('admin_locale', 'en')
+            ->patch(route('vehicles.pricing.update', $vehicle), $payload)
+            ->assertSessionHasErrors([
+                'prices.low.7d' => 'Price must be a positive whole number divisible by 50 THB.',
+            ]);
+
+        $this->assertDatabaseCount('vehicle_price_tiers', 0);
+    }
+
+    /** @return array<string, array{int}> */
+    public static function invalidCatalogPriceValues(): array
+    {
+        return [
+            '110' => [110],
+            '120' => [120],
+            '1275' => [1275],
+            '2321' => [2321],
+        ];
+    }
+
     public function test_enabled_tariff_requires_a_package_total(): void
     {
         $vehicle = Vehicle::factory()->create();
@@ -169,19 +227,19 @@ class AdminVehicleCatalogTest extends TestCase
                 'vehicle' => $vehicle,
                 'template' => 'click',
                 'base_prices' => [
-                    'high' => 120,
-                    'middle' => 110,
+                    'high' => 150,
+                    'middle' => 100,
                     'low' => 100,
                 ],
             ]))
             ->assertOk()
-            ->assertJsonPath('data.prices.high.1d', 120)
-            ->assertJsonPath('data.prices.high.7d', 800)
-            ->assertJsonPath('data.prices.high.14d', 1500)
-            ->assertJsonPath('data.prices.high.21d', 2000)
-            ->assertJsonPath('data.prices.high.month', 2200)
-            ->assertJsonPath('data.prices.middle.1d', 110)
-            ->assertJsonPath('data.prices.middle.7d', 700)
+            ->assertJsonPath('data.prices.high.1d', 150)
+            ->assertJsonPath('data.prices.high.7d', 1000)
+            ->assertJsonPath('data.prices.high.14d', 1950)
+            ->assertJsonPath('data.prices.high.21d', 2600)
+            ->assertJsonPath('data.prices.high.month', 2850)
+            ->assertJsonPath('data.prices.middle.1d', 100)
+            ->assertJsonPath('data.prices.middle.7d', 650)
             ->assertJsonPath('data.prices.low.1d', 100)
             ->assertJsonPath('data.prices.low.month', 1900)
             ->assertJsonPath('data.enabled.low.month', true);
@@ -207,11 +265,11 @@ class AdminVehicleCatalogTest extends TestCase
             ->assertJsonValidationErrors('template');
     }
 
-    public function test_price_generator_rejects_a_base_price_below_the_rounding_step(): void
+    public function test_price_generator_rejects_a_base_price_that_is_not_a_multiple_of_the_rounding_step(): void
     {
         $vehicle = Vehicle::factory()->create(['type' => 'scooter']);
 
-        $this->actingAs($this->admin)
+        $response = $this->actingAs($this->admin)
             ->getJson(route('vehicles.pricing.generate', [
                 'vehicle' => $vehicle,
                 'template' => 'click',
@@ -223,6 +281,34 @@ class AdminVehicleCatalogTest extends TestCase
             ]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('base_prices.high');
+        $this->assertSame(
+            'Price must be a positive whole number divisible by 50 THB.',
+            $response->json('errors')['base_prices.high'][0] ?? null,
+        );
+    }
+
+    public function test_price_generator_returns_a_localized_exact_field_error(): void
+    {
+        $vehicle = Vehicle::factory()->create(['type' => 'scooter']);
+
+        $response = $this->actingAs($this->admin)
+            ->withUnencryptedCookie('admin_locale', 'ru')
+            ->withCredentials()
+            ->getJson(route('vehicles.pricing.generate', [
+                'vehicle' => $vehicle,
+                'template' => 'click',
+                'base_prices' => [
+                    'high' => 120,
+                    'middle' => 150,
+                    'low' => 100,
+                ],
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('base_prices.high');
+        $this->assertSame(
+            'Цена должна быть положительным целым числом и кратна 50 THB.',
+            $response->json('errors')['base_prices.high'][0] ?? null,
+        );
     }
 
     public function test_saving_generated_prices_remembers_the_selected_template(): void

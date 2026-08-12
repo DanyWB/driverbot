@@ -1,9 +1,112 @@
 const dayjs = require("dayjs");
 const {createEmptyBooking, ensureBooking} = require("../services/bookingService");
-const {generateCalendarKeyboard} = require("../utils/calendar");
+const {
+  generateCalendarKeyboard,
+  getCalendarBackAction,
+  getCalendarDisplayRange,
+} = require("../utils/calendar");
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const db = require("../connect");
-const {getCtxLang, getCalendarLabels, getWeekdays} = require("../utils/i18n");
+const {getCtxLang, getCalendarLabels, getWeekdays, t} = require("../utils/i18n");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
+
+async function showStartDateCalendar(ctx, booking, lang, options = {}) {
+  const displayDate = booking.startDate ? dayjs(booking.startDate) : dayjs();
+  booking.startDate = null;
+  booking.startTime = null;
+  booking.endDate = null;
+  booking.endTime = null;
+  booking.totalPrice = null;
+  booking.pricePerDay = null;
+  booking.priceUnknown = false;
+  booking.step = "select_start_date";
+  booking.calendarMonth = displayDate.month() + 1;
+  booking.calendarYear = displayDate.year();
+
+  const blockedDays = booking.selectedBikeId
+    ? await getBusyDatesForBike(
+        booking.selectedBikeId,
+        db,
+        getCalendarDisplayRange(booking.calendarYear, booking.calendarMonth)
+      )
+    : [];
+  const keyboard = generateCalendarKeyboard(
+    booking.calendarYear,
+    booking.calendarMonth,
+    blockedDays,
+    {
+      lang,
+      labels: getCalendarLabels(lang),
+      weekdays: getWeekdays(lang),
+      disablePast: true,
+      backAction: getCalendarBackAction(booking),
+    }
+  );
+
+  return (options.renderer || botScreenRenderer).renderText(ctx, {
+    screen: "booking_start_date",
+    text: t(lang, "booking_choose_start_date"),
+    replyMarkup: keyboard,
+    returnContext: {
+      scenario: booking.scenario,
+      categoryId: booking.categoryId || null,
+      selectedBikeId: booking.selectedBikeId || null,
+    },
+    navigationMode: options.navigationMode || "back",
+  });
+}
+
+async function showEndDateCalendar(ctx, booking, lang, options = {}) {
+  if (!booking.startDate) {
+    return showStartDateCalendar(ctx, booking, lang, options);
+  }
+
+  const displayDate = booking.endDate
+    ? dayjs(booking.endDate)
+    : dayjs(booking.startDate);
+  booking.endDate = null;
+  booking.endTime = null;
+  booking.totalPrice = null;
+  booking.pricePerDay = null;
+  booking.priceUnknown = false;
+  booking.step = "select_end_date";
+  booking.calendarMonth = displayDate.month() + 1;
+  booking.calendarYear = displayDate.year();
+
+  const blockedDays = booking.selectedBikeId
+    ? await getBusyDatesForBike(
+        booking.selectedBikeId,
+        db,
+        getCalendarDisplayRange(booking.calendarYear, booking.calendarMonth)
+      )
+    : [];
+  const keyboard = generateCalendarKeyboard(
+    booking.calendarYear,
+    booking.calendarMonth,
+    blockedDays,
+    {
+      lang,
+      labels: getCalendarLabels(lang),
+      weekdays: getWeekdays(lang),
+      minDate: booking.startDate,
+      selectedDate: booking.startDate,
+      backAction: getCalendarBackAction(booking),
+    }
+  );
+
+  return (options.renderer || botScreenRenderer).renderText(ctx, {
+    screen: "booking_end_date",
+    text: t(lang, "booking_choose_end_date"),
+    replyMarkup: keyboard,
+    returnContext: {
+      scenario: booking.scenario,
+      categoryId: booking.categoryId || null,
+      selectedBikeId: booking.selectedBikeId || null,
+      startDate: booking.startDate,
+    },
+    navigationMode: options.navigationMode || "back",
+  });
+}
 
 // Universal navigation handlers for back/home and calendar navigation.
 module.exports = async (ctx) => {
@@ -12,24 +115,19 @@ module.exports = async (ctx) => {
 
   if (action === "book:restart") {
     ctx.session.booking = createEmptyBooking();
-    await ctx.answerCallbackQuery();
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // ignore delete errors
-    }
     return require("../commands/book")(ctx);
   }
 
   if (action === "home") {
-    ctx.session.booking = null;
-    await ctx.answerCallbackQuery();
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // ignore delete errors
-    }
-    return require("../commands/start")(ctx);
+    return require("./main_menu").showMainMenu(ctx, lang);
+  }
+
+  if (action === "book:calendar_back_start") {
+    return showStartDateCalendar(ctx, ensureBooking(ctx), lang);
+  }
+
+  if (action === "book:calendar_back_end") {
+    return showEndDateCalendar(ctx, ensureBooking(ctx), lang);
   }
 
   if (action === "book:calendar_prev" || action === "book:calendar_next") {
@@ -47,11 +145,11 @@ module.exports = async (ctx) => {
 
     let blockedDays = [];
     if (booking.selectedBikeId) {
-      const rangeStart = newDate.startOf("month").startOf("week");
-      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, {
-        startDate: rangeStart.format("YYYY-MM-DD"),
-        endDate: rangeStart.add(41, "day").format("YYYY-MM-DD"),
-      });
+      blockedDays = await getBusyDatesForBike(
+        booking.selectedBikeId,
+        db,
+        getCalendarDisplayRange(booking.calendarYear, booking.calendarMonth)
+      );
     }
 
     const keyboard = generateCalendarKeyboard(
@@ -66,10 +164,27 @@ module.exports = async (ctx) => {
         disablePast: booking.step !== "select_end_date",
         selectedDate:
           booking.step === "select_end_date" ? booking.startDate : null,
+        backAction: getCalendarBackAction(booking),
       }
     );
 
-    await ctx.editMessageReplyMarkup({reply_markup: keyboard});
-    return ctx.answerCallbackQuery();
+    const selectingEnd = booking.step === "select_end_date";
+    return botScreenRenderer.renderText(ctx, {
+      screen: selectingEnd ? "booking_end_date" : "booking_start_date",
+      text: t(
+        lang,
+        selectingEnd ? "booking_choose_end_date" : "booking_choose_start_date"
+      ),
+      replyMarkup: keyboard,
+      returnContext: {
+        scenario: booking.scenario,
+        categoryId: booking.categoryId || null,
+        selectedBikeId: booking.selectedBikeId || null,
+      },
+      navigationMode: "replace",
+    });
   }
 };
+
+module.exports.showStartDateCalendar = showStartDateCalendar;
+module.exports.showEndDateCalendar = showEndDateCalendar;

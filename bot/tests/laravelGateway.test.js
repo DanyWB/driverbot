@@ -54,3 +54,21 @@ test("uses a fresh idempotency key for each customer sync and profile mutation",
     delete require.cache[require.resolve("../services/laravelGateway")];
   }
 });
+
+test("normalizes flat and nested booking pagination metadata", () => {
+  const gateway = require("../services/laravelGateway");
+  assert.deepEqual(
+    gateway.bookingPagination(
+      {meta: {total: 31, limit: 7, offset: 6, has_more: true}},
+      {limit: 7, offset: 6, itemsLength: 7}
+    ),
+    {total: 31, limit: 7, offset: 6, hasMore: true}
+  );
+  assert.deepEqual(
+    gateway.bookingPagination(
+      {meta: {pagination: {total_count: 6, per_page: 7, offset: 0}}},
+      {limit: 7, offset: 0, itemsLength: 6}
+    ),
+    {total: 6, limit: 7, offset: 0, hasMore: false}
+  );
+});

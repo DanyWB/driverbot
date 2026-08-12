@@ -11,6 +11,44 @@ const {ensureBooking} = require("../services/bookingService");
 const {getUserByTelegramId} = require("../services/userService");
 const gateway = require("../services/laravelGateway");
 const sessionCart = require("../services/sessionCartService");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
+const {
+  clearActiveUiMessage,
+  getActiveUiMessage,
+} = require("../utils/navigationState");
+
+async function sendConfirmationReceipt(ctx, lang) {
+  try {
+    await ctx.answerCallbackQuery();
+  } catch (error) {
+    // Callback answers are best effort; the booking has already been created.
+  }
+
+  const active = getActiveUiMessage(ctx.session);
+  const chatId = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+  if (active && chatId) {
+    try {
+      await ctx.api.deleteMessage(chatId, active.messageId);
+    } catch (error) {
+      try {
+        await ctx.api.editMessageReplyMarkup(chatId, active.messageId, {
+          reply_markup: {inline_keyboard: []},
+        });
+      } catch (disableError) {
+        // The receipt remains transactional even if the old UI cannot be cleaned up.
+      }
+    }
+    clearActiveUiMessage(ctx.session, active.messageId);
+  }
+
+  return ctx.reply(t(lang, "booking_confirmed"), {
+    reply_markup: {
+      inline_keyboard: [[
+        {text: t(lang, "btn_main_menu"), callback_data: "menu:main"},
+      ]],
+    },
+  });
+}
 
 module.exports = async (ctx) => {
   const telegramId = ctx.from.id;
@@ -21,11 +59,21 @@ module.exports = async (ctx) => {
       ? await getUserByTelegramId(telegramId)
       : await db("users").where({telegram_id: telegramId}).first();
     if (!user) {
-      return ctx.reply(t(lang, "not_registered"));
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_not_registered",
+        text: t(lang, "not_registered"),
+        navigationMode: "replace",
+      });
     }
 
     const admin = isLaravelMode() ? null : await db("users").where({is_admin: true}).first();
-    if (!isLaravelMode() && !admin) return ctx.reply(t(lang, "booking_admin_missing"));
+    if (!isLaravelMode() && !admin) {
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_admin_missing",
+        text: t(lang, "booking_admin_missing"),
+        navigationMode: "replace",
+      });
+    }
 
     const rentals = isLaravelMode()
       ? sessionCart.getCart(ctx)
@@ -44,13 +92,17 @@ module.exports = async (ctx) => {
     ) {
       sessionCart.loadOptionsIntoBooking(ctx, ensureBooking(ctx));
       ctx.session.optionsScope = "process";
-      return ctx.reply(t(lang, "booking_delivery_address_required"), {
-        reply_markup: {
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_delivery_address_required",
+        text: t(lang, "booking_delivery_address_required"),
+        replyMarkup: {
           inline_keyboard: [[{
             text: t(lang, "booking_options_set_address"),
             callback_data: "book:options:address",
-          }]],
+          }], [{text: t(lang, "btn_back"), callback_data: "book:draft"}]],
         },
+        returnContext: {origin: "booking_confirmation"},
+        navigationMode: "replace",
       });
     }
 
@@ -59,9 +111,12 @@ module.exports = async (ctx) => {
       : ctx.session?.acceptTerms || rentals.some((rental) => rental.accept_terms === true);
 
     if (!accepted) {
-      return ctx.reply(t(lang, "conditions_accept_required"), {
-        parse_mode: "HTML",
-        reply_markup: {
+      ctx.session.termsOrigin = "booking_confirmation";
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_terms_required",
+        text: t(lang, "conditions_accept_required"),
+        parseMode: "HTML",
+        replyMarkup: {
           inline_keyboard: [
             [
               {
@@ -75,9 +130,10 @@ module.exports = async (ctx) => {
                 callback_data: "conditions:accept",
               },
             ],
-            [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
+            [{text: t(lang, "btn_back"), callback_data: "book:draft"}],
           ],
         },
+        returnContext: {termsOrigin: "booking_confirmation"},
       });
     }
 
@@ -93,11 +149,7 @@ module.exports = async (ctx) => {
       return ctx.answerCallbackQuery(t(lang, "booking_no_bookings_to_confirm"));
     }
 
-    await ctx.editMessageText(t(lang, "booking_confirmed"), {
-      reply_markup: {
-        inline_keyboard: [[{text: t(lang, "btn_main_menu"), callback_data: "home"}]],
-      },
-    });
+    await sendConfirmationReceipt(ctx, lang);
 
     if (isLaravelMode()) {
       sessionCart.clear(ctx);
@@ -163,19 +215,42 @@ module.exports = async (ctx) => {
     if (err.code === "BOT_API_UNAVAILABLE") throw err;
     if (err.code === "TERMS_VERSION_OUTDATED") {
       sessionCart.clearTermsAcceptance(ctx);
-      return ctx.reply(t(lang, "conditions_version_changed"), {
-        reply_markup: {
+      ctx.session.termsOrigin = "booking_confirmation";
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_terms_required",
+        text: t(lang, "conditions_version_changed"),
+        replyMarkup: {
           inline_keyboard: [[{
             text: t(lang, "conditions_accept_btn"),
             callback_data: "conditions:accept_toggle",
-          }]],
+          }], [{text: t(lang, "btn_back"), callback_data: "book:draft"}]],
         },
+        returnContext: {termsOrigin: "booking_confirmation"},
+        navigationMode: "replace",
       });
     }
     if (["overlap_conflict", "VEHICLE_UNAVAILABLE"].includes(err.code)) {
-      return ctx.reply(t(lang, "booking_bike_busy", {name: ""}));
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_conflict",
+        text: t(lang, "booking_bike_busy", {name: ""}),
+        replyMarkup: {inline_keyboard: [[{
+          text: t(lang, "btn_back"),
+          callback_data: "book:draft",
+        }]]},
+        navigationMode: "replace",
+      });
     }
     console.error("Ошибка подтверждения бронирования:", err);
-    return ctx.reply(t(lang, "booking_add_error"));
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_error",
+      text: t(lang, "booking_add_error"),
+      replyMarkup: {inline_keyboard: [[{
+        text: t(lang, "btn_back"),
+        callback_data: "book:draft",
+      }]]},
+      navigationMode: "replace",
+    });
   }
 };
+
+module.exports.sendConfirmationReceipt = sendConfirmationReceipt;

@@ -5,5 +5,5 @@ module.exports = async (ctx) => {
     ctx.session.booking.selectedBikeId = null;
   }
 
-  return showAvailableBikes(ctx);
+  return showAvailableBikes(ctx, {preserveCategory: true});
 };

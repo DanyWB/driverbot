@@ -47,6 +47,20 @@ class PricingServiceTest extends TestCase
         $this->assertSame(300, $quote->roundedTotal);
     }
 
+    public function test_catalog_input_validation_does_not_change_client_quote_rounding(): void
+    {
+        $this->price(PricingSeasonKey::Low, PricingTier::OneDay, 1275);
+
+        $quote = app(PricingService::class)->quote(
+            $this->vehicle,
+            RentalPeriod::fromStrings('2026-06-10', '2026-06-10'),
+        );
+
+        $this->assertSame('1275.000000', $quote->calculatedTotal);
+        $this->assertSame(1300, $quote->roundedTotal);
+        $this->assertSame(1300, $quote->finalTotal);
+    }
+
     public function test_thirty_day_cross_season_quote_uses_month_rates_for_every_day(): void
     {
         $this->price(PricingSeasonKey::High, PricingTier::Month, 4400);

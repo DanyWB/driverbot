@@ -7,6 +7,7 @@ const {
   listActiveVehicles,
   listAvailableVehicles,
 } = require("../services/vehicleService");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 composer.callbackQuery(/^book:cat:(\d+)$/, async (ctx) => {
   const categoryId = Number(ctx.match[1]);
@@ -32,10 +33,13 @@ composer.callbackQuery(/^book:cat:(\d+)$/, async (ctx) => {
   }
 
   if (!bikes.length) {
-    return ctx.editMessageText(t(lang, "booking_no_bikes_in_category"), {
-      reply_markup: {
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_bikes_empty",
+      text: t(lang, "booking_no_bikes_in_category"),
+      replyMarkup: {
         inline_keyboard: [[{text: t(lang, "btn_back"), callback_data: backTarget}]],
       },
+      returnContext: {scenario: booking.scenario, categoryId},
     });
   }
 
@@ -47,8 +51,11 @@ composer.callbackQuery(/^book:cat:(\d+)$/, async (ctx) => {
   ]);
   buttons.push([{text: t(lang, "btn_back"), callback_data: backTarget}]);
 
-  await ctx.editMessageText(t(lang, "booking_choose_bike"), {
-    reply_markup: {inline_keyboard: buttons},
+  return botScreenRenderer.renderText(ctx, {
+    screen: "booking_bikes",
+    text: t(lang, "booking_choose_bike"),
+    replyMarkup: {inline_keyboard: buttons},
+    returnContext: {scenario: booking.scenario, categoryId},
   });
 });
 module.exports = composer;

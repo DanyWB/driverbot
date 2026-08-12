@@ -1,6 +1,10 @@
 const db = require("../connect");
 const dayjs = require("dayjs");
-const {generateCalendarKeyboard} = require("../utils/calendar");
+const {
+  generateCalendarKeyboard,
+  getCalendarBackAction,
+  getCalendarDisplayRange,
+} = require("../utils/calendar");
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const {ensureBooking} = require("../services/bookingService");
 const {t, getCtxLang, getCalendarLabels, getWeekdays} = require("../utils/i18n");
@@ -14,12 +18,13 @@ const {getVehicleById} = require("../services/vehicleService");
 const {isLaravelMode} = require("../config/runtime");
 const {preview} = require("../utils/text");
 const {vehicleEmoji} = require("../utils/vehicle");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 function calendarRange(booking) {
-  const start = dayjs(
-    `${booking.calendarYear}-${String(booking.calendarMonth).padStart(2, "0")}-01`
-  ).startOf("week");
-  return {startDate: start.format("YYYY-MM-DD"), endDate: start.add(41, "day").format("YYYY-MM-DD")};
+  return getCalendarDisplayRange(
+    booking.calendarYear,
+    booking.calendarMonth
+  );
 }
 
 module.exports = async (ctx) => {
@@ -45,30 +50,50 @@ module.exports = async (ctx) => {
       blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, calendarRange(booking));
     }
 
-    return ctx.editMessageText(t(lang, "booking_choose_start_date"), {
-      reply_markup: generateCalendarKeyboard(
-        booking.calendarYear,
-        booking.calendarMonth,
-        blockedDays,
-        {
-          lang,
-          labels: getCalendarLabels(lang),
-          weekdays: getWeekdays(lang),
-          disablePast: true,
-        }
-      ),
+    const calendar = generateCalendarKeyboard(
+      booking.calendarYear,
+      booking.calendarMonth,
+      blockedDays,
+      {
+        lang,
+        labels: getCalendarLabels(lang),
+        weekdays: getWeekdays(lang),
+        disablePast: true,
+        backAction: getCalendarBackAction(booking),
+      }
+    );
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_start_date",
+      text: t(lang, "booking_choose_start_date"),
+      replyMarkup: calendar,
+      returnContext: {
+        scenario: booking.scenario,
+        categoryId: booking.categoryId || null,
+        selectedBikeId: bikeId,
+      },
     });
   }
 
   return finalizeBikeSelection(ctx, booking, bikeId, lang);
 };
 
-async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride) {
+async function finalizeBikeSelection(
+  ctx,
+  bookingOverride,
+  bikeId,
+  langOverride,
+  options = {}
+) {
   const booking = bookingOverride || ensureBooking(ctx);
   const lang = langOverride || getCtxLang(ctx);
+  const renderer = options.renderer || botScreenRenderer;
   const bike = await getVehicleById(db, bikeId);
   if (!bike || bike.is_active === false) {
-    return ctx.editMessageText(t(lang, "booking_bike_not_found"));
+    return renderer.renderText(ctx, {
+      screen: "booking_bike_missing",
+      text: t(lang, "booking_bike_not_found"),
+      navigationMode: "replace",
+    });
   }
 
   let conflict = null;
@@ -99,8 +124,10 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
     } catch (e) {
       blockedDays = [];
     }
-    return ctx.editMessageText(t(lang, "booking_range_conflict_bike"), {
-      reply_markup: generateCalendarKeyboard(
+    return renderer.renderText(ctx, {
+      screen: "booking_start_date",
+      text: t(lang, "booking_range_conflict_bike"),
+      replyMarkup: generateCalendarKeyboard(
         booking.calendarYear,
         booking.calendarMonth,
         blockedDays,
@@ -109,8 +136,15 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
           labels: getCalendarLabels(lang),
           weekdays: getWeekdays(lang),
           disablePast: true,
+          backAction: getCalendarBackAction(booking),
         }
       ),
+      returnContext: {
+        scenario: booking.scenario,
+        categoryId: booking.categoryId || null,
+        selectedBikeId: booking.selectedBikeId,
+      },
+      navigationMode: "replace",
     });
   }
 
@@ -125,7 +159,11 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
     });
   } catch (error) {
     if (error.code === "season_not_found") {
-      return ctx.editMessageText(t(lang, "booking_season_not_found"));
+      return renderer.renderText(ctx, {
+        screen: "booking_pricing_missing",
+        text: t(lang, "booking_season_not_found"),
+        navigationMode: "replace",
+      });
     }
     throw error;
   }
@@ -137,19 +175,27 @@ async function finalizeBikeSelection(ctx, bookingOverride, bikeId, langOverride)
   if (pricing.available === false) {
     booking.totalPrice = null;
     booking.pricePerDay = null;
-    return ctx.editMessageText(t(lang, "booking_range_conflict_bike"), {
-      reply_markup: {
+    return renderer.renderText(ctx, {
+      screen: "booking_bike_unavailable",
+      text: t(lang, "booking_range_conflict_bike"),
+      replyMarkup: {
         inline_keyboard: [[{text: t(lang, "btn_back"), callback_data: "book:back_to_bikes"}]],
       },
+      returnContext: {
+        scenario: booking.scenario,
+        categoryId: booking.categoryId || null,
+      },
+      navigationMode: "replace",
     });
   }
 
-  return showBikeSummary(ctx, bike, booking);
+  return showBikeSummary(ctx, bike, booking, options);
 }
 
-async function showBikeSummary(ctx, bike, bookingOverride) {
+async function showBikeSummary(ctx, bike, bookingOverride, options = {}) {
   const booking = bookingOverride || ensureBooking(ctx);
   const lang = getCtxLang(ctx);
+  const renderer = options.renderer || botScreenRenderer;
   let startLabel = booking.startDate
     ? dayjs(booking.startDate).format("DD.MM.YYYY")
     : "-";
@@ -177,34 +223,63 @@ async function showBikeSummary(ctx, bike, bookingOverride) {
     desc: preview(bike.description, 240),
   });
 
-  if (bike.image_url && ctx.session.lastPhotoVehicleId !== bike.id) {
+  const replyMarkup = {
+    inline_keyboard: [
+      [
+        {
+          text: t(lang, "booking_add_to_rental_btn"),
+          callback_data: "book:add_rental",
+        },
+      ],
+      [
+        {
+          text: t(lang, "booking_options_btn"),
+          callback_data: "book:options",
+        },
+      ],
+      [{
+        text: t(lang, "btn_back"),
+        callback_data:
+          booking.scenario === "bike_first"
+            ? "book:calendar_back_end"
+            : "book:back_to_bikes",
+      }],
+    ],
+  };
+
+  if (bike.image_url) {
     try {
-      await ctx.replyWithPhoto(bike.image_url, {caption: bike.name});
-      ctx.session.lastPhotoVehicleId = bike.id;
+      return await renderer.renderPhoto(ctx, {
+        screen: "booking_bike_summary",
+        photo: bike.image_url,
+        caption: text,
+        parseMode: "HTML",
+        replyMarkup,
+        returnContext: {
+          scenario: booking.scenario,
+          categoryId: booking.categoryId || null,
+          selectedBikeId: bike.id,
+        },
+        navigationMode: options.navigationMode || "push",
+      });
     } catch (error) {
       console.warn(`Could not send photo for vehicle ${bike.id}:`, error.message);
     }
   }
 
-  return ctx.editMessageText(text, {
-    parse_mode: "HTML",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: t(lang, "booking_add_to_rental_btn"),
-            callback_data: "book:add_rental",
-          },
-        ],
-        [
-          {
-            text: t(lang, "booking_options_btn"),
-            callback_data: "book:options",
-          },
-        ],
-        [{text: t(lang, "btn_back"), callback_data: "book:back_to_bikes"}],
-      ],
+  return renderer.renderText(ctx, {
+    screen: "booking_bike_summary",
+    text,
+    parseMode: "HTML",
+    replyMarkup,
+    returnContext: {
+      scenario: booking.scenario,
+      categoryId: booking.categoryId || null,
+      selectedBikeId: bike.id,
     },
+    navigationMode: bike.image_url
+      ? "replace"
+      : options.navigationMode || "push",
   });
 }
 

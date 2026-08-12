@@ -1,10 +1,16 @@
 const dayjs = require("dayjs");
 const showAvailableBikes = require("./book_show_available_bikes");
 const db = require("../connect");
-const {generateCalendarKeyboard} = require("../utils/calendar");
+const {
+  generateCalendarKeyboard,
+  getCalendarBackAction,
+  getCalendarDisplayRange,
+  isIsoCalendarDay,
+} = require("../utils/calendar");
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const {ensureBooking} = require("../services/bookingService");
 const {t, getCtxLang, getCalendarLabels, getWeekdays} = require("../utils/i18n");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 module.exports = async (ctx) => {
   const data = ctx.callbackQuery.data;
@@ -15,6 +21,13 @@ module.exports = async (ctx) => {
   booking.step = booking.step || "select_date";
 
   const lang = getCtxLang(ctx);
+
+  if (!isIsoCalendarDay(selectedDate)) {
+    return ctx.answerCallbackQuery({
+      text: t(lang, "booking_date_invalid"),
+      show_alert: true,
+    });
+  }
 
   const today = dayjs().startOf("day");
   const picked = dayjs(selectedDate);
@@ -38,15 +51,20 @@ module.exports = async (ctx) => {
 
     let blockedDays = [];
     if (booking.selectedBikeId) {
-      const rangeStart = dayjs(selectedDate).startOf("month").startOf("week");
-      blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, {
-        startDate: rangeStart.format("YYYY-MM-DD"),
-        endDate: rangeStart.add(41, "day").format("YYYY-MM-DD"),
-      });
+      blockedDays = await getBusyDatesForBike(
+        booking.selectedBikeId,
+        db,
+        getCalendarDisplayRange(
+          booking.calendarYear,
+          booking.calendarMonth
+        )
+      );
     }
 
-    return ctx.editMessageText(t(lang, "booking_choose_end_date"), {
-      reply_markup: generateCalendarKeyboard(
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_end_date",
+      text: t(lang, "booking_choose_end_date"),
+      replyMarkup: generateCalendarKeyboard(
         dayjs(selectedDate).year(),
         dayjs(selectedDate).month() + 1,
         blockedDays,
@@ -56,8 +74,15 @@ module.exports = async (ctx) => {
           weekdays: getWeekdays(lang),
           minDate: booking.startDate,
           selectedDate: booking.startDate,
+          backAction: getCalendarBackAction(booking),
         }
       ),
+      returnContext: {
+        scenario: booking.scenario,
+        categoryId: booking.categoryId || null,
+        selectedBikeId: booking.selectedBikeId || null,
+        startDate: booking.startDate,
+      },
     });
   }
 

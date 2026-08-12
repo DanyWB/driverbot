@@ -61,18 +61,30 @@ class BotApiBookingDocumentTest extends BotApiTestCase
         $this->withHeaders($this->apiHeaders('200001'))
             ->getJson('/api/v1/bot/customers/me/bookings?scope=current')
             ->assertOk()
-            ->assertJsonCount(2, 'data');
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('meta.limit', 50)
+            ->assertJsonPath('meta.offset', 0)
+            ->assertJsonPath('meta.has_more', false);
 
-        $firstPageId = $this->withHeaders($this->apiHeaders('200001'))
+        $firstPage = $this->withHeaders($this->apiHeaders('200001'))
             ->getJson('/api/v1/bot/customers/me/bookings?scope=current&limit=1&offset=0')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->json('data.0.public_id');
-        $secondPageId = $this->withHeaders($this->apiHeaders('200001'))
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('meta.limit', 1)
+            ->assertJsonPath('meta.offset', 0)
+            ->assertJsonPath('meta.has_more', true);
+        $firstPageId = $firstPage->json('data.0.public_id');
+        $secondPage = $this->withHeaders($this->apiHeaders('200001'))
             ->getJson('/api/v1/bot/customers/me/bookings?scope=current&limit=1&offset=1')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->json('data.0.public_id');
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('meta.limit', 1)
+            ->assertJsonPath('meta.offset', 1)
+            ->assertJsonPath('meta.has_more', false);
+        $secondPageId = $secondPage->json('data.0.public_id');
         $this->assertNotSame($firstPageId, $secondPageId);
     }
 
@@ -196,6 +208,38 @@ class BotApiBookingDocumentTest extends BotApiTestCase
             ->assertOk()
             ->assertJsonPath('meta.idempotency_replayed', true);
         $this->assertDatabaseCount('vehicle_occupancies', 0);
+    }
+
+    public function test_admin_cancellation_reason_is_exposed_without_internal_notes(): void
+    {
+        $this->syncCustomer('200010');
+        $vehicle = $this->bookableVehicle();
+        $response = $this->withHeaders($this->apiHeaders('200010', 'create-for-admin-cancel'))
+            ->postJson('/api/v1/bot/bookings', $this->bookingPayload($vehicle))
+            ->assertCreated();
+        $publicId = (string) $response->json('data.0.booking.public_id');
+        $booking = Booking::query()->where('public_id', $publicId)->sole();
+        $booking->forceFill(['admin_note' => 'Internal capacity note'])->save();
+        $reason = 'Unavailable <b>today</b> & tomorrow';
+
+        app(BookingService::class)->cancelByAdmin(
+            $booking,
+            BookingActor::admin(User::factory()->create()->id),
+            $reason,
+        );
+
+        $this->withHeaders($this->apiHeaders('200010'))
+            ->getJson("/api/v1/bot/bookings/{$publicId}")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'cancelled')
+            ->assertJsonPath('data.cancellation.reason', $reason)
+            ->assertJsonMissingPath('data.admin_note');
+
+        $this->withHeaders($this->apiHeaders('200010'))
+            ->getJson('/api/v1/bot/customers/me/bookings?scope=history')
+            ->assertOk()
+            ->assertJsonPath('data.0.cancellation.reason', $reason)
+            ->assertJsonMissingPath('data.0.admin_note');
     }
 
     public function test_approved_booking_requires_manager_cancellation_inside_24_hours(): void

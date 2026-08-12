@@ -26,6 +26,7 @@ function normalizeVehicle(vehicle) {
     ...vehicle,
     vehicle_type: vehicle.type,
     category_id: vehicle.category?.id || null,
+    category_code: vehicle.category?.code || null,
     category_name: vehicle.category?.name || null,
     image_url: vehicle.primary_photo?.thumbnail_url || vehicle.primary_photo?.url || null,
   };
@@ -192,12 +193,42 @@ async function createBookings(ctx, items, confirmationKey) {
   }));
 }
 
-async function listBookings(telegramId, scope, {limit = 50, offset = 0} = {}) {
+function nonNegativeInteger(value) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function bookingPagination(payload, fallback) {
+  const meta = payload?.meta?.pagination || payload?.meta || {};
+  const total = nonNegativeInteger(
+    meta.total ?? meta.total_count ?? meta.count
+  );
+  const limit = nonNegativeInteger(meta.limit ?? meta.per_page) ?? fallback.limit;
+  const offset = nonNegativeInteger(meta.offset) ?? fallback.offset;
+  const explicitHasMore = meta.has_more ?? meta.hasMore;
+  const hasMore = typeof explicitHasMore === "boolean"
+    ? explicitHasMore
+    : total !== null
+    ? offset + fallback.itemsLength < total
+    : fallback.itemsLength >= limit;
+
+  return {total, limit, offset, hasMore};
+}
+
+async function listBookingsPage(telegramId, scope, {limit = 50, offset = 0} = {}) {
   const payload = await api().get("/customers/me/bookings", {
     telegramId,
     query: {scope, limit, offset},
   });
-  return (payload.data || []).map(normalizeBooking);
+  const items = (payload.data || []).map(normalizeBooking);
+  return {
+    items,
+    ...bookingPagination(payload, {limit, offset, itemsLength: items.length}),
+  };
+}
+
+async function listBookings(telegramId, scope, options = {}) {
+  return (await listBookingsPage(telegramId, scope, options)).items;
 }
 
 async function getBooking(telegramId, publicId) {
@@ -224,10 +255,12 @@ module.exports = {
   getVehicle,
   listAvailableVehicles,
   listBookings,
+  listBookingsPage,
   listCategories,
   listVehicles,
   normalizeBooking,
   normalizeVehicle,
+  bookingPagination,
   profileAsLegacyUser,
   syncTelegramUser,
   unavailableDates,

@@ -2,6 +2,8 @@ const {registerUser, getUserByTelegramId} = require("../services/userService");
 const {isLaravelMode} = require("../config/runtime");
 const {setUserCommands} = require("../utils/setCommands");
 const {getMainMenuKeyboard} = require("../utils/mainMenu");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
+const {showMainMenu} = require("../handlers/main_menu");
 const {
   t,
   getLanguageKeyboard,
@@ -11,19 +13,6 @@ const {
 
 module.exports = async (ctx) => {
   const telegramId = ctx.from.id;
-  if (ctx.callbackQuery) {
-    try {
-      await ctx.answerCallbackQuery();
-    } catch (e) {
-      // ignore callback errors
-    }
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // ignore delete errors
-    }
-  }
-
   let user = null;
   try {
     user = await getUserByTelegramId(telegramId);
@@ -64,13 +53,15 @@ module.exports = async (ctx) => {
     await ctx.reply(
       t(lang, "welcome_new", {
         name: ctx.from.first_name || t(lang, "user_default_name"),
-      })
+      }),
+      {reply_markup: getMainMenuKeyboard(lang)}
     );
   } else {
     await ctx.reply(
       t(lang, "welcome_back", {
         name: user.name || ctx.from.first_name || t(lang, "user_default_name"),
-      })
+      }),
+      {reply_markup: getMainMenuKeyboard(lang)}
     );
   }
 
@@ -82,22 +73,32 @@ module.exports = async (ctx) => {
   if (!isNameOk) {
     ctx.session.step = "waiting_for_name";
     ctx.session.scenario = "registration";
-    return ctx.reply(t(lang, "enter_name"));
+    return botScreenRenderer.renderText(ctx, {
+      screen: "registration_name",
+      text: t(lang, "enter_name"),
+      navigationMode: "reset",
+    });
   }
 
   if (!isPhoneOk) {
     ctx.session.step = "waiting_for_phone";
     ctx.session.scenario = "registration";
-    return ctx.reply(t(lang, "enter_phone"));
+    return botScreenRenderer.renderText(ctx, {
+      screen: "registration_phone",
+      text: t(lang, "enter_phone"),
+      navigationMode: "reset",
+    });
   }
 
   if (!isPassportOk) {
     ctx.session.step = "waiting_for_passport";
     ctx.session.scenario = "registration";
-    return ctx.reply(t(lang, "enter_passport"));
+    return botScreenRenderer.renderText(ctx, {
+      screen: "registration_passport",
+      text: t(lang, "enter_passport"),
+      navigationMode: "reset",
+    });
   }
 
-  return ctx.reply(t(lang, "menu_title"), {
-    reply_markup: getMainMenuKeyboard(lang),
-  });
+  return showMainMenu(ctx, lang, {navigationMode: "reset"});
 };

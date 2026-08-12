@@ -52,8 +52,9 @@ class TelegramNotificationRenderer
                 : 'Telegram recipient is empty.');
         }
 
-        $replacements = $this->replacements($booking, $payload);
-        $template = $this->template($notification, $admin);
+        $reason = $this->cancellationReason($booking, $payload);
+        $replacements = $this->replacements($booking, $payload, $reason);
+        $template = $this->template($notification, $admin, $reason);
         $text = Lang::get($template, $replacements, $locale);
 
         if (! is_string($text) || $text === $template) {
@@ -62,7 +63,7 @@ class TelegramNotificationRenderer
 
         return new RenderedTelegramMessage(
             $chatId,
-            mb_substr($text, 0, 4096),
+            $this->telegramText($text),
             $admin ? $this->adminKeyboard($booking, $locale) : $this->customerKeyboard($booking, $notification, $locale),
         );
     }
@@ -75,12 +76,13 @@ class TelegramNotificationRenderer
         return is_array($payload) ? $payload : [];
     }
 
-    private function template(NotificationOutbox $notification, bool $admin): string
+    private function template(NotificationOutbox $notification, bool $admin, ?string $reason): string
     {
         if ($admin) {
             return match ($notification->event_type) {
                 'booking.pending' => 'notifications.admin.pending',
                 'booking.cancelled_by_client' => 'notifications.admin.cancelled_by_client',
+                'booking.expired' => 'notifications.admin.expired',
                 default => throw NotificationDeliveryException::permanent(
                     "Unsupported admin notification event [{$notification->event_type}].",
                 ),
@@ -90,7 +92,9 @@ class TelegramNotificationRenderer
         return match ($notification->event_type) {
             'booking.pending' => 'notifications.customer.pending',
             'booking.approved' => 'notifications.customer.approved',
-            'booking.cancelled' => 'notifications.customer.cancelled',
+            'booking.cancelled' => $reason === null
+                ? 'notifications.customer.cancelled'
+                : 'notifications.customer.cancelled_with_reason',
             'booking.expired' => 'notifications.customer.expired',
             'booking.dates_changed' => 'notifications.customer.dates_changed',
             'booking.price_changed' => 'notifications.customer.price_changed',
@@ -121,7 +125,7 @@ class TelegramNotificationRenderer
     /** @param array<string, mixed> $payload
      * @return array<string, string>
      */
-    private function replacements(Booking $booking, array $payload): array
+    private function replacements(Booking $booking, array $payload, ?string $reason): array
     {
         $snapshot = $booking->latestPriceSnapshot;
         $finalTotal = is_numeric($payload['final_total'] ?? null)
@@ -134,8 +138,8 @@ class TelegramNotificationRenderer
         return array_map($this->escape(...), [
             'booking' => '#'.$this->shortBookingId((string) $booking->public_id),
             'customer' => $this->preview((string) $booking->customer->name, 120),
-            'phone' => $this->contact($booking, ContactType::Phone) ?? '-',
-            'telegram' => $this->contact($booking, ContactType::TelegramUsername) ?? '-',
+            'phone' => $this->preview($this->contact($booking, ContactType::Phone) ?? '-', 120),
+            'telegram' => $this->preview($this->contact($booking, ContactType::TelegramUsername) ?? '-', 120),
             'vehicle' => $this->preview((string) $booking->vehicle->name, 160),
             'period' => $this->period($booking),
             'old_period' => $this->periodValues($oldDates),
@@ -145,7 +149,24 @@ class TelegramNotificationRenderer
             'delivery' => $booking->delivery_required ? 'yes' : 'no',
             'address' => $this->preview((string) ($booking->delivery_address ?: '-'), 300),
             'helmets' => (string) $booking->helmets_quantity,
+            'reason' => $reason ?? '',
         ]);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function cancellationReason(Booking $booking, array $payload): ?string
+    {
+        $reason = $booking->getAttribute('cancellation_reason');
+
+        if (! is_string($reason) || trim($reason) === '') {
+            $reason = $payload['reason'] ?? null;
+        }
+
+        if (! is_string($reason) || trim($reason) === '') {
+            return null;
+        }
+
+        return $this->preview(trim($reason), 2000);
     }
 
     /** @return array<string, mixed> */
@@ -264,6 +285,86 @@ class TelegramNotificationRenderer
     private function escape(mixed $value): string
     {
         return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    private function telegramText(string $html): string
+    {
+        if ($this->telegramVisibleLength($html) <= 4096) {
+            return $html;
+        }
+
+        $tokens = preg_split(
+            '/(<\/?[a-z][^>]*>|&(?:#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]+);)/iu',
+            $html,
+            -1,
+            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY,
+        );
+
+        if (! is_array($tokens)) {
+            throw NotificationDeliveryException::permanent('Rendered Telegram notification could not be truncated safely.');
+        }
+
+        $result = '';
+        $visibleLength = 0;
+        $contentLimit = 4095;
+        $openTags = [];
+
+        foreach ($tokens as $token) {
+            if (str_starts_with($token, '<')) {
+                $result .= $token;
+                $this->trackTelegramTag($token, $openTags);
+
+                continue;
+            }
+
+            $tokenLength = $this->telegramVisibleLength($token);
+
+            if ($visibleLength + $tokenLength <= $contentLimit) {
+                $result .= $token;
+                $visibleLength += $tokenLength;
+
+                continue;
+            }
+
+            $remaining = $contentLimit - $visibleLength;
+
+            if ($remaining > 0 && ! str_starts_with($token, '&')) {
+                $result .= mb_substr($token, 0, $remaining);
+            }
+
+            break;
+        }
+
+        $result .= '…';
+
+        foreach (array_reverse($openTags) as $tag) {
+            $result .= "</{$tag}>";
+        }
+
+        return $result;
+    }
+
+    private function telegramVisibleLength(string $html): int
+    {
+        return mb_strlen(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+
+    /** @param list<string> $openTags */
+    private function trackTelegramTag(string $token, array &$openTags): void
+    {
+        if (preg_match('/^<\s*\/\s*([a-z0-9]+)/i', $token, $matches) === 1) {
+            if ($openTags !== [] && end($openTags) === strtolower($matches[1])) {
+                array_pop($openTags);
+            }
+
+            return;
+        }
+
+        if (str_ends_with(trim($token), '/>') || preg_match('/^<\s*([a-z0-9]+)/i', $token, $matches) !== 1) {
+            return;
+        }
+
+        $openTags[] = strtolower($matches[1]);
     }
 
     private function locale(mixed $locale): string
