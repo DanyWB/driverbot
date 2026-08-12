@@ -4,6 +4,7 @@ const {
   clearPriceFileIdCache,
   handlePricesActionWithDeps,
   sendPricesMenu,
+  sendSeasonMenu,
 } = require("../handlers/prices");
 
 function callbackCtx(action, lang = "en") {
@@ -19,14 +20,25 @@ test("prices menu is rendered in every runtime mode through one route", async ()
   const renderer = {async renderText(_ctx, value) { payload = value; }};
   await sendPricesMenu({session: {lang: "ru"}}, "ru", {renderer});
   assert.equal(payload.screen, "prices_menu");
-  assert.equal(payload.replyMarkup.inline_keyboard.length, 4);
+  assert.equal(payload.replyMarkup.inline_keyboard.length, 3);
+  assert.deepEqual(
+    payload.replyMarkup.inline_keyboard.slice(0, 2).flat().map((button) => button.callback_data),
+    ["prices:type:bikes", "prices:type:cars"]
+  );
+
+  await sendSeasonMenu({session: {lang: "ru"}}, "cars", "ru", {renderer});
+  assert.equal(payload.screen, "prices_cars_seasons");
   assert.deepEqual(
     payload.replyMarkup.inline_keyboard.slice(0, 3).flat().map((button) => button.callback_data),
-    ["prices:season:high", "prices:season:middle", "prices:season:low"]
+    [
+      "prices:season:high:cars",
+      "prices:season:middle:cars",
+      "prices:season:low:cars",
+    ]
   );
 });
 
-test("all seasons render photos and cache Telegram file ids by resolved path", async () => {
+test("all bike and car seasons render photos and cache Telegram file ids by path", async () => {
   clearPriceFileIdCache();
   const photos = [];
   let inputFiles = 0;
@@ -38,21 +50,27 @@ test("all seasons render photos and cache Telegram file ids by resolved path", a
   };
   const deps = {
     renderer,
-    resolveImage: (season, lang) => `C:/prices/${lang}/${season}.png`,
+    resolveImage: (season, lang, options) =>
+      `C:/prices/${lang}/${options.type}_${season}.png`,
     createInputFile: (filePath) => {
       inputFiles += 1;
       return {filePath};
     },
   };
 
-  for (const season of ["high", "middle", "low"]) {
-    await handlePricesActionWithDeps(callbackCtx(`prices:season:${season}`), deps);
+  for (const type of ["bikes", "cars"]) {
+    for (const season of ["high", "middle", "low"]) {
+      await handlePricesActionWithDeps(
+        callbackCtx(`prices:season:${season}:${type}`),
+        deps
+      );
+    }
   }
-  await handlePricesActionWithDeps(callbackCtx("prices:season:high"), deps);
+  await handlePricesActionWithDeps(callbackCtx("prices:season:high:bikes"), deps);
 
-  assert.equal(photos.length, 4);
-  assert.equal(inputFiles, 3);
-  assert.equal(photos[3].photo, "cached-prices_high");
+  assert.equal(photos.length, 7);
+  assert.equal(inputFiles, 6);
+  assert.equal(photos[6].photo, "cached-prices_bikes_high");
 });
 
 test("missing or unreadable image logs and falls back to localized text", async () => {
