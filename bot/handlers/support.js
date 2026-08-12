@@ -1,6 +1,7 @@
 const {t, getCtxLang} = require("../utils/i18n");
 const {getConfiguration} = require("../services/laravelGateway");
 const {telegramUsernameUrl} = require("../utils/constants");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 function supportKeyboard(lang, backTarget = "menu", managerTelegram = null) {
   const adminUrl = telegramUsernameUrl(managerTelegram);
@@ -15,7 +16,7 @@ function supportKeyboard(lang, backTarget = "menu", managerTelegram = null) {
   rows.push([
     {
       text:
-        backTarget === "start"
+        ["start", "main_menu"].includes(backTarget)
           ? t(lang, "btn_main_menu")
           : t(lang, "btn_back"),
       callback_data: `support:back:${backTarget}`,
@@ -36,11 +37,17 @@ async function configuredSupportKeyboard(lang, backTarget) {
   return supportKeyboard(lang, backTarget, managerTelegram);
 }
 
-async function sendSupportMenu(ctx, langOverride) {
+async function sendSupportMenu(ctx, langOverride, options = {}) {
   const lang = langOverride || getCtxLang(ctx);
-  return ctx.reply(t(lang, "support_info"), {
-    parse_mode: "HTML",
-    reply_markup: await configuredSupportKeyboard(lang, "start"),
+  const backTarget = options.backTarget ||
+    (options.origin === "rent_menu" ? "rent_menu" : "main_menu");
+  return (options.renderer || botScreenRenderer).renderText(ctx, {
+    screen: "support",
+    text: t(lang, "support_info"),
+    parseMode: "HTML",
+    replyMarkup: await configuredSupportKeyboard(lang, backTarget),
+    returnContext: {origin: options.origin || "main_menu"},
+    navigationMode: options.navigationMode || "push",
   });
 }
 
@@ -51,21 +58,23 @@ async function handleSupportAction(ctx) {
   if (action?.startsWith("support:back")) {
     const parts = action.split(":");
     const target = parts[2] || "start";
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // ignore delete errors
-    }
     if (target === "menu") {
-      return sendSupportMenu(ctx, lang);
+      return sendSupportMenu(ctx, lang, {navigationMode: "back"});
     }
-    return require("../commands/start")(ctx);
+    if (target === "rent_menu") {
+      return require("./rent_menu").sendRentMenu(ctx, lang, {
+        navigationMode: "back",
+      });
+    }
+    return require("./main_menu").showMainMenu(ctx, lang);
   }
 
   if (action === "support:call") {
-    return ctx.editMessageText(t(lang, "support_call_text"), {
-      parse_mode: "HTML",
-      reply_markup: {
+    return botScreenRenderer.renderText(ctx, {
+      screen: "support_call",
+      text: t(lang, "support_call_text"),
+      parseMode: "HTML",
+      replyMarkup: {
         inline_keyboard: [
           [
             {
@@ -80,16 +89,20 @@ async function handleSupportAction(ctx) {
   }
 
   if (action === "support:faq") {
-    return ctx.editMessageText(t(lang, "support_faq_text"), {
-      parse_mode: "HTML",
-      reply_markup: await configuredSupportKeyboard(lang, "menu"),
+    return botScreenRenderer.renderText(ctx, {
+      screen: "support_faq",
+      text: t(lang, "support_faq_text"),
+      parseMode: "HTML",
+      replyMarkup: await configuredSupportKeyboard(lang, "menu"),
     });
   }
 
   if (action === "support:find") {
-    return ctx.editMessageText(t(lang, "support_find_text"), {
-      parse_mode: "HTML",
-      reply_markup: await configuredSupportKeyboard(lang, "menu"),
+    return botScreenRenderer.renderText(ctx, {
+      screen: "support_find",
+      text: t(lang, "support_find_text"),
+      parseMode: "HTML",
+      replyMarkup: await configuredSupportKeyboard(lang, "menu"),
     });
   }
 }

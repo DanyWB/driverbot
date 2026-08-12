@@ -24,6 +24,17 @@ REDIS_URL=redis://127.0.0.1:6379/1
 BOOKING_TZ=Asia/Bangkok
 ```
 
+Дополнительные UI-материалы не блокируют запуск:
+
+- сезонные изображения ищутся сначала в `images/prices/<lang>/<season>.png`, затем
+  в универсальном `images/prices/<season>.png`; при отсутствии файла бот показывает
+  локализованный fallback, а цену бронирования всё равно получает только из Laravel;
+- цветные иконки категорий настраиваются необязательными
+  `TELEGRAM_CATEGORY_LIGHT_ICON_ID`, `TELEGRAM_CATEGORY_COMFORT_ICON_ID`,
+  `TELEGRAM_CATEGORY_MAXI_ICON_ID` и `TELEGRAM_CATEGORY_CAR_ICON_ID`;
+- если custom emoji ID пуст или Telegram его отклонил, бот автоматически использует
+  обычные `🛵`/`🚗` и продолжает сценарий.
+
 Проверка и запуск:
 
 ```powershell

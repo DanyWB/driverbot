@@ -78,6 +78,24 @@ class BookingServiceTest extends TestCase
         $this->assertSame(2, AuditLog::query()->where('subject_id', $booking->public_id)->count());
         $this->assertDatabaseHas('notification_outbox', ['event_type' => 'booking.pending', 'channel' => 'telegram']);
         $this->assertDatabaseHas('notification_outbox', ['event_type' => 'booking.pending', 'channel' => 'internal']);
+        $this->assertSame(2, NotificationOutbox::query()->where('event_type', 'booking.pending')->count());
+    }
+
+    public function test_admin_created_pending_booking_does_not_notify_the_same_admin(): void
+    {
+        $this->createPending(
+            actor: BookingActor::admin($this->admin->id),
+            source: BookingSource::AdminManual,
+        );
+
+        $this->assertSame(1, NotificationOutbox::query()
+            ->where('event_type', 'booking.pending')
+            ->where('channel', 'telegram')
+            ->count());
+        $this->assertSame(0, NotificationOutbox::query()
+            ->where('event_type', 'booking.pending')
+            ->where('channel', 'internal')
+            ->count());
     }
 
     public function test_delivery_requires_an_address_at_the_domain_boundary(): void
@@ -196,6 +214,10 @@ class BookingServiceTest extends TestCase
 
         $this->assertSame(BookingStatus::CancelledByClient, $cancelled->bookingStatus());
         $this->assertDatabaseHas('notification_outbox', ['event_type' => 'booking.cancelled_by_client', 'channel' => 'internal']);
+        $this->assertSame(1, NotificationOutbox::query()
+            ->where('event_type', 'booking.cancelled_by_client')
+            ->where('channel', 'internal')
+            ->count());
     }
 
     public function test_no_show_is_only_available_for_approved_bookings_after_start(): void
@@ -324,7 +346,11 @@ class BookingServiceTest extends TestCase
 
         $this->assertSame(BookingStatus::Expired, $booking->fresh()->bookingStatus());
         $this->assertDatabaseMissing('vehicle_occupancies', ['booking_id' => $booking->id]);
-        $this->assertSame(1, NotificationOutbox::query()->where('event_type', 'booking.expired')->count());
+        $expired = NotificationOutbox::query()->where('event_type', 'booking.expired')->get();
+        $this->assertCount(2, $expired);
+        $this->assertCount(2, $expired->pluck('deduplication_key')->unique());
+        $this->assertCount(1, $expired->where('channel', 'telegram'));
+        $this->assertCount(1, $expired->where('channel', 'internal'));
     }
 
     public function test_direct_status_mutation_is_rejected(): void
@@ -359,8 +385,11 @@ class BookingServiceTest extends TestCase
         }
     }
 
-    private function createPending(?Customer $customer = null, ?BookingActor $actor = null): Booking
-    {
+    private function createPending(
+        ?Customer $customer = null,
+        ?BookingActor $actor = null,
+        BookingSource $source = BookingSource::Telegram,
+    ): Booking {
         $customer ??= $this->customer;
         $actor ??= BookingActor::customer($customer->id);
 
@@ -370,9 +399,9 @@ class BookingServiceTest extends TestCase
                 vehicleId: $this->vehicle->id,
                 startsOn: '2026-08-10',
                 endsOn: '2026-08-12',
-                source: BookingSource::Telegram,
-                termsAcceptedAt: now(),
-                termsVersion: (string) config('business.terms_version'),
+                source: $source,
+                termsAcceptedAt: $source === BookingSource::Telegram ? now() : null,
+                termsVersion: $source === BookingSource::Telegram ? (string) config('business.terms_version') : null,
             ),
             $actor,
         );

@@ -246,11 +246,11 @@ class AdminBookingManagementTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post(route('bookings.price-overrides.store', $booking), [
-                'manual_total' => 700,
+                'manual_total' => 2321,
                 'reason' => 'Returning customer discount',
             ])
             ->assertRedirect(route('bookings.show', $booking));
-        $this->assertSame(700, $booking->priceSnapshots()->firstOrFail()->final_total);
+        $this->assertSame(2321, $booking->priceSnapshots()->firstOrFail()->final_total);
         $this->assertDatabaseHas('notification_outbox', [
             'event_type' => 'booking.price_changed',
             'recipient' => 'telegram-100500',

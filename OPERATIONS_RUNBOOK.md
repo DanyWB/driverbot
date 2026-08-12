@@ -138,6 +138,15 @@ php artisan notifications:dispatch-outbox
 Сначала устраняется причина ошибки. Массовый retry не запускается, пока Telegram token, chat ID,
 сеть и шаблоны не проверены.
 
+Если outbox содержит давно просроченные `pending`-записи без `last_error`, а
+`failed_jobs` пуст, сначала проверьте, что одновременно работают scheduler и worker
+очереди `notifications`; такой backlog обычно означает, что dispatcher не запускался,
+а не ошибку Telegram API. До ручного `notifications:dispatch-outbox` убедитесь, что
+`TELEGRAM_BOT_TOKEN` и numeric `TELEGRAM_ADMIN_CHAT_ID` относятся к нужному окружению,
+администратор начал диалог с ботом, Laravel config cache обновлён, а исходящие запросы
+к `api.telegram.org` разрешены. После исправления используйте monitor и точечный retry;
+массовая отправка старого локального backlog в production-чат запрещена.
+
 ## 8. Backup
 
 Ежедневный timer запускает:

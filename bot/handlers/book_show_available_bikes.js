@@ -6,10 +6,13 @@ const {listAvailableVehicles} = require("../services/vehicleService");
 const {isLaravelMode} = require("../config/runtime");
 const {listCategories} = require("../services/laravelGateway");
 const {vehicleEmoji} = require("../utils/vehicle");
+const {renderCategoryRowsWithFallback} = require("../utils/categoryPresentation");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
-module.exports = async (ctx) => {
+module.exports = async (ctx, options = {}) => {
   const booking = ctx.session.booking;
   const lang = getCtxLang(ctx);
+  const renderer = options.renderer || botScreenRenderer;
 
   if (!booking || !booking.startDate || !booking.endDate) {
     return ctx.answerCallbackQuery(t(lang, "booking_dates_not_selected"));
@@ -17,7 +20,9 @@ module.exports = async (ctx) => {
 
   if (booking.selectedBikeId) {
     const {finalizeBikeSelection} = require("./book_select_bike");
-    return finalizeBikeSelection(ctx, booking, booking.selectedBikeId, lang);
+    return finalizeBikeSelection(ctx, booking, booking.selectedBikeId, lang, {
+      renderer,
+    });
   }
 
   const {startDate, endDate} = booking;
@@ -26,6 +31,10 @@ module.exports = async (ctx) => {
     endDate,
     startTime: booking.startTime,
     endTime: booking.endTime,
+    categoryId:
+      options.preserveCategory && booking.categoryId
+        ? booking.categoryId
+        : null,
   });
 
   if (availableBikes.length === 0) {
@@ -67,17 +76,21 @@ module.exports = async (ctx) => {
     const messageKey = isLaravelMode()
       ? "booking_no_available_bikes"
       : "booking_no_availability_lead";
-    return ctx.editMessageText(t(lang, messageKey), {
-      reply_markup: {
+    return renderer.renderText(ctx, {
+      screen: "booking_no_availability",
+      text: t(lang, messageKey),
+      replyMarkup: {
         inline_keyboard: [
           [{text: t(lang, "btn_back"), callback_data: "book:restart"}],
           [{text: t(lang, "rent_btn_support"), callback_data: "rent:support"}],
         ],
       },
+      returnContext: {scenario: booking.scenario},
+      navigationMode: "replace",
     });
   }
 
-  if (booking.scenario === "date_first") {
+  if (booking.scenario === "date_first" && !options.preserveCategory) {
     booking.categoryId = null;
     const categoryIds = [
       ...new Set(availableBikes.map((bike) => bike.category_id).filter(Boolean)),
@@ -89,26 +102,52 @@ module.exports = async (ctx) => {
           .whereIn("id", categoryIds)
           .orderBy("id");
 
-    const categoryLabels = {
-      1: "booking_category_light",
-      2: "booking_category_comfort",
-      3: "booking_category_maxy",
-    };
-
     if (categories.length) {
-      const keyboard = categories.map((category) => [
-        {
-          text: !isLaravelMode() && categoryLabels[category.id]
-            ? t(lang, categoryLabels[category.id])
-            : category.name,
-          callback_data: `book:cat:${category.id}`,
-        },
-      ]);
+      if (isLaravelMode()) {
+        return renderCategoryRowsWithFallback(
+          ctx,
+          categories,
+          lang,
+          (category) => `book:cat:${category.id}`,
+          (keyboard) => {
+            keyboard.push([
+              {text: t(lang, "btn_back"), callback_data: "book:restart"},
+            ]);
+            return renderer.renderText(ctx, {
+              screen: "booking_category",
+              text: t(lang, "booking_choose_category"),
+              replyMarkup: {inline_keyboard: keyboard},
+              returnContext: {
+                scenario: booking.scenario,
+                startDate,
+                endDate,
+              },
+            });
+          }
+        );
+      }
 
+      const categoryLabels = {
+        1: "booking_category_light",
+        2: "booking_category_comfort",
+        3: "booking_category_maxy",
+      };
+      const keyboard = categories.map((category) => [{
+        text: categoryLabels[category.id]
+          ? t(lang, categoryLabels[category.id])
+          : category.name,
+        callback_data: `book:cat:${category.id}`,
+      }]);
       keyboard.push([{text: t(lang, "btn_back"), callback_data: "book:restart"}]);
-
-      return ctx.editMessageText(t(lang, "booking_choose_category"), {
-        reply_markup: {inline_keyboard: keyboard},
+      return renderer.renderText(ctx, {
+        screen: "booking_category",
+        text: t(lang, "booking_choose_category"),
+        replyMarkup: {inline_keyboard: keyboard},
+        returnContext: {
+          scenario: booking.scenario,
+          startDate,
+          endDate,
+        },
       });
     }
   }
@@ -120,9 +159,20 @@ module.exports = async (ctx) => {
     },
   ]);
 
-  keyboard.push([{text: t(lang, "btn_back"), callback_data: "book:restart"}]);
+  const backAction = options.preserveCategory && booking.scenario === "date_first"
+    ? "book:show_available_bikes"
+    : "book:restart";
+  keyboard.push([{text: t(lang, "btn_back"), callback_data: backAction}]);
 
-  await ctx.editMessageText(t(lang, "booking_available_bikes_title"), {
-    reply_markup: {inline_keyboard: keyboard},
+  return renderer.renderText(ctx, {
+    screen: "booking_bikes",
+    text: t(lang, "booking_available_bikes_title"),
+    replyMarkup: {inline_keyboard: keyboard},
+    returnContext: {
+      scenario: booking.scenario,
+      categoryId: booking.categoryId || null,
+      startDate,
+      endDate,
+    },
   });
 };

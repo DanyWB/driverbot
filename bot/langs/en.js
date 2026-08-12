@@ -27,9 +27,13 @@ module.exports = {
   share_contact_btn: "📨 Share contact",
 
   menu_title: "🏠 Main menu:",
+  quick_book: "Booking",
+  quick_prices: "Prices",
+  main_menu_book: "📅 Book",
+  main_menu_bookings: "🗂 My bookings",
   menu_my_rent: "🚘 My Rent",
   menu_support: "💬 Support",
-  menu_prices: "💸 Look Prices",
+  menu_prices: "💸 Prices",
   prices_dynamic_hint:
     "The exact price is calculated from the current tariffs for the selected vehicle and rental dates.",
   menu_account: "👤 My Account",
@@ -101,6 +105,12 @@ module.exports = {
   rent_history_empty: "History is empty.",
   rent_details_title: "📍 Booking details",
   rent_details_status: "Status: {status}",
+  rent_history_page: "Page {current} / {total}",
+  rent_details_category: "Category: {category}",
+  rent_details_days: "Rental days: {days}",
+  rent_details_created: "Created: {created}",
+  rent_details_reason: "Reason: {reason}",
+  rent_status_unknown: "status unavailable",
   rent_status_process: "in progress",
   rent_status_pending: "awaiting confirmation",
   rent_status_active: "active",
@@ -138,6 +148,7 @@ module.exports = {
   rent_action_cancel: "❌ Cancel",
   rent_action_back: "◀️ Back",
   rent_cancel_confirm: "Cancel booking ID {id}?",
+  rent_cancel_confirm_action: "Yes, cancel booking",
   rent_cancelled: "Booking cancelled.",
   rent_cannot_cancel: "You cannot cancel this booking.",
   rent_cancel_manager_required:
@@ -196,9 +207,14 @@ module.exports = {
   booking_choose_bike: "🚘 Choose a vehicle:",
   booking_no_bikes_in_category: "😔 No vehicles in this category yet.",
 
-  booking_category_light: "🌿 Light (110-125cc)",
-  booking_category_comfort: "✨ Comfort (150-160cc)",
-  booking_category_maxy: "🏎️ Maxy (300-350cc)",
+  booking_category_light: "🛵 Light (100cc-110cc)",
+  booking_category_comfort: "🛵 Comfort (150cc-160cc)",
+  booking_category_maxy: "🛵 Maxi (300cc-350cc)",
+  category_light_label: "Light (100cc-110cc)",
+  category_comfort_label: "Comfort (150cc-160cc)",
+  category_maxi_label: "Maxi (300cc-350cc)",
+  category_cars_label: "Cars",
+  category_scooters_label: "Scooters",
 
   booking_dates_not_selected: "Rental dates are not selected.",
   booking_profile_required:
@@ -217,6 +233,7 @@ module.exports = {
     "The selected range includes booked dates for this vehicle. Choose another period.",
   booking_end_before_start: "End date cannot be earlier than start date.",
   booking_date_in_past: "You cannot select a date in the past.",
+  booking_date_invalid: "Invalid date. Please reopen the calendar.",
 
   booking_invalid_bike_id: "Invalid vehicle ID format.",
   booking_bike_not_found: "Vehicle not found.",

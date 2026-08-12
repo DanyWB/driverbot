@@ -2,12 +2,17 @@ const dayjs = require("dayjs");
 const {ensureBooking} = require("../services/bookingService");
 const {getTimeSlots, makeDateTime} = require("../utils/timeSlots");
 const {getTimeKeyboard} = require("../utils/timeKeyboard");
-const {generateCalendarKeyboard} = require("../utils/calendar");
+const {
+  generateCalendarKeyboard,
+  getCalendarBackAction,
+  getCalendarDisplayRange,
+} = require("../utils/calendar");
 const {getCalendarLabels, getWeekdays, getCtxLang, t} = require("../utils/i18n");
 const {getBusyDatesForBike} = require("../utils/getBusyDatesForBike");
 const db = require("../connect");
 const showAvailableBikes = require("./book_show_available_bikes");
 const {isLaravelMode} = require("../config/runtime");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 async function handleStartTime(ctx, booking, lang) {
   const startAt = makeDateTime(booking.startDate, booking.startTime);
@@ -34,15 +39,20 @@ async function handleStartTime(ctx, booking, lang) {
 
   let blockedDays = [];
   if (booking.selectedBikeId) {
-    const rangeStart = startAt.startOf("month").startOf("week");
-    blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, {
-      startDate: rangeStart.format("YYYY-MM-DD"),
-      endDate: rangeStart.add(41, "day").format("YYYY-MM-DD"),
-    });
+    blockedDays = await getBusyDatesForBike(
+      booking.selectedBikeId,
+      db,
+      getCalendarDisplayRange(
+        booking.calendarYear,
+        booking.calendarMonth
+      )
+    );
   }
 
-  return ctx.editMessageText(t(lang, "booking_choose_end_date"), {
-    reply_markup: generateCalendarKeyboard(
+  return botScreenRenderer.renderText(ctx, {
+    screen: "booking_end_date",
+    text: t(lang, "booking_choose_end_date"),
+    replyMarkup: generateCalendarKeyboard(
       booking.calendarYear,
       booking.calendarMonth,
       blockedDays,
@@ -51,8 +61,15 @@ async function handleStartTime(ctx, booking, lang) {
         labels: getCalendarLabels(lang),
         weekdays: getWeekdays(lang),
         minDate: booking.startDate,
+        backAction: getCalendarBackAction(booking),
       }
     ),
+    returnContext: {
+      scenario: booking.scenario,
+      categoryId: booking.categoryId || null,
+      selectedBikeId: booking.selectedBikeId || null,
+      startDate: booking.startDate,
+    },
   });
 }
 
@@ -96,10 +113,17 @@ async function handleEndTime(ctx, booking, lang) {
 
   // Check blocked days for selected bike (date-level)
   if (booking.selectedBikeId && !isLaravelMode()) {
-    const rangeStart = dayjs(booking.startDate).startOf("month").startOf("week");
+    const startRange = getCalendarDisplayRange(
+      dayjs(booking.startDate).year(),
+      dayjs(booking.startDate).month() + 1
+    );
+    const endRange = getCalendarDisplayRange(
+      dayjs(booking.endDate).year(),
+      dayjs(booking.endDate).month() + 1
+    );
     const blockedDays = await getBusyDatesForBike(booking.selectedBikeId, db, {
-      startDate: rangeStart.format("YYYY-MM-DD"),
-      endDate: dayjs(booking.endDate).endOf("month").endOf("week").format("YYYY-MM-DD"),
+      startDate: startRange.startDate,
+      endDate: endRange.endDate,
     });
     const selectedDates = [];
     let current = dayjs(booking.startDate);
@@ -115,8 +139,10 @@ async function handleEndTime(ctx, booking, lang) {
       booking.endDate = null;
       booking.endTime = null;
       booking.step = "select_start_date";
-      return ctx.reply(t(lang, "booking_range_conflict"), {
-        reply_markup: generateCalendarKeyboard(
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_start_date",
+        text: t(lang, "booking_range_conflict"),
+        replyMarkup: generateCalendarKeyboard(
           dayjs().year(),
           dayjs().month() + 1,
           blockedDays,
@@ -125,8 +151,10 @@ async function handleEndTime(ctx, booking, lang) {
             labels: getCalendarLabels(lang),
             weekdays: getWeekdays(lang),
             disablePast: true,
+            backAction: getCalendarBackAction(booking),
           }
         ),
+        navigationMode: "replace",
       });
     }
   }
@@ -170,14 +198,12 @@ async function handleStartTimeOptional(ctx, booking, lang) {
     }
   }
 
-  const {formatOptionsText, getOptionsKeyboard, persistProcessOptions} = require("./book_options");
+  const {persistProcessOptions, sendOptions} = require("./book_options");
   booking.timeSource = null;
   if (ctx.session.optionsScope === "process") {
     await persistProcessOptions(ctx, booking);
   }
-  return ctx.editMessageText(formatOptionsText(booking, lang), {
-    reply_markup: getOptionsKeyboard(lang),
-  });
+  return sendOptions(ctx, lang, {navigationMode: "back"});
 }
 
 async function handleEndTimeOptional(ctx, booking, lang) {
@@ -201,14 +227,12 @@ async function handleEndTimeOptional(ctx, booking, lang) {
     }
   }
 
-  const {formatOptionsText, getOptionsKeyboard, persistProcessOptions} = require("./book_options");
+  const {persistProcessOptions, sendOptions} = require("./book_options");
   booking.timeSource = null;
   if (ctx.session.optionsScope === "process") {
     await persistProcessOptions(ctx, booking);
   }
-  return ctx.editMessageText(formatOptionsText(booking, lang), {
-    reply_markup: getOptionsKeyboard(lang),
-  });
+  return sendOptions(ctx, lang, {navigationMode: "back"});
 }
 
 module.exports = async (ctx) => {

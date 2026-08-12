@@ -28,8 +28,17 @@ if (-not (Test-Path $server) -or -not (Test-Path $client)) {
     throw "Redis server or client is missing in $RedisHome."
 }
 
-$pong = & $client -h 127.0.0.1 -p $Port ping 2>$null
-if ($LASTEXITCODE -eq 0 -and $pong -eq "PONG") {
+function Test-RedisConnection {
+    try {
+        $pong = & $client -h 127.0.0.1 -p $Port ping 2>$null
+        return $LASTEXITCODE -eq 0 -and $pong -eq "PONG"
+    }
+    catch {
+        return $false
+    }
+}
+
+if (Test-RedisConnection) {
     Write-Output "Redis is already running on 127.0.0.1:$Port."
     exit 0
 }
@@ -56,8 +65,7 @@ $process = Start-Process `
 
 for ($attempt = 0; $attempt -lt 20; $attempt++) {
     Start-Sleep -Milliseconds 250
-    $pong = & $client -h 127.0.0.1 -p $Port ping 2>$null
-    if ($LASTEXITCODE -eq 0 -and $pong -eq "PONG") {
+    if (Test-RedisConnection) {
         Write-Output "Redis started on 127.0.0.1:$Port (PID $($process.Id))."
         exit 0
     }

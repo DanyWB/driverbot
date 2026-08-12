@@ -1,33 +1,28 @@
 const {createEmptyBooking} = require("../services/bookingService");
 const {t, getCtxLang} = require("../utils/i18n");
 const {getUserByTelegramId} = require("../services/userService");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 module.exports = async (ctx) => {
   const lang = getCtxLang(ctx);
-  if (ctx.callbackQuery) {
-    try {
-      await ctx.answerCallbackQuery();
-    } catch (e) {
-      // ignore callback errors
-    }
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // ignore delete errors
-    }
-  }
   const user = await getUserByTelegramId(ctx.from.id);
 
   if (!user || !user.name) {
     ctx.session.step = "waiting_for_name";
     ctx.session.scenario = "registration";
-    return ctx.reply(t(lang, "enter_name"));
+    return botScreenRenderer.renderText(ctx, {
+      screen: "registration_name",
+      text: t(lang, "enter_name"),
+    });
   }
 
   if (!user.phone) {
     ctx.session.step = "waiting_for_phone";
     ctx.session.scenario = "registration";
-    return ctx.reply(t(lang, "enter_phone"));
+    return botScreenRenderer.renderText(ctx, {
+      screen: "registration_phone",
+      text: t(lang, "enter_phone"),
+    });
   }
 
   ctx.session.commentReturn = null;
@@ -35,9 +30,11 @@ module.exports = async (ctx) => {
 
   const text = t(lang, "booking_intro");
 
-  await ctx.reply(text, {
-    parse_mode: "HTML",
-    reply_markup: {
+  return botScreenRenderer.renderText(ctx, {
+    screen: "booking_start",
+    text,
+    parseMode: "HTML",
+    replyMarkup: {
       inline_keyboard: [
         [
           {text: t(lang, "booking_btn_date_first"), callback_data: "book:date_first"},
@@ -47,5 +44,6 @@ module.exports = async (ctx) => {
         ],
       ],
     },
+    returnContext: {origin: "main_menu"},
   });
 };

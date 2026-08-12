@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const {randomUUID} = require("crypto");
+require("dotenv").config();
 const {BotApiClient} = require("../services/botApiClient");
 
 function futureDate(days) {

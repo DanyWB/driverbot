@@ -10,12 +10,12 @@ const {vehicleEmoji} = require("../utils/vehicle");
 
 async function buildDraftMenuPayload(ctx, options = {}) {
   const lang = options.lang || getCtxLang(ctx);
-  const backAction = options.backAction || "home";
+  const backAction = options.backAction || "menu:main";
   const backText =
     options.backText ||
     (backAction === "rent:current"
       ? t(lang, "rent_current_back_btn")
-      : backAction === "home"
+      : ["home", "menu:main"].includes(backAction)
       ? t(lang, "btn_main_menu")
       : t(lang, "btn_back"));
   ctx.session.commentReturn =

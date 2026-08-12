@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
 import { Calculator, Save, TriangleAlert } from '@lucide/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import PriceBreakdown from '@/components/bookings/PriceBreakdown.vue';
 import AdminDateInput from '@/components/AdminDateInput.vue';
 import AdminSelect from '@/components/AdminSelect.vue';
@@ -11,6 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLocale } from '@/composables/useLocale';
 import { formatMoney } from '@/lib/bookings';
+import {
+    catalogPriceBackendError,
+    catalogPriceFieldPath,
+    CATALOG_PRICE_STEP,
+    isEmptyCatalogPrice,
+    validateCatalogPrice,
+} from '@/lib/catalogPricing';
 import type {
     PriceQuote,
     PricingTemplateOption,
@@ -72,6 +79,13 @@ const basePrices = ref<Record<string, number | string>>({
 });
 const generating = ref(false);
 const generatorError = ref('');
+const generatorFieldErrors = ref<Record<string, string>>({});
+const basePriceTouched = ref<Record<string, boolean>>({});
+const generatorValidationAttempted = ref(false);
+const priceTouched = ref<Record<string, boolean>>({});
+const pricingValidationAttempted = ref(false);
+const generatorPanel = ref<HTMLElement | null>(null);
+const pricingForm = ref<HTMLFormElement | null>(null);
 const completeCount = computed(() => {
     let count = 0;
 
@@ -101,11 +115,27 @@ const pricingError = computed(() => {
         errors.template ??
         errors.prices ??
         errors.enabled ??
-        Object.entries(errors).find(
-            ([key]) => key.startsWith('prices.') || key.startsWith('enabled.'),
-        )?.[1]
+        Object.entries(errors).find(([key]) => key.startsWith('enabled.'))?.[1]
     );
 });
+const hasGeneratorValidationErrors = computed(() =>
+    seasons.some(
+        (season) =>
+            validateCatalogPrice(basePrices.value[season.key] ?? '', true) !==
+            null,
+    ),
+);
+const hasPricingValidationErrors = computed(() =>
+    seasons.some((season) =>
+        tiers.some(
+            (tier) =>
+                validateCatalogPrice(
+                    form.prices[season.key]?.[tier.key] ?? '',
+                    form.enabled[season.key]?.[tier.key] ?? false,
+                ) !== null,
+        ),
+    ),
+);
 
 watch(
     () => form.isDirty,
@@ -117,27 +147,46 @@ watch(
     },
 );
 
+async function focusFirstInvalid(container: HTMLElement | null): Promise<void> {
+    await nextTick();
+    const input = container?.querySelector<HTMLElement>(
+        '[data-catalog-price-input][aria-invalid="true"]',
+    );
+
+    input?.focus();
+    input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
 function submit(): void {
+    pricingValidationAttempted.value = true;
+
+    if (hasPricingValidationErrors.value) {
+        void focusFirstInvalid(pricingForm.value);
+
+        return;
+    }
+
     form.patch(`/vehicles/${props.vehicleId}/pricing`, {
         preserveScroll: true,
         onSuccess: () => {
             form.template = null;
             form.defaults();
             quote.value = null;
+            pricingValidationAttempted.value = false;
+            priceTouched.value = {};
         },
+        onError: () => focusFirstInvalid(pricingForm.value),
     });
 }
 
 async function generatePrices(): Promise<void> {
-    if (
-        !templateKey.value ||
-        seasons.some(
-            (season) => Number(basePrices.value[season.key] ?? 0) < 100,
-        )
-    ) {
+    generatorValidationAttempted.value = true;
+
+    if (!templateKey.value || hasGeneratorValidationErrors.value) {
         generatorError.value = t(
             'Select a template and enter all three base prices.',
         );
+        void focusFirstInvalid(generatorPanel.value);
 
         return;
     }
@@ -153,6 +202,7 @@ async function generatePrices(): Promise<void> {
 
     generating.value = true;
     generatorError.value = '';
+    generatorFieldErrors.value = {};
     const params = new URLSearchParams({ template: templateKey.value });
 
     for (const season of seasons) {
@@ -170,9 +220,20 @@ async function generatePrices(): Promise<void> {
         const payload = await response.json();
 
         if (!response.ok) {
+            generatorFieldErrors.value = Object.fromEntries(
+                seasons.flatMap((season) => {
+                    const error = payload.errors?.[`base_prices.${season.key}`];
+                    const message = Array.isArray(error) ? error[0] : error;
+
+                    return typeof message === 'string'
+                        ? [[season.key, message]]
+                        : [];
+                }),
+            );
             generatorError.value = t(
                 payload.message ?? 'Price generation failed.',
             );
+            void focusFirstInvalid(generatorPanel.value);
 
             return;
         }
@@ -192,6 +253,82 @@ async function generatePrices(): Promise<void> {
     } finally {
         generating.value = false;
     }
+}
+
+function catalogPriceValidationMessage(
+    value: number | string,
+    required: boolean,
+): string | undefined {
+    const error = validateCatalogPrice(value, required);
+
+    if (error === 'required') {
+        return t('Enter a price.');
+    }
+
+    if (error === 'positive_integer') {
+        return t('Price must be a positive whole number.');
+    }
+
+    if (error === 'multiple_of_step') {
+        return t('Price must be a multiple of 50 THB.');
+    }
+
+    return undefined;
+}
+
+function basePriceError(season: string): string | undefined {
+    const value = basePrices.value[season] ?? '';
+    const shouldShowClientError =
+        generatorValidationAttempted.value ||
+        basePriceTouched.value[season] ||
+        !isEmptyCatalogPrice(value);
+
+    return (
+        (shouldShowClientError
+            ? catalogPriceValidationMessage(value, true)
+            : undefined) ??
+        (generatorFieldErrors.value[season]
+            ? t(generatorFieldErrors.value[season])
+            : undefined)
+    );
+}
+
+function touchBasePrice(season: string): void {
+    basePriceTouched.value[season] = true;
+    delete generatorFieldErrors.value[season];
+    generatorError.value = '';
+}
+
+function pricePath(season: string, tier: string): `prices.${string}` {
+    return catalogPriceFieldPath(season, tier);
+}
+
+function priceError(season: string, tier: string): string | undefined {
+    const path = pricePath(season, tier);
+    const value = form.prices[season]?.[tier] ?? '';
+    const required = form.enabled[season]?.[tier] ?? false;
+    const shouldShowClientError =
+        pricingValidationAttempted.value ||
+        priceTouched.value[path] ||
+        !isEmptyCatalogPrice(value);
+    const backendError = catalogPriceBackendError(
+        form.errors as Record<string, string>,
+        season,
+        tier,
+    );
+
+    return (
+        (shouldShowClientError
+            ? catalogPriceValidationMessage(value, required)
+            : undefined) ?? (backendError ? t(backendError) : undefined)
+    );
+}
+
+function touchPrice(season: string, tier: string): void {
+    const path = pricePath(season, tier);
+
+    priceTouched.value[path] = true;
+    form.clearErrors(path);
 }
 
 async function preview(): Promise<void> {
@@ -254,15 +391,21 @@ async function preview(): Promise<void> {
             </div>
         </div>
 
-        <div class="mt-5 rounded-md border bg-muted/20 p-4">
+        <div
+            ref="generatorPanel"
+            class="mt-5 rounded-md border bg-muted/20 p-4"
+        >
             <div class="flex flex-col gap-1">
                 <h3 class="font-semibold">{{ t('Price generator') }}</h3>
                 <p class="text-sm text-muted-foreground">
                     {{
                         t(
-                            'The 1-day tariff equals the seasonal base price. Packages from 7 days are calculated by the discount formula and rounded down to 100 THB.',
+                            'The 1-day tariff equals the seasonal base price. Packages from 7 days are calculated by the discount formula and rounded down to 50 THB.',
                         )
                     }}
+                </p>
+                <p class="text-xs font-medium text-muted-foreground">
+                    {{ t('Price must be a multiple of 50 THB.') }}
                 </p>
             </div>
             <div
@@ -293,9 +436,23 @@ async function preview(): Promise<void> {
                         v-model.number="basePrices[season.key]"
                         class="mt-2 tabular-nums"
                         type="number"
-                        min="100"
-                        step="1"
+                        :min="CATALOG_PRICE_STEP"
+                        :step="CATALOG_PRICE_STEP"
                         :placeholder="t('THB per day')"
+                        :aria-invalid="Boolean(basePriceError(season.key))"
+                        :aria-describedby="
+                            basePriceError(season.key)
+                                ? `base_price_${season.key}_error`
+                                : undefined
+                        "
+                        data-catalog-price-input
+                        @input="touchBasePrice(season.key)"
+                    />
+                    <InputError
+                        :id="`base_price_${season.key}_error`"
+                        class="mt-1"
+                        :message="basePriceError(season.key)"
+                        role="alert"
                     />
                 </div>
                 <Button
@@ -307,7 +464,11 @@ async function preview(): Promise<void> {
                     <Calculator />{{ t('Fill table') }}
                 </Button>
             </div>
-            <p v-if="generatorError" class="mt-3 text-sm text-destructive">
+            <p
+                v-if="generatorError"
+                class="mt-3 text-sm text-destructive"
+                role="alert"
+            >
                 {{ generatorError }}
             </p>
             <p class="mt-3 text-xs text-muted-foreground">
@@ -319,7 +480,15 @@ async function preview(): Promise<void> {
             </p>
         </div>
 
-        <form class="mt-6" @submit.prevent="submit">
+        <form
+            ref="pricingForm"
+            class="mt-6"
+            novalidate
+            @submit.prevent="submit"
+        >
+            <p class="mb-3 text-xs text-muted-foreground">
+                {{ t('Price must be a multiple of 50 THB.') }}
+            </p>
             <div class="overflow-x-auto rounded-md border">
                 <table class="w-full min-w-[850px] table-fixed text-sm">
                     <thead
@@ -353,10 +522,28 @@ async function preview(): Promise<void> {
                                         form.prices[season.key][tier.key]
                                     "
                                     type="number"
-                                    min="1"
-                                    step="1"
+                                    :min="CATALOG_PRICE_STEP"
+                                    :step="CATALOG_PRICE_STEP"
                                     class="tabular-nums"
                                     :aria-label="`${t(season.label)}, ${t(tier.label)}`"
+                                    :aria-invalid="
+                                        Boolean(
+                                            priceError(season.key, tier.key),
+                                        )
+                                    "
+                                    :aria-describedby="
+                                        priceError(season.key, tier.key)
+                                            ? `price_${season.key}_${tier.key}_error`
+                                            : undefined
+                                    "
+                                    data-catalog-price-input
+                                    @input="touchPrice(season.key, tier.key)"
+                                />
+                                <InputError
+                                    :id="`price_${season.key}_${tier.key}_error`"
+                                    class="mt-1"
+                                    :message="priceError(season.key, tier.key)"
+                                    role="alert"
                                 />
                                 <label
                                     class="mt-2 flex items-center gap-2 text-xs text-muted-foreground"
@@ -366,6 +553,9 @@ async function preview(): Promise<void> {
                                         "
                                         type="checkbox"
                                         class="size-4 accent-current"
+                                        @change="
+                                            touchPrice(season.key, tier.key)
+                                        "
                                     />{{ t('Active') }}</label
                                 >
                             </td>
@@ -373,7 +563,11 @@ async function preview(): Promise<void> {
                     </tbody>
                 </table>
             </div>
-            <InputError class="mt-2" :message="pricingError" />
+            <InputError
+                class="mt-2"
+                :message="pricingError ? t(pricingError) : undefined"
+                role="alert"
+            />
             <div class="mt-4 flex justify-end">
                 <Button type="submit" :disabled="form.processing"
                     ><Save />{{ t('Save prices') }}</Button

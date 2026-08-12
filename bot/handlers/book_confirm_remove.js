@@ -3,6 +3,7 @@ const {t, getCtxLang} = require("../utils/i18n");
 const {isLaravelMode} = require("../config/runtime");
 const sessionCart = require("../services/sessionCartService");
 const {getUserByTelegramId} = require("../services/userService");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 module.exports = async (ctx) => {
   const data = ctx.callbackQuery.data;
@@ -14,7 +15,11 @@ module.exports = async (ctx) => {
     ? await getUserByTelegramId(telegramId)
     : await db("users").where({telegram_id: telegramId}).first();
   if (!user) {
-    return ctx.reply(t(lang, "not_registered"));
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_remove_error",
+      text: t(lang, "not_registered"),
+      navigationMode: "replace",
+    });
   }
 
   const deleted = isLaravelMode()
@@ -36,13 +41,16 @@ module.exports = async (ctx) => {
         .select("rentals.id", "bikes.name", "rentals.start_date", "rentals.end_date");
 
   if (!rentals.length) {
-    return ctx.editMessageText(t(lang, "booking_no_bikes_in_process"), {
-      reply_markup: {
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_draft_empty",
+      text: t(lang, "booking_no_bikes_in_process"),
+      replyMarkup: {
         inline_keyboard: [
           [{text: t(lang, "rent_btn_book"), callback_data: "rent:book"}],
           [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
         ],
       },
+      navigationMode: "replace",
     });
   }
 
@@ -51,13 +59,16 @@ module.exports = async (ctx) => {
     text += `• ${r.name}: ${r.start_date || ""} - ${r.end_date || ""}\n`;
   });
 
-  return ctx.editMessageText(text, {
-    reply_markup: {
+  return botScreenRenderer.renderText(ctx, {
+    screen: "booking_draft",
+    text,
+    replyMarkup: {
       inline_keyboard: [
         [{text: t(lang, "booking_confirm_btn"), callback_data: "book:confirm_rental"}],
         [{text: t(lang, "rent_btn_book"), callback_data: "rent:book"}],
         [{text: t(lang, "btn_main_menu"), callback_data: "home"}],
       ],
     },
+    navigationMode: "replace",
   });
 };

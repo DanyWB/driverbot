@@ -436,6 +436,7 @@ components:
                   data:
                     type: array
                     items: {$ref: '#/components/schemas/Booking'}
+                  meta: {$ref: '#/components/schemas/PaginationResponseMeta'}
     BookingSuccess:
       description: Customer-owned booking.
       content:
@@ -467,6 +468,16 @@ components:
       properties:
         request_id: {type: string}
         idempotency_replayed: {type: boolean}
+    PaginationResponseMeta:
+      allOf:
+        - $ref: '#/components/schemas/ResponseMeta'
+        - type: object
+          required: [total, limit, offset, has_more]
+          properties:
+            total: {type: integer, minimum: 0}
+            limit: {type: integer, minimum: 1, maximum: 100}
+            offset: {type: integer, minimum: 0}
+            has_more: {type: boolean}
     ErrorEnvelope:
       type: object
       required: [error]
@@ -689,10 +700,12 @@ components:
         can_cancel: {type: boolean}
         cancellation:
           type: object
+          required: [can_cancel, requires_manager, manager_telegram, reason]
           properties:
             can_cancel: {type: boolean}
             requires_manager: {type: boolean}
             manager_telegram: {type: [string, 'null']}
+            reason: {type: [string, 'null'], maxLength: 2000}
         pending_expires_at: {type: [string, 'null'], format: date-time}
         created_at: {type: [string, 'null'], format: date-time}
         updated_at: {type: [string, 'null'], format: date-time}

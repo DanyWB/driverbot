@@ -35,6 +35,21 @@ if (fs.existsSync(commandsPath)) {
 
 bot.on("message", require("./handlers/message_handler"));
 
+bot.callbackQuery("noop", async (ctx) => {
+  try {
+    await ctx.answerCallbackQuery();
+  } catch (error) {
+    // Stale callback queries are harmless.
+  }
+});
+bot.callbackQuery(
+  /^menu:(main|book|bookings|prices|conditions|profile|support|about)$/,
+  (ctx) => require("./handlers/main_menu").handleMainMenuAction(
+    ctx,
+    ctx.callbackQuery.data.slice("menu:".length)
+  )
+);
+
 bot.callbackQuery(/^book:select_date:/, require("./handlers/book_select_date"));
 bot.callbackQuery("book:start", require("./commands/book"));
 bot.callbackQuery("book:comment", require("./handlers/book_add_comment"));
@@ -66,10 +81,20 @@ bot.callbackQuery(
 bot.callbackQuery(/^book:cat:\d+$/, require("./handlers/book_select_category"));
 bot.callbackQuery("book:back_to_bikes", require("./handlers/book_back_to_bikes"));
 bot.callbackQuery("book:show_available_bikes", require("./handlers/book_show_available_bikes"));
-bot.callbackQuery(["book:calendar_prev", "book:calendar_next", "book:restart", "home"], require("./handlers/navigation"));
+bot.callbackQuery(
+  [
+    "book:calendar_prev",
+    "book:calendar_next",
+    "book:calendar_back_end",
+    "book:calendar_back_start",
+    "book:restart",
+    "home",
+  ],
+  require("./handlers/navigation")
+);
 bot.callbackQuery(/^lang:set:(ru|en|ua)$/, require("./handlers/language_select"));
 bot.callbackQuery(
-  "account:back",
+  /^account:back(?::(main_menu|rent_menu))?$/,
   require("./handlers/account_menu").handleAccountAction
 );
 bot.callbackQuery(/^prices:/, require("./handlers/prices").handlePricesAction);
@@ -78,7 +103,12 @@ bot.callbackQuery(
   require("./handlers/support").handleSupportAction
 );
 bot.callbackQuery(
-  ["conditions:open", "conditions:accept", "conditions:accept_toggle"],
+  [
+    "conditions:open",
+    "conditions:accept",
+    "conditions:accept_toggle",
+    "conditions:back",
+  ],
   require("./handlers/conditions").handleConditionsAction
 );
 bot.callbackQuery(

@@ -7,19 +7,23 @@ use Illuminate\Http\Request;
 
 class BotApiResponse
 {
-    /** @param array<mixed>|null $data */
+    /**
+     * @param  array<mixed>|null  $data
+     * @param  array<string, mixed>  $meta
+     */
     public static function success(
         Request $request,
         ?array $data,
         int $status = 200,
         bool $replayed = false,
+        array $meta = [],
     ): JsonResponse {
         return response()->json([
             'data' => $data,
             'meta' => [
                 'request_id' => self::requestId($request),
                 'idempotency_replayed' => $replayed,
-            ],
+            ] + $meta,
         ], $status);
     }
 

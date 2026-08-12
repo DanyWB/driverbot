@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'rounding_step' => 100,
+    'rounding_step' => 50,
 
     'templates' => [
         'click' => [

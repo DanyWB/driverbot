@@ -5,6 +5,7 @@ return [
         'pending' => "<b>Заявка :booking получена</b>\nТехника: :vehicle\nПериод: :period\nСумма: :price\nМы сообщим, когда менеджер подтвердит бронирование.",
         'approved' => "<b>Бронирование :booking подтверждено</b>\nТехника: :vehicle\nПериод: :period\nСумма: :price",
         'cancelled' => "<b>Бронирование :booking отменено</b>\nТехника: :vehicle\nПериод: :period\nДля уточнения деталей свяжитесь с менеджером.",
+        'cancelled_with_reason' => "<b>Бронирование :booking отменено</b>\nТехника: :vehicle\nПериод: :period\nПричина: :reason\nДля уточнения деталей свяжитесь с менеджером.",
         'expired' => "<b>Заявка :booking не была подтверждена вовремя</b>\nК сожалению, техника была освобождена. Вы можете создать новую заявку или связаться с нами для уточнения деталей.",
         'dates_changed' => "<b>Даты бронирования :booking изменены</b>\nБыло: :old_period\nСтало: :new_period\nАктуальная сумма: :price",
         'price_changed' => "<b>Сумма бронирования :booking изменена</b>\nТехника: :vehicle\nПериод: :period\nНовая сумма: :price",
@@ -14,6 +15,7 @@ return [
     'admin' => [
         'pending' => "<b>Новая заявка :booking</b>\nКлиент: :customer\nТелефон: :phone\nTelegram: :telegram\nТехника: :vehicle\nПериод: :period\nСумма: :price\nШлемы: :helmets\nДоставка: :delivery\nАдрес: :address\nКомментарий: :comment",
         'cancelled_by_client' => "<b>Клиент отменил бронирование :booking</b>\nКлиент: :customer\nТелефон: :phone\nTelegram: :telegram\nТехника: :vehicle\nПериод: :period",
+        'expired' => "<b>Срок заявки :booking истек</b>\nКлиент: :customer\nТелефон: :phone\nTelegram: :telegram\nТехника: :vehicle\nПериод: :period\nЗаявка не была подтверждена вовремя, техника освобождена.",
     ],
     'buttons' => [
         'open_admin' => 'Открыть в админке',

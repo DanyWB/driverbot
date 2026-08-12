@@ -74,15 +74,23 @@ class BookingController extends Controller
             $query->whereNotIn('status', array_map(fn (BookingStatus $status): string => $status->value, $current));
         }
 
+        $limit = (int) ($data['limit'] ?? 50);
+        $offset = (int) ($data['offset'] ?? 0);
+        $total = (clone $query)->count();
         $items = $query
-            ->offset((int) ($data['offset'] ?? 0))
-            ->limit((int) ($data['limit'] ?? 50))
+            ->offset($offset)
+            ->limit($limit)
             ->get()
             ->map(fn (Booking $booking): array => $presenter->booking($booking))
             ->values()
             ->all();
 
-        return BotApiResponse::success($request, $items);
+        return BotApiResponse::success($request, $items, meta: [
+            'total' => $total,
+            'limit' => $limit,
+            'offset' => $offset,
+            'has_more' => $offset + count($items) < $total,
+        ]);
     }
 
     public function show(Request $request, string $booking, BotApiPresenter $presenter): JsonResponse

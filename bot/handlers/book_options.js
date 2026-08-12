@@ -8,6 +8,7 @@ const {showBikeSummary} = require("./book_select_bike");
 const {isLaravelMode} = require("../config/runtime");
 const {applyOptions, loadOptionsIntoBooking} = require("../services/sessionCartService");
 const {getVehicleById} = require("../services/vehicleService");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 function getOptionsKeyboard(lang) {
   return {
@@ -52,11 +53,20 @@ function formatOptionsText(booking, lang) {
   });
 }
 
-async function sendOptions(ctx, langOverride) {
+async function sendOptions(ctx, langOverride, options = {}) {
   const lang = langOverride || getCtxLang(ctx);
   const booking = ensureBooking(ctx);
-  return ctx.editMessageText(formatOptionsText(booking, lang), {
-    reply_markup: getOptionsKeyboard(lang),
+  return (options.renderer || botScreenRenderer).renderText(ctx, {
+    screen: "booking_options",
+    text: options.notice
+      ? `${options.notice}\n\n${formatOptionsText(booking, lang)}`
+      : formatOptionsText(booking, lang),
+    replyMarkup: getOptionsKeyboard(lang),
+    returnContext: {
+      optionsScope: ctx.session?.optionsScope || null,
+      selectedBikeId: booking.selectedBikeId || null,
+    },
+    navigationMode: options.navigationMode || "push",
   });
 }
 
@@ -178,14 +188,38 @@ module.exports = async (ctx) => {
 
   if (action === "book:options:address") {
     ctx.session.step = "waiting_for_delivery_address";
-    await ctx.answerCallbackQuery();
-    return ctx.reply(t(lang, "booking_options_address_prompt"));
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_options_address",
+      text: t(lang, "booking_options_address_prompt"),
+      replyMarkup: {
+        inline_keyboard: [[{
+          text: t(lang, "btn_back"),
+          callback_data:
+            ctx.session.optionsScope === "process"
+              ? "book:options:process"
+              : "book:options",
+        }]],
+      },
+      returnContext: {optionsScope: ctx.session.optionsScope || null},
+    });
   }
 
   if (action === "book:options:notes") {
     ctx.session.step = "waiting_for_notes";
-    await ctx.answerCallbackQuery();
-    return ctx.reply(t(lang, "booking_options_notes_prompt"));
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_options_notes",
+      text: t(lang, "booking_options_notes_prompt"),
+      replyMarkup: {
+        inline_keyboard: [[{
+          text: t(lang, "btn_back"),
+          callback_data:
+            ctx.session.optionsScope === "process"
+              ? "book:options:process"
+              : "book:options",
+        }]],
+      },
+      returnContext: {optionsScope: ctx.session.optionsScope || null},
+    });
   }
 
   if (action === "book:options:time_start") {
@@ -200,8 +234,11 @@ module.exports = async (ctx) => {
     const backAction =
       ctx.session.optionsScope === "process" ? "book:options:process" : "book:options";
     keyboard.inline_keyboard.push([{text: t(lang, "btn_back"), callback_data: backAction}]);
-    return ctx.editMessageText(t(lang, "booking_choose_start_time"), {
-      reply_markup: keyboard,
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_start_time",
+      text: t(lang, "booking_choose_start_time"),
+      replyMarkup: keyboard,
+      returnContext: {optionsScope: ctx.session.optionsScope || null},
     });
   }
 
@@ -217,8 +254,11 @@ module.exports = async (ctx) => {
     const backAction =
       ctx.session.optionsScope === "process" ? "book:options:process" : "book:options";
     keyboard.inline_keyboard.push([{text: t(lang, "btn_back"), callback_data: backAction}]);
-    return ctx.editMessageText(t(lang, "booking_choose_end_time"), {
-      reply_markup: keyboard,
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_end_time",
+      text: t(lang, "booking_choose_end_time"),
+      replyMarkup: keyboard,
+      returnContext: {optionsScope: ctx.session.optionsScope || null},
     });
   }
 
@@ -232,24 +272,47 @@ module.exports = async (ctx) => {
         backAction: "rent:current",
       });
       if (payload?.error) {
-        return ctx.reply(payload.error);
+        return botScreenRenderer.renderText(ctx, {
+          screen: "booking_draft_error",
+          text: payload.error,
+          navigationMode: "replace",
+        });
       }
       if (payload?.empty) {
-        return ctx.reply(t(lang, "booking_no_bikes_in_process"));
+        return botScreenRenderer.renderText(ctx, {
+          screen: "booking_draft_empty",
+          text: t(lang, "booking_no_bikes_in_process"),
+          navigationMode: "replace",
+        });
       }
-      return ctx.editMessageText(payload.text, {
-        parse_mode: "HTML",
-        reply_markup: payload.reply_markup,
+      return botScreenRenderer.renderText(ctx, {
+        screen: "booking_draft",
+        text: payload.text,
+        parseMode: "HTML",
+        replyMarkup: payload.reply_markup,
+        returnContext: {origin: "options"},
+        navigationMode: "back",
       });
     }
     const bike = booking.selectedBikeId
       ? await getVehicleById(db, booking.selectedBikeId)
       : null;
     if (bike) {
-      return showBikeSummary(ctx, bike, booking);
+      return showBikeSummary(ctx, bike, booking, {
+        renderer: botScreenRenderer,
+        navigationMode: "back",
+      });
     }
-    return ctx.reply(t(lang, "booking_choose_bike"), {
-      reply_markup: {inline_keyboard: [[{text: t(lang, "btn_back"), callback_data: "book:start"}]]},
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_bike_missing",
+      text: t(lang, "booking_choose_bike"),
+      replyMarkup: {
+        inline_keyboard: [[{
+          text: t(lang, "btn_back"),
+          callback_data: "book:start",
+        }]],
+      },
+      navigationMode: "back",
     });
   }
 };
@@ -257,3 +320,4 @@ module.exports = async (ctx) => {
 module.exports.getOptionsKeyboard = getOptionsKeyboard;
 module.exports.formatOptionsText = formatOptionsText;
 module.exports.persistProcessOptions = persistProcessOptions;
+module.exports.sendOptions = sendOptions;

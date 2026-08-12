@@ -5,5 +5,5 @@ module.exports = async (ctx) => {
     ctx.session.step = null;
     ctx.session.scenario = null;
   }
-  return require("./start")(ctx);
+  return require("../handlers/main_menu").showMainMenu(ctx);
 };

@@ -1,4 +1,5 @@
 const {t, getCtxLang} = require("../utils/i18n");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 module.exports = async (ctx) => {
   ctx.session.step = "awaiting_comment";
@@ -11,11 +12,14 @@ module.exports = async (ctx) => {
       ? t(lang, "rent_current_back_btn")
       : t(lang, "btn_back");
 
-  await ctx.editMessageText(t(lang, "booking_comment_prompt"), {
-    reply_markup: {
+  return botScreenRenderer.renderText(ctx, {
+    screen: "booking_comment",
+    text: t(lang, "booking_comment_prompt"),
+    replyMarkup: {
       inline_keyboard: [
         [{text: backText, callback_data: backCallback}],
       ],
     },
+    returnContext: {backAction: backCallback},
   });
 };

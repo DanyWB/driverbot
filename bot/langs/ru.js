@@ -26,6 +26,10 @@ module.exports = {
   share_contact_btn: "📨 Отправить контакт",
 
   menu_title: "🏠 Главное меню:",
+  quick_book: "Бронирование",
+  quick_prices: "Цены",
+  main_menu_book: "📅 Забронировать",
+  main_menu_bookings: "🗂 Мои бронирования",
   menu_my_rent: "🚘 Моя аренда",
   menu_support: "💬 Поддержка",
   menu_prices: "💸 Цены",
@@ -112,6 +116,12 @@ module.exports = {
   rent_history_empty: "История пуста.",
   rent_details_title: "📍 Детали брони",
   rent_details_status: "Статус: {status}",
+  rent_history_page: "Страница {current} / {total}",
+  rent_details_category: "Категория: {category}",
+  rent_details_days: "Дней аренды: {days}",
+  rent_details_created: "Создано: {created}",
+  rent_details_reason: "Причина: {reason}",
+  rent_status_unknown: "статус недоступен",
   rent_status_process: "в процессе",
   rent_status_pending: "ожидает подтверждения",
   rent_status_active: "активна",
@@ -149,6 +159,7 @@ module.exports = {
   rent_action_cancel: "❌ Отменить",
   rent_action_back: "◀️ Назад",
   rent_cancel_confirm: "Отменить бронирование ID {id}?",
+  rent_cancel_confirm_action: "Да, отменить бронирование",
   rent_cancelled: "Бронирование отменено.",
   rent_cannot_cancel: "Нельзя отменить эту бронь.",
   rent_cancel_manager_required:
@@ -194,9 +205,14 @@ module.exports = {
   booking_choose_bike: "🚘 Выберите технику:",
   booking_no_bikes_in_category: "😔 В этой категории пока нет техники.",
 
-  booking_category_light: "🌿 Лёгкие (110-125cc)",
-  booking_category_comfort: "✨ Комфорт (150-160cc)",
-  booking_category_maxy: "🏎️ Макси (300-350cc)",
+  booking_category_light: "🛵 Легкие (100cc-110cc)",
+  booking_category_comfort: "🛵 Комфорт (150cc-160cc)",
+  booking_category_maxy: "🛵 Макс (300cc-350cc)",
+  category_light_label: "Легкие (100cc-110cc)",
+  category_comfort_label: "Комфорт (150cc-160cc)",
+  category_maxi_label: "Макс (300cc-350cc)",
+  category_cars_label: "Автомобили",
+  category_scooters_label: "Скутеры",
 
   booking_dates_not_selected: "Даты аренды не выбраны.",
   booking_profile_required:
@@ -215,6 +231,7 @@ module.exports = {
     "В выбранном диапазоне есть занятые даты для этой техники. Выберите другой период.",
   booking_end_before_start: "Дата окончания не может быть раньше начала.",
   booking_date_in_past: "Нельзя выбрать дату в прошлом.",
+  booking_date_invalid: "Некорректная дата. Откройте календарь заново.",
 
   booking_invalid_bike_id: "Неверный формат ID техники.",
   booking_bike_not_found: "Техника не найдена.",

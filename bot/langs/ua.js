@@ -27,6 +27,10 @@ module.exports = {
   share_contact_btn: "📨 Надіслати контакт",
 
   menu_title: "🏠 Головне меню:",
+  quick_book: "Бронювання",
+  quick_prices: "Ціни",
+  main_menu_book: "📅 Забронювати",
+  main_menu_bookings: "🗂 Мої бронювання",
   menu_my_rent: "🚘 Моя оренда",
   menu_support: "💬 Підтримка",
   menu_prices: "💸 Ціни",
@@ -112,6 +116,12 @@ module.exports = {
   rent_history_empty: "Історія пуста.",
   rent_details_title: "📍 Деталі бронювання",
   rent_details_status: "Статус: {status}",
+  rent_history_page: "Сторінка {current} / {total}",
+  rent_details_category: "Категорія: {category}",
+  rent_details_days: "Днів оренди: {days}",
+  rent_details_created: "Створено: {created}",
+  rent_details_reason: "Причина: {reason}",
+  rent_status_unknown: "статус недоступний",
   rent_status_process: "у процесі",
   rent_status_pending: "очікує підтвердження",
   rent_status_active: "активна",
@@ -149,6 +159,7 @@ module.exports = {
   rent_action_cancel: "❌ Скасувати",
   rent_action_back: "◀️ Назад",
   rent_cancel_confirm: "Скасувати бронювання ID {id}?",
+  rent_cancel_confirm_action: "Так, скасувати бронювання",
   rent_cancelled: "Бронювання скасовано.",
   rent_cannot_cancel: "Не можна скасувати це бронювання.",
   rent_cancel_manager_required:
@@ -194,9 +205,14 @@ module.exports = {
   booking_choose_bike: "🚘 Оберіть транспорт:",
   booking_no_bikes_in_category: "😔 У цій категорії поки немає транспорту.",
 
-  booking_category_light: "🌿 Light (110-125cc)",
-  booking_category_comfort: "✨ Comfort (150-160cc)",
-  booking_category_maxy: "🏎️ Maxy (300-350cc)",
+  booking_category_light: "🛵 Легкі (100cc-110cc)",
+  booking_category_comfort: "🛵 Комфорт (150cc-160cc)",
+  booking_category_maxy: "🛵 Максі (300cc-350cc)",
+  category_light_label: "Легкі (100cc-110cc)",
+  category_comfort_label: "Комфорт (150cc-160cc)",
+  category_maxi_label: "Максі (300cc-350cc)",
+  category_cars_label: "Автомобілі",
+  category_scooters_label: "Скутери",
 
   booking_dates_not_selected: "Дати оренди не обрані.",
   booking_profile_required:
@@ -215,6 +231,7 @@ module.exports = {
     "У вибраному діапазоні є зайняті дати для цього транспорту. Оберіть інший період.",
   booking_end_before_start: "Дата закінчення не може бути раніше початку.",
   booking_date_in_past: "Не можна вибрати дату в минулому.",
+  booking_date_invalid: "Некоректна дата. Відкрийте календар знову.",
 
   booking_invalid_bike_id: "Невірний формат ID транспорту.",
   booking_bike_not_found: "Транспорт не знайдено.",

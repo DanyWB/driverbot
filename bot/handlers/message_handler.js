@@ -5,10 +5,11 @@ const {
   handlePassportStep,
 } = require("./registration_steps");
 const {detectMainMenuAction} = require("../utils/mainMenu");
-const {handleMainMenuAction} = require("./main_menu");
+const {handleQuickAction} = require("./main_menu");
 const {t, getCtxLang} = require("../utils/i18n");
 const {isLaravelMode} = require("../config/runtime");
 const {applyOptions} = require("../services/sessionCartService");
+const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 module.exports = async (ctx) => {
   const step = ctx.session?.step;
@@ -16,7 +17,7 @@ module.exports = async (ctx) => {
   const action = detectMainMenuAction(ctx.message?.text);
 
   if (action) {
-    return handleMainMenuAction(ctx, action);
+    return handleQuickAction(ctx, action);
   }
 
   if (!step) return;
@@ -65,8 +66,10 @@ module.exports = async (ctx) => {
     }
 
     ctx.session.commentReturn = null;
-    await ctx.reply(t(lang, "booking_comment_saved"), {
-      reply_markup: {
+    return botScreenRenderer.renderText(ctx, {
+      screen: "booking_comment_saved",
+      text: t(lang, "booking_comment_saved"),
+      replyMarkup: {
         inline_keyboard: [
           [
             {
@@ -76,8 +79,9 @@ module.exports = async (ctx) => {
           ],
         ],
       },
+      returnContext: {backAction: callbackData},
+      navigationMode: "back",
     });
-    return;
   }
 
   if (step === "waiting_for_name") {
@@ -103,8 +107,11 @@ module.exports = async (ctx) => {
     ctx.session.step = null;
     ctx.session.scenario = null;
     const lang = getCtxLang(ctx);
-    await ctx.reply(t(lang, "booking_options_address_saved"));
-    return;
+    const {sendOptions} = require("./book_options");
+    return sendOptions(ctx, lang, {
+      notice: t(lang, "booking_options_address_saved"),
+      navigationMode: "back",
+    });
   }
 
   if (step === "waiting_for_notes") {
@@ -118,8 +125,11 @@ module.exports = async (ctx) => {
     ctx.session.step = null;
     ctx.session.scenario = null;
     const lang = getCtxLang(ctx);
-    await ctx.reply(t(lang, "booking_options_notes_saved"));
-    return;
+    const {sendOptions} = require("./book_options");
+    return sendOptions(ctx, lang, {
+      notice: t(lang, "booking_options_notes_saved"),
+      navigationMode: "back",
+    });
   }
 
   if (step === "admin_decline_reason" && ctx.message?.text) {

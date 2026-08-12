@@ -5,6 +5,7 @@ namespace App\Domain\Bookings\Services;
 use App\Domain\Bookings\Data\BookingActor;
 use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Notifications\Services\NotificationOutboxService;
+use App\Domain\Shared\Enums\ActorType;
 use App\Models\AuditLog;
 use App\Models\Booking;
 use App\Models\BookingPriceSnapshot;
@@ -58,7 +59,7 @@ class BookingEventRecorder
             'request_id' => $requestId,
         ]);
 
-        $this->enqueueStatusNotifications($booking, $history, $to, $reason);
+        $this->enqueueStatusNotifications($booking, $history, $to, $actor, $reason);
     }
 
     /**
@@ -144,6 +145,7 @@ class BookingEventRecorder
         Booking $booking,
         BookingStatusHistory $history,
         BookingStatus $status,
+        BookingActor $actor,
         ?string $reason,
     ): void {
         $customerEvents = [
@@ -160,7 +162,13 @@ class BookingEventRecorder
             ]);
         }
 
-        if (in_array($status, [BookingStatus::Pending, BookingStatus::CancelledByClient], true)) {
+        $adminEvents = [
+            BookingStatus::Pending,
+            BookingStatus::CancelledByClient,
+            BookingStatus::Expired,
+        ];
+
+        if ($actor->type !== ActorType::Admin && in_array($status, $adminEvents, true)) {
             $this->outbox->enqueue(
                 "booking:{$booking->public_id}:status:{$history->id}:admin",
                 "booking.{$status->value}",
