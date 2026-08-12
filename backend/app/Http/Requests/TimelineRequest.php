@@ -19,17 +19,18 @@ class TimelineRequest extends FormRequest
         $today = CarbonImmutable::now($timezone);
         $startsOn = $this->input('starts_on');
         $endsOn = $this->input('ends_on');
+        $hasStartsOn = is_string($startsOn) && trim($startsOn) !== '';
 
-        if (! is_string($startsOn) || trim($startsOn) === '') {
+        if (! $hasStartsOn) {
             $startsOn = is_string($endsOn) && $endsOn !== ''
                 ? $endsOn
                 : $today->startOfMonth()->toDateString();
         }
 
         if (! is_string($endsOn) || trim($endsOn) === '') {
-            $endsOn = $this->has('starts_on')
+            $endsOn = $hasStartsOn
                 ? $startsOn
-                : $today->endOfMonth()->toDateString();
+                : $today->addMonthNoOverflow()->endOfMonth()->toDateString();
         }
 
         $this->merge([
