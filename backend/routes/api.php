@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Bot\AdminTelegramBindingController;
 use App\Http\Controllers\Api\V1\Bot\BookingController;
 use App\Http\Controllers\Api\V1\Bot\CatalogController;
 use App\Http\Controllers\Api\V1\Bot\ConfigurationController;
@@ -26,6 +27,8 @@ Route::prefix('v1/bot')->group(function (): void {
     });
 
     Route::middleware(['service.api:bot:write', 'throttle:bot-api'])->group(function (): void {
+        Route::post('admin-telegram-bindings', [AdminTelegramBindingController::class, 'store'])
+            ->middleware('throttle:admin-telegram-binding');
         Route::post('customers/sync', [CustomerController::class, 'sync']);
 
         Route::middleware('telegram.customer')->group(function (): void {
@@ -34,6 +37,9 @@ Route::prefix('v1/bot')->group(function (): void {
             Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel'])->whereUuid('booking');
         });
     });
+
+    Route::post('admin-telegram-binding-codes/revoke', [AdminTelegramBindingController::class, 'revokeExposedCode'])
+        ->middleware(['service.api:bot:write', 'throttle:admin-telegram-binding-revoke']);
 
     Route::middleware(['service.api:bot:documents', 'throttle:bot-api', 'telegram.customer'])->group(function (): void {
         Route::post('customers/me/documents', [DocumentController::class, 'storeForCustomer']);

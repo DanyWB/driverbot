@@ -6,6 +6,7 @@ use App\Domain\Bookings\Services\BookingStatusMutationGuard;
 use App\Http\Responses\BotApiResponse;
 use App\Models\ServiceApiClient;
 use App\Models\User;
+use App\Observers\AdminTelegramBindingLifecycleObserver;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -41,6 +42,8 @@ class AppServiceProvider extends ServiceProvider
     protected function configureDefaults(): void
     {
         Date::use(CarbonImmutable::class);
+
+        User::observe(AdminTelegramBindingLifecycleObserver::class);
 
         Event::listen(Login::class, function (Login $event): void {
             if ($event->user instanceof User) {
@@ -88,6 +91,58 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return $limits;
+        });
+
+        RateLimiter::for('admin-telegram-binding', function (Request $request): array {
+            $client = $request->attributes->get('service_api_client');
+            $serviceKey = $client instanceof ServiceApiClient
+                ? "service:{$client->id}"
+                : "ip:{$request->ip()}";
+            $telegramId = trim((string) $request->header('X-Telegram-User-ID', ''));
+            $actorKey = preg_match('/^[1-9][0-9]{0,19}$/', $telegramId) === 1
+                ? "telegram:{$telegramId}"
+                : 'telegram:missing';
+
+            return [
+                Limit::perMinute(max(1, (int) config('bot_api.binding_rate_limit_per_minute', 10)))
+                    ->by("{$serviceKey}:admin-binding:{$actorKey}")
+                    ->response(fn (Request $request) => BotApiResponse::error(
+                        $request,
+                        'rate_limit_exceeded',
+                        'Too many Telegram binding attempts.',
+                        429,
+                    )),
+            ];
+        });
+
+        RateLimiter::for('admin-telegram-binding-revoke', function (Request $request): array {
+            $client = $request->attributes->get('service_api_client');
+            $serviceKey = $client instanceof ServiceApiClient
+                ? "service:{$client->id}"
+                : "ip:{$request->ip()}";
+            $telegramId = trim((string) $request->header('X-Telegram-User-ID', ''));
+            $actorKey = preg_match('/^[1-9][0-9]{0,19}$/', $telegramId) === 1
+                ? "telegram:{$telegramId}"
+                : 'telegram:missing';
+
+            return [
+                Limit::perMinute(max(1, (int) config('bot_api.binding_revoke_service_rate_limit_per_minute', 120)))
+                    ->by("{$serviceKey}:admin-binding-revoke:service")
+                    ->response(fn (Request $request) => BotApiResponse::error(
+                        $request,
+                        'rate_limit_exceeded',
+                        'Too many Telegram binding code revocation attempts.',
+                        429,
+                    )),
+                Limit::perMinute(max(1, (int) config('bot_api.binding_revoke_rate_limit_per_minute', 30)))
+                    ->by("{$serviceKey}:admin-binding-revoke:{$actorKey}")
+                    ->response(fn (Request $request) => BotApiResponse::error(
+                        $request,
+                        'rate_limit_exceeded',
+                        'Too many Telegram binding code revocation attempts.',
+                        429,
+                    )),
+            ];
         });
     }
 }

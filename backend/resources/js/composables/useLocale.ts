@@ -480,6 +480,59 @@ const russianMessages: Record<string, string> = {
     'Current password': 'Текущий пароль',
     'New password': 'Новый пароль',
     'Confirm password': 'Подтвердите пароль',
+    'Telegram notifications': 'Уведомления Telegram',
+    'Connect your personal Telegram account to receive administrator alerts':
+        'Подключите личный аккаунт Telegram для получения уведомлений администратора',
+    'Legacy recipient is active': 'Активен прежний получатель',
+    'The previous server recipient still receives alerts. It will be replaced as soon as the first administrator connects Telegram here.':
+        'Прежний получатель с сервера пока получает уведомления. Он будет заменён, как только первый администратор подключит здесь Telegram.',
+    'Your Telegram account': 'Ваш аккаунт Telegram',
+    'Telegram account': 'Аккаунт Telegram',
+    Connected: 'Подключён',
+    'Not connected': 'Не подключён',
+    'Each administrator connects a separate Telegram account. Alerts are sent independently to every active recipient.':
+        'Каждый администратор подключает отдельный аккаунт Telegram. Уведомления отправляются независимо каждому активному получателю.',
+    'Active recipients: :count': 'Активных получателей: :count',
+    'Connected account': 'Подключённый аккаунт',
+    Connection: 'Подключение',
+    'Last successful test': 'Последняя успешная проверка',
+    'Not yet': 'Ещё не выполнялась',
+    'Send test message': 'Отправить тестовое сообщение',
+    'Sending…': 'Отправка…',
+    'Replace Telegram account': 'Заменить аккаунт Telegram',
+    'Disconnect Telegram': 'Отключить Telegram',
+    'Disconnect Telegram?': 'Отключить Telegram?',
+    'This administrator will stop receiving alerts. Other connected administrators will not be affected.':
+        'Этот администратор перестанет получать уведомления. Подключения других администраторов не изменятся.',
+    Disconnect: 'Отключить',
+    'Finish connecting in Telegram': 'Завершите подключение в Telegram',
+    'Open the bot and send this one-time command. Do not share it with anyone.':
+        'Откройте бота и отправьте эту одноразовую команду. Никому её не передавайте.',
+    'Your current account remains connected until the new command is accepted.':
+        'Текущий аккаунт останется подключённым, пока новая команда не будет принята.',
+    Copied: 'Скопировано',
+    'Copy command': 'Скопировать команду',
+    'Copy failed. Select the command and copy it manually.':
+        'Не удалось скопировать. Выделите команду и скопируйте её вручную.',
+    'Code expires in :time': 'Код истечёт через :time',
+    'Open Telegram bot': 'Открыть Telegram-бота',
+    'Bot username is not configured': 'Имя Telegram-бота не настроено',
+    'You can still copy the command, but the direct bot link is unavailable.':
+        'Команду по-прежнему можно скопировать, но прямая ссылка на бота недоступна.',
+    'Generating…': 'Создание…',
+    'Generate a new code': 'Создать новый код',
+    'Connect Telegram': 'Подключить Telegram',
+    'How multiple administrators work':
+        'Как работают несколько администраторов',
+    'Every administrator signs in to the web panel and connects their own Telegram account here. Disconnecting one account never disables notifications for the others.':
+        'Каждый администратор входит в веб-панель и подключает здесь свой аккаунт Telegram. Отключение одного аккаунта не выключает уведомления у остальных.',
+    'Telegram binding code created.': 'Код подключения Telegram создан.',
+    'Telegram test message sent.': 'Тестовое сообщение отправлено в Telegram.',
+    'Telegram account disconnected.': 'Аккаунт Telegram отключён.',
+    'Connect a Telegram account before sending a test message.':
+        'Подключите аккаунт Telegram перед отправкой тестового сообщения.',
+    'The test message could not be delivered. Check the bot connection and try again.':
+        'Не удалось доставить тестовое сообщение. Проверьте подключение бота и повторите попытку.',
 };
 
 function isLocale(value: string | null): value is AppLocale {

@@ -12,6 +12,7 @@ use App\Domain\Bookings\Services\BookingService;
 use App\Domain\Customers\Enums\IdentityProvider;
 use App\Domain\Pricing\Enums\PricingSeasonKey;
 use App\Domain\Pricing\Enums\PricingTier;
+use App\Models\AdminTelegramBinding;
 use App\Models\AuditLog;
 use App\Models\Booking;
 use App\Models\BookingPriceSnapshot;
@@ -96,6 +97,41 @@ class BookingServiceTest extends TestCase
             ->where('event_type', 'booking.pending')
             ->where('channel', 'internal')
             ->count());
+    }
+
+    public function test_admin_created_pending_booking_notifies_other_connected_administrators_only(): void
+    {
+        $otherAdmin = User::factory()->create();
+        $actorBinding = AdminTelegramBinding::query()->create([
+            'admin_user_id' => $this->admin->id,
+            'telegram_user_id' => '700401',
+            'telegram_chat_id' => '700401',
+            'locale' => 'ru',
+            'generation' => 1,
+            'connected_at' => now(),
+        ]);
+        $peerBinding = AdminTelegramBinding::query()->create([
+            'admin_user_id' => $otherAdmin->id,
+            'telegram_user_id' => '700402',
+            'telegram_chat_id' => '700402',
+            'locale' => 'en',
+            'generation' => 1,
+            'connected_at' => now(),
+        ]);
+
+        $this->createPending(
+            actor: BookingActor::admin($this->admin->id),
+            source: BookingSource::AdminManual,
+        );
+
+        $recipients = NotificationOutbox::query()
+            ->where('event_type', 'booking.pending')
+            ->where('channel', 'internal')
+            ->pluck('recipient')
+            ->all();
+
+        $this->assertSame([$peerBinding->recipientKey()], $recipients);
+        $this->assertNotContains($actorBinding->recipientKey(), $recipients);
     }
 
     public function test_delivery_requires_an_address_at_the_domain_boundary(): void

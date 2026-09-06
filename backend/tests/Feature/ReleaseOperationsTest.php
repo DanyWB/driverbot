@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Operations\Data\ReleaseCheck;
 use App\Domain\Operations\Services\ReleasePreflightService;
 use App\Domain\Operations\Services\SchedulerHeartbeat;
+use App\Models\AdminTelegramBinding;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -75,5 +76,45 @@ class ReleaseOperationsTest extends TestCase
         $this->assertSame(ReleaseCheck::FAILURE, $strictCheck->status);
         $this->assertInstanceOf(ReleaseCheck::class, $advisoryCheck);
         $this->assertSame(ReleaseCheck::WARNING, $advisoryCheck->status);
+    }
+
+    public function test_release_preflight_accepts_an_active_database_telegram_binding(): void
+    {
+        config()->set('notifications.telegram.bot_token', '123456789:'.str_repeat('a', 35));
+        config()->set('notifications.telegram.bot_username', 'DrivePhangan_TestBot');
+        config()->set('notifications.telegram.admin_chat_id', null);
+        $admin = User::factory()->create();
+        AdminTelegramBinding::query()->create([
+            'admin_user_id' => $admin->id,
+            'telegram_user_id' => '700300',
+            'telegram_chat_id' => '700300',
+            'locale' => 'ru',
+            'generation' => 1,
+            'connected_at' => now(),
+        ]);
+
+        $check = collect(app(ReleasePreflightService::class)->inspect(true))
+            ->firstWhere('id', 'telegram.configuration');
+
+        $this->assertInstanceOf(ReleaseCheck::class, $check);
+        $this->assertSame(ReleaseCheck::PASS, $check->status);
+    }
+
+    public function test_release_preflight_does_not_restore_bootstrap_recipient_after_disconnect(): void
+    {
+        config()->set('notifications.telegram.bot_token', '123456789:'.str_repeat('a', 35));
+        config()->set('notifications.telegram.bot_username', 'DrivePhangan_TestBot');
+        config()->set('notifications.telegram.admin_chat_id', '700301');
+        AdminTelegramBinding::query()->create([
+            'generation' => 2,
+            'connected_at' => now()->subHour(),
+            'disconnected_at' => now(),
+        ]);
+
+        $check = collect(app(ReleasePreflightService::class)->inspect(true))
+            ->firstWhere('id', 'telegram.configuration');
+
+        $this->assertInstanceOf(ReleaseCheck::class, $check);
+        $this->assertSame(ReleaseCheck::FAILURE, $check->status);
     }
 }

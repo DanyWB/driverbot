@@ -10,6 +10,27 @@ module.exports = {
   cmd_language: "🌍 Change language",
   cmd_admin: "👑 Admin panel",
 
+  telegram_bind_usage:
+    "Enter the linking code from the web admin panel in this format: /bind CODE",
+  telegram_bind_private_only:
+    "For security, you can link the account only in a private chat with the bot.",
+  telegram_bind_exposed_revocation_attempted:
+    "⚠️ This code was exposed outside a private chat. Do not use it. Create a new code in the web admin panel and verify the currently linked account before continuing.",
+  telegram_bind_exposed_revocation_failed:
+    "⚠️ This code was exposed and its revocation could not be confirmed. Create a new code immediately and verify or replace the currently linked account in the web admin panel.",
+  telegram_bind_success:
+    "✅ Telegram has been linked. Admin notifications will be sent to this chat.",
+  telegram_bind_invalid:
+    "The linking code is invalid or has expired. Create a new code in the web admin panel.",
+  telegram_bind_already_bound:
+    "This Telegram account is already linked to another administrator.",
+  telegram_bind_admin_inactive:
+    "The administrator account cannot be linked. Sign in to the web admin panel and create a new code.",
+  telegram_bind_rate_limited:
+    "Too many linking attempts. Wait a minute and try again.",
+  telegram_bind_unavailable:
+    "Telegram could not be linked. Please try again a little later.",
+
   welcome_new:
     "👋 Welcome, {name}!\n\nTo continue, please complete a short registration.",
   welcome_back: "👋 Welcome back, {name}!",

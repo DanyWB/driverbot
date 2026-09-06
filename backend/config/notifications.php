@@ -8,8 +8,11 @@ $backoff = array_values(array_filter(
 return [
     'telegram' => [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'bot_username' => env('TELEGRAM_BOT_USERNAME'),
         'admin_chat_id' => env('TELEGRAM_ADMIN_CHAT_ID'),
         'admin_locale' => env('TELEGRAM_ADMIN_LOCALE', 'ru'),
+        'binding_code_ttl_minutes' => (int) env('TELEGRAM_BINDING_CODE_TTL_MINUTES', 10),
+        'binding_code_retention_days' => (int) env('TELEGRAM_BINDING_CODE_RETENTION_DAYS', 7),
         'api_base_url' => env('TELEGRAM_API_BASE_URL', 'https://api.telegram.org'),
         'timeout_seconds' => (int) env('TELEGRAM_HTTP_TIMEOUT_SECONDS', 10),
         'connect_timeout_seconds' => (int) env('TELEGRAM_CONNECT_TIMEOUT_SECONDS', 5),

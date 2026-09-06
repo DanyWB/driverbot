@@ -8,6 +8,10 @@ use Illuminate\Validation\ValidationException;
 
 class AdminAccountService
 {
+    public function __construct(
+        private readonly AdminTelegramBindingService $telegramBindings,
+    ) {}
+
     public function delete(User $user): void
     {
         DB::transaction(function () use ($user): void {
@@ -30,6 +34,7 @@ class AdminAccountService
                 ]);
             }
 
+            $this->telegramBindings->disconnect($lockedUser);
             $lockedUser->delete();
         }, 3);
     }

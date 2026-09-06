@@ -41,6 +41,19 @@ test("synchronizes a Telegram customer once per configured session window", asyn
       session: {},
     }, next);
     assert.equal(syncCalls, 2);
+
+    await middleware({
+      from: {id: 457},
+      message: {text: "/bind ABCD-EFGH"},
+      session: {},
+    }, next);
+    await middleware({
+      from: {id: 458},
+      message: {text: "/bind@DrivePhanganBot ABCD-EFGH"},
+      session: {},
+    }, next);
+    assert.equal(syncCalls, 2);
+    assert.equal(nextCalls, 6);
   } finally {
     clientModule.getBotApiClient = originalClientFactory;
     gatewayModule.syncTelegramUser = originalSync;

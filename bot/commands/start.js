@@ -12,6 +12,11 @@ const {
 } = require("../utils/i18n");
 
 module.exports = async (ctx) => {
+  const bindingCode = startBindingCode(ctx);
+  if (bindingCode !== null) {
+    return require("./bind").handleBind(ctx, bindingCode);
+  }
+
   const telegramId = ctx.from.id;
   let user = null;
   try {
@@ -102,3 +107,19 @@ module.exports = async (ctx) => {
 
   return showMainMenu(ctx, lang, {navigationMode: "reset"});
 };
+
+function startBindingCode(ctx) {
+  let payload = typeof ctx.match === "string" ? ctx.match.trim() : "";
+
+  if (!payload) {
+    const match = /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+(.+))?\s*$/.exec(
+      ctx.message?.text || ""
+    );
+    payload = match?.[1]?.trim() || "";
+  }
+
+  const binding = /^bind_(.*)$/i.exec(payload);
+  return binding ? binding[1].trim() : null;
+}
+
+module.exports.startBindingCode = startBindingCode;

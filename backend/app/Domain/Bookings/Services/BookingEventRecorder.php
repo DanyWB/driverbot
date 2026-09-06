@@ -168,17 +168,16 @@ class BookingEventRecorder
             BookingStatus::Expired,
         ];
 
-        if ($actor->type !== ActorType::Admin && in_array($status, $adminEvents, true)) {
-            $this->outbox->enqueue(
-                "booking:{$booking->public_id}:status:{$history->id}:admin",
+        if (in_array($status, $adminEvents, true)) {
+            $this->outbox->enqueueAdmins(
                 "booking.{$status->value}",
-                'internal',
-                'admin',
+                "booking:{$booking->public_id}:status:{$history->id}:admin",
                 [
                     'booking_public_id' => $booking->public_id,
                     'status' => $status->value,
                     'reason' => $reason,
                 ],
+                excludedAdminId: $actor->type === ActorType::Admin ? $actor->adminId : null,
             );
         }
 

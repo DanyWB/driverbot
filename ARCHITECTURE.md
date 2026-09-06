@@ -233,6 +233,8 @@ customer_documents
 booking_status_history
 audit_logs
 notification_outbox
+admin_telegram_bindings
+admin_telegram_binding_codes
 service_api_clients
 idempotency_keys
 ```
@@ -430,6 +432,17 @@ Notification intent сохраняется в `notification_outbox` в той ж
 
 Шаблоны уведомлений принадлежат Laravel. Интерактивные ответы текущего шага диалога
 принадлежат Node.js-боту, но используют стабильные коды и данные Laravel.
+
+Административные Telegram-получатели также принадлежат Laravel. Каждый `admin_user`
+имеет не более одной persistent binding/tombstone-записи; один Telegram ID может
+принадлежать только одному администратору. Web-админка выдает короткоживущий одноразовый
+код, а доверенный Node.js-бот передает Laravel подтвержденную Telegram identity из личного
+чата. Laravel создает отдельный notification intent для каждого активного и verified
+администратора. Версия `generation` не позволяет доставить старую очередь аккаунту после
+отвязки или повторного подключения. Eloquent observer и PostgreSQL lifecycle-trigger
+дублируют защиту: деактивация, снятие email verification или удаление администратора
+отзывают активные одноразовые коды, очищают Telegram PII и увеличивают `generation`,
+даже если изменение выполнено bulk SQL.
 
 ## 16. Файлы и изображения
 
