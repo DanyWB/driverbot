@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Jobs\DeliverNotificationRecipient;
+use App\Models\AdminTelegramBinding;
+use App\Models\AdminTelegramBindingCode;
 use App\Models\IdempotencyKey;
 use App\Models\NotificationOutbox;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -52,6 +55,7 @@ class NotificationOperationsTest extends TestCase
 
     public function test_housekeeping_has_a_dry_run_and_preserves_failures(): void
     {
+        $admin = User::factory()->create();
         IdempotencyKey::query()->create([
             'scope' => 'test',
             'idempotency_key' => 'expired-key',
@@ -60,6 +64,16 @@ class NotificationOperationsTest extends TestCase
             'response_status' => 200,
             'response_body' => ['ok' => true],
             'expires_at' => now()->subDay(),
+        ]);
+        AdminTelegramBindingCode::query()->create([
+            'admin_user_id' => $admin->id,
+            'code_hash' => str_repeat('b', 64),
+            'expires_at' => now()->subDays(8),
+        ]);
+        AdminTelegramBindingCode::query()->create([
+            'admin_user_id' => $admin->id,
+            'code_hash' => str_repeat('c', 64),
+            'expires_at' => now()->addMinutes(10),
         ]);
         $this->notification('telegram', '100', NotificationOutbox::STATUS_SENT, [
             'sent_at' => now()->subDays(100),
@@ -74,20 +88,53 @@ class NotificationOperationsTest extends TestCase
         $this->artisan('operations:housekeeping', ['--dry-run' => true])->assertSuccessful();
         $this->assertDatabaseCount('notification_outbox', 3);
         $this->assertDatabaseCount('idempotency_keys', 1);
+        $this->assertDatabaseCount('admin_telegram_binding_codes', 2);
 
         $this->artisan('operations:housekeeping')->assertSuccessful();
         $this->assertDatabaseCount('notification_outbox', 1);
         $this->assertDatabaseHas('notification_outbox', ['status' => NotificationOutbox::STATUS_FAILED]);
         $this->assertDatabaseCount('idempotency_keys', 0);
+        $this->assertDatabaseCount('admin_telegram_binding_codes', 1);
+        $this->assertDatabaseHas('admin_telegram_binding_codes', ['code_hash' => str_repeat('c', 64)]);
     }
 
     public function test_monitor_reports_configuration_and_terminal_failures(): void
     {
         config()->set('notifications.telegram.bot_token', 'token');
-        config()->set('notifications.telegram.admin_chat_id', '-100');
+        config()->set('notifications.telegram.admin_chat_id', '-100500');
 
         $this->artisan('notifications:monitor')->assertSuccessful();
         $this->notification('telegram', '100', NotificationOutbox::STATUS_FAILED, ['failed_at' => now()]);
+        $this->artisan('notifications:monitor')->assertFailed();
+    }
+
+    public function test_monitor_accepts_an_active_database_binding_without_legacy_recipient(): void
+    {
+        config()->set('notifications.telegram.bot_token', 'token');
+        config()->set('notifications.telegram.admin_chat_id', null);
+        $admin = User::factory()->create();
+        AdminTelegramBinding::query()->create([
+            'admin_user_id' => $admin->id,
+            'telegram_user_id' => '700200',
+            'telegram_chat_id' => '700200',
+            'locale' => 'ru',
+            'generation' => 1,
+            'connected_at' => now(),
+        ]);
+
+        $this->artisan('notifications:monitor')->assertSuccessful();
+    }
+
+    public function test_monitor_does_not_restore_legacy_recipient_after_a_binding_was_disconnected(): void
+    {
+        config()->set('notifications.telegram.bot_token', 'token');
+        config()->set('notifications.telegram.admin_chat_id', '-100500');
+        AdminTelegramBinding::query()->create([
+            'generation' => 2,
+            'connected_at' => now()->subHour(),
+            'disconnected_at' => now(),
+        ]);
+
         $this->artisan('notifications:monitor')->assertFailed();
     }
 

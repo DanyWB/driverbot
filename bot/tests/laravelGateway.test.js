@@ -36,12 +36,57 @@ test("uses a fresh idempotency key for each customer sync and profile mutation",
     await gateway.updateProfile(123, {phone: "+66000000000"});
     await gateway.updateProfile(123, {phone: "+66000000000"});
 
+    await gateway.bindAdminTelegram({
+      from: {
+        id: 123,
+        username: "driver",
+        first_name: "Test",
+        last_name: "Admin",
+        language_code: "uk-UA",
+      },
+      chat: {id: 123, type: "private"},
+      update: {update_id: 987},
+    }, "ABCD-EFGH");
+
+    await gateway.revokeExposedAdminTelegramBindingCode({
+      from: {id: 123},
+      update: {update_id: 988},
+    }, "WXYZ-2345");
+
     const keys = calls.map((call) => call.options.idempotencyKey);
     assert.equal(new Set(keys).size, keys.length);
     assert.match(keys[0], /^telegram:123:sync:/);
     assert.match(keys[2], /^telegram:123:profile:/);
+    assert.equal(keys[4], "telegram:123:987:admin-telegram-binding");
+    assert.equal(keys[5], "telegram:123:988:admin-telegram-binding-code-revoke");
     assert.equal(calls[0].options.body.locale, "ua");
     assert.equal(calls[1].options.body.locale, null);
+    assert.deepEqual(calls[4], {
+      method: "POST",
+      path: "/admin-telegram-bindings",
+      options: {
+        telegramId: "123",
+        idempotencyKey: "telegram:123:987:admin-telegram-binding",
+        body: {
+          code: "ABCD-EFGH",
+          chat_id: "123",
+          chat_type: "private",
+          username: "driver",
+          first_name: "Test",
+          last_name: "Admin",
+          locale: "ua",
+        },
+      },
+    });
+    assert.deepEqual(calls[5], {
+      method: "POST",
+      path: "/admin-telegram-binding-codes/revoke",
+      options: {
+        telegramId: "123",
+        idempotencyKey: "telegram:123:988:admin-telegram-binding-code-revoke",
+        body: {code: "WXYZ-2345"},
+      },
+    });
 
     await gateway.listBookings(123, "history", {limit: 6, offset: 12});
     assert.deepEqual(calls.at(-1), {

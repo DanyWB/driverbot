@@ -40,7 +40,7 @@ class BotApiOpenApiContractTest extends TestCase
             }
         }
 
-        $this->assertCount(16, array_unique($covered));
+        $this->assertCount(18, array_unique($covered));
     }
 
     public function test_contract_does_not_expose_internal_fields_or_storage_paths(): void
@@ -99,6 +99,10 @@ class BotApiOpenApiContractTest extends TestCase
         $this->assertContains(
             'delivery_address',
             $document['components']['schemas']['CreateBookingItem']['allOf'][0]['then']['required'] ?? [],
+        );
+        $this->assertSame(
+            ['connected', 'admin_name', 'telegram_id', 'username', 'generation', 'connected_at'],
+            $document['components']['schemas']['AdminTelegramBindingResult']['required'] ?? null,
         );
     }
 }

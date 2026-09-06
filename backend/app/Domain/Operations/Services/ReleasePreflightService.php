@@ -2,6 +2,7 @@
 
 namespace App\Domain\Operations\Services;
 
+use App\Domain\Notifications\Services\AdminTelegramRecipientResolver;
 use App\Domain\Operations\Data\ReleaseCheck;
 use App\Domain\Pricing\Services\PricingCatalogAuditor;
 use App\Models\NotificationOutbox;
@@ -16,7 +17,10 @@ use Throwable;
 
 class ReleasePreflightService
 {
-    public function __construct(private readonly PricingCatalogAuditor $pricing) {}
+    public function __construct(
+        private readonly PricingCatalogAuditor $pricing,
+        private readonly AdminTelegramRecipientResolver $adminTelegramRecipients,
+    ) {}
 
     /** @return list<ReleaseCheck> */
     public function inspect(bool $strict): array
@@ -130,16 +134,25 @@ class ReleasePreflightService
     private function telegramConfiguration(bool $strict): ReleaseCheck
     {
         $token = trim((string) config('notifications.telegram.bot_token'));
-        $chatId = trim((string) config('notifications.telegram.admin_chat_id'));
+        $botUsername = ltrim(trim((string) config('notifications.telegram.bot_username')), '@');
+
+        try {
+            $hasRecipient = $this->adminTelegramRecipients->hasConfiguredRecipient();
+        } catch (Throwable) {
+            $hasRecipient = false;
+        }
+
         $valid = preg_match('/^[0-9]{6,12}:[A-Za-z0-9_-]{30,}$/', $token) === 1
-            && preg_match('/^-?[1-9][0-9]{4,19}$/', $chatId) === 1;
+            && preg_match('/^[A-Za-z0-9_]{5,32}$/', $botUsername) === 1
+            && str_ends_with(strtolower($botUsername), 'bot')
+            && $hasRecipient;
 
         return $this->requirement(
             'telegram.configuration',
             $valid,
             $strict,
-            'Telegram token and numeric admin chat ID are configured.',
-            'TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID is missing or malformed.',
+            'Telegram bot and at least one administrator recipient are configured.',
+            'Configure TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME and an active administrator binding or bootstrap fallback.',
         );
     }
 

@@ -91,6 +91,36 @@ async function syncTelegramUser(user) {
   return profileAsLegacyUser(payload.data);
 }
 
+async function bindAdminTelegram(ctx, code) {
+  const user = ctx.from || {};
+  const chat = ctx.chat || ctx.message?.chat || {};
+  const payload = await api().post("/admin-telegram-bindings", {
+    telegramId: String(user.id),
+    idempotencyKey: idempotencyKey(ctx, "admin-telegram-binding"),
+    body: {
+      code: String(code || "").trim(),
+      chat_id: String(chat.id),
+      chat_type: String(chat.type || ""),
+      username: user.username || null,
+      first_name: user.first_name || null,
+      last_name: user.last_name || null,
+      locale: telegramLocale(user.language_code),
+    },
+  });
+
+  return payload.data;
+}
+
+async function revokeExposedAdminTelegramBindingCode(ctx, code) {
+  const payload = await api().post("/admin-telegram-binding-codes/revoke", {
+    telegramId: String(ctx.from?.id || ""),
+    idempotencyKey: idempotencyKey(ctx, "admin-telegram-binding-code-revoke"),
+    body: {code: String(code || "").trim()},
+  });
+
+  return payload.data;
+}
+
 async function getProfile(telegramId) {
   const payload = await api().get("/customers/me", {telegramId});
   return profileAsLegacyUser(payload.data);
@@ -247,6 +277,7 @@ async function cancelBooking(ctx, publicId, reason = null) {
 }
 
 module.exports = {
+  bindAdminTelegram,
   cancelBooking,
   createBookings,
   getBooking,
@@ -267,4 +298,5 @@ module.exports = {
   updateProfile,
   uploadPassport,
   quote,
+  revokeExposedAdminTelegramBindingCode,
 };

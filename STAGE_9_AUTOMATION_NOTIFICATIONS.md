@@ -2,8 +2,9 @@
 
 Дата закрытия: 2026-07-22.
 
-Статус: выполнен. Реальная отправка в Telegram требует production token и numeric
-admin chat ID; секреты не хранятся в Git и не использовались в автоматических тестах.
+Статус: выполнен. Реальная отправка в Telegram требует token, bot username и хотя бы
+одного подключенного администратора. `TELEGRAM_ADMIN_CHAT_ID` оставлен только как
+временный bootstrap fallback до первой DB-привязки; секреты не хранятся в Git.
 
 ## 1. Результат
 
@@ -25,6 +26,8 @@ Laravel полностью владеет шаблонами, планирова
 - reconciliation напоминаний и housekeeping;
 - локализованные шаблоны `ru`, `en`, `ua` и безопасное HTML-экранирование;
 - monitoring command и структурированные warning/error logs.
+- персональная Telegram-привязка каждого web-администратора одноразовым кодом;
+- независимый fan-out административных событий всем активным получателям.
 
 Поздняя отмена менее чем за 24 часа остается синхронным сценарием Bot API: бронь не
 изменяется, а клиент получает runtime `MANAGER_TELEGRAM_USERNAME`. Отдельное
@@ -74,6 +77,18 @@ Telegram Bot API не предоставляет idempotency key для `sendMes
 неустранимое внешнее окно: процесс может завершиться после принятия сообщения
 Telegram, но до записи `sent_at`. Для расследования сохраняются attempts,
 `provider_message_id`, timestamps, last error и structured logs.
+
+Для административного события создается отдельная outbox-запись на каждого активного
+администратора. Получатель имеет версионированный ключ
+`admin-binding:<binding-id>:v<generation>`. При отвязке, повторной привязке, удалении,
+деактивации или снятии email verification прежнее поколение становится неприменимым и
+delivery переводит ожидающее сообщение в `discarded`, не обращаясь к Telegram. Ошибка
+одного администратора не блокирует доставку остальным. Для административного действия
+инициатор исключается из fan-out, но остальные подключенные администраторы продолжают
+получать событие. Очистка identity защищена как Eloquent observer, так и PostgreSQL
+lifecycle-trigger, поэтому bulk update/delete также не может оживить старую очередь или
+оставить уникальный Telegram ID в orphan-записи; все еще активные коды такого администратора
+отзываются той же транзакцией.
 
 ## 4. Expiry и reminders
 
@@ -145,15 +160,31 @@ pending, stale processing или отсутствующей обязательн
 
 ```dotenv
 TELEGRAM_BOT_TOKEN=<same bot token stored as a backend secret>
-TELEGRAM_ADMIN_CHAT_ID=<numeric chat id>
+TELEGRAM_BOT_USERNAME=<bot username without a secret>
+# Optional only on a fresh installation, before the first DB binding:
+TELEGRAM_ADMIN_CHAT_ID=<bootstrap numeric chat id>
+TELEGRAM_BINDING_CODE_TTL_MINUTES=10
+TELEGRAM_BINDING_CODE_RETENTION_DAYS=7
 MANAGER_TELEGRAM_USERNAME=@username
 APP_URL=https://admin.example.com
 QUEUE_CONNECTION=redis
 CACHE_STORE=redis
 ```
 
-`TELEGRAM_ADMIN_CHAT_ID` должен быть numeric chat ID пользователя/чата, который уже
-доступен боту. Обычного username недостаточно для надежной proactive-доставки.
+Каждый администратор открывает `Настройки -> Уведомления Telegram`, подтверждает пароль,
+создает одноразовый код и отправляет боту команду `/bind XXXX-XXXX` в личном чате. Код
+действует 10 минут, хранится только как HMAC и погашается один раз. Затем следует отправить
+тестовое сообщение с той же страницы. Процедура повторяется из web-аккаунта каждого
+администратора; один Telegram ID нельзя подключить к двум администраторам.
+Уже подключенный администратор может выпустить код замены без предварительной отвязки:
+старый чат продолжает получать уведомления до успешного `/bind`, после чего generation
+атомарно меняется. Если `/bind` с валидным кодом случайно отправлен в группе, бот best
+effort удаляет сообщение и через доверенный API сразу отзывает раскрытый код.
+
+До первой записи в `admin_telegram_bindings` допускается numeric
+`TELEGRAM_ADMIN_CHAT_ID`. Как только появилась первая привязка или tombstone, список в
+БД навсегда становится авторитетным, а fallback не включается повторно. Поэтому отвязка
+последнего администратора означает ноль административных получателей до новой привязки.
 Полный список tuning-параметров находится в `backend/.env.example`.
 
 ## 8. Проверки
@@ -168,6 +199,8 @@ CACHE_STORE=redis
 - динамические поля HTML-экранируются;
 - provider message ID и sent timestamp сохраняются;
 - manual retry, monitor и dry-run housekeeping покрыты feature tests;
+- одноразовость/TTL кодов, private-chat identity, multi-admin fan-out, смена generation,
+  удаление админа и запрет возврата legacy fallback покрыты feature tests;
 - PostgreSQL migration применена и расширяет status constraint значением discarded.
 
 Финальный срез:

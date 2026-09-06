@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Models\AdminTelegramBinding;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -108,6 +109,57 @@ class ProfileUpdateTest extends TestCase
         $this->assertNull($first->fresh());
         $this->assertNotNull($second->fresh());
         $this->assertSame(1, User::query()->where('is_active', true)->count());
+    }
+
+    public function test_deleting_an_administrator_scrubs_their_telegram_binding_but_keeps_a_tombstone(): void
+    {
+        $user = User::factory()->create();
+        User::factory()->create();
+        $binding = AdminTelegramBinding::query()->create([
+            'admin_user_id' => $user->id,
+            'telegram_user_id' => '700099',
+            'telegram_chat_id' => '700099',
+            'username' => 'former_admin',
+            'first_name' => 'Former',
+            'locale' => 'ru',
+            'generation' => 3,
+            'connected_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->delete(route('profile.destroy'), ['password' => 'password'])
+            ->assertSessionHasNoErrors();
+
+        $binding->refresh();
+        $this->assertNull($binding->admin_user_id);
+        $this->assertNull($binding->telegram_user_id);
+        $this->assertNull($binding->telegram_chat_id);
+        $this->assertNull($binding->username);
+        $this->assertSame(4, $binding->generation);
+        $this->assertNotNull($binding->disconnected_at);
+    }
+
+    public function test_direct_model_deletion_also_scrubs_a_telegram_binding(): void
+    {
+        $user = User::factory()->create();
+        $binding = AdminTelegramBinding::query()->create([
+            'admin_user_id' => $user->id,
+            'telegram_user_id' => '700098',
+            'telegram_chat_id' => '700098',
+            'username' => 'direct_delete_admin',
+            'locale' => 'en',
+            'generation' => 1,
+            'connected_at' => now(),
+        ]);
+
+        $user->delete();
+
+        $binding->refresh();
+        $this->assertNull($binding->admin_user_id);
+        $this->assertNull($binding->telegram_user_id);
+        $this->assertNull($binding->telegram_chat_id);
+        $this->assertNull($binding->username);
+        $this->assertSame(2, $binding->generation);
     }
 
     public function test_correct_password_must_be_provided_to_delete_account()

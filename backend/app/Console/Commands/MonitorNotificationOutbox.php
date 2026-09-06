@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Notifications\Services\AdminTelegramRecipientResolver;
 use App\Models\NotificationOutbox;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +13,7 @@ class MonitorNotificationOutbox extends Command
 
     protected $description = 'Report failed, overdue and stale notification outbox records';
 
-    public function handle(): int
+    public function handle(AdminTelegramRecipientResolver $adminRecipients): int
     {
         $staleMinutes = max(1, (int) config('notifications.outbox.processing_stale_minutes', 10));
         $overdueMinutes = max(1, (int) config('notifications.outbox.monitor_overdue_minutes', 15));
@@ -32,7 +33,9 @@ class MonitorNotificationOutbox extends Command
         ];
         $configurationIssues = array_values(array_filter([
             trim((string) config('notifications.telegram.bot_token')) === '' ? 'TELEGRAM_BOT_TOKEN is missing' : null,
-            trim((string) config('notifications.telegram.admin_chat_id')) === '' ? 'TELEGRAM_ADMIN_CHAT_ID is missing' : null,
+            ! $adminRecipients->hasConfiguredRecipient()
+                ? 'No active Telegram administrator binding or bootstrap fallback is configured'
+                : null,
         ]));
         $healthy = array_sum($metrics) === 0 && $configurationIssues === [];
 

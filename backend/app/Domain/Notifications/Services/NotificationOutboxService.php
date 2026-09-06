@@ -12,6 +12,8 @@ use DateTimeInterface;
 
 class NotificationOutboxService
 {
+    public function __construct(private readonly AdminTelegramRecipientResolver $adminRecipients) {}
+
     /** @param array<string, mixed> $payload */
     public function enqueue(
         string $deduplicationKey,
@@ -52,6 +54,41 @@ class NotificationOutboxService
             'booking_public_id' => (string) $booking->public_id,
             ...$payload,
         ], $availableAt);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<NotificationOutbox>
+     */
+    public function enqueueAdmins(
+        string $eventType,
+        string $deduplicationKey,
+        array $payload,
+        ?DateTimeInterface $availableAt = null,
+        ?int $excludedAdminId = null,
+    ): array {
+        $notifications = [];
+
+        foreach ($this->adminRecipients->recipients($excludedAdminId) as $recipient) {
+            $key = $recipient->bindingId === null
+                ? $deduplicationKey
+                : "{$deduplicationKey}:{$recipient->deduplicationSuffix()}";
+            $notifications[] = $this->enqueue(
+                $key,
+                $eventType,
+                'internal',
+                $recipient->outboxRecipient,
+                [
+                    ...$payload,
+                    'admin_locale' => $recipient->locale,
+                    'admin_binding_id' => $recipient->bindingId,
+                    'admin_binding_generation' => $recipient->generation,
+                ],
+                $availableAt,
+            );
+        }
+
+        return $notifications;
     }
 
     public function schedulePickupReminders(Booking $booking): void

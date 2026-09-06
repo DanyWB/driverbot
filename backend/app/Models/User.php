@@ -7,6 +7,8 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -38,6 +40,18 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     protected $table = 'admin_users';
+
+    /** @return HasOne<AdminTelegramBinding, $this> */
+    public function telegramBinding(): HasOne
+    {
+        return $this->hasOne(AdminTelegramBinding::class, 'admin_user_id');
+    }
+
+    /** @return HasMany<AdminTelegramBindingCode, $this> */
+    public function telegramBindingCodes(): HasMany
+    {
+        return $this->hasMany(AdminTelegramBindingCode::class, 'admin_user_id');
+    }
 
     /**
      * Get the attributes that should be cast.

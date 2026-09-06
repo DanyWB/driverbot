@@ -58,6 +58,8 @@ backup. Каждый release содержит `release-manifest.env` с UTC ID, 
    `deploy/env/bot.production.example` в `shared/bot/.env`.
 3. Заменить все `CHANGE_ME`, выставить права `0600` и владельца `drive-phangan`.
    `BOT_TOKEN` в bot env и `TELEGRAM_BOT_TOKEN` в backend env должны совпадать.
+   В backend env также указать публичный `TELEGRAM_BOT_USERNAME`. Numeric
+   `TELEGRAM_ADMIN_CHAT_ID` допустим только как bootstrap до первой web-привязки.
 4. Создать `APP_KEY` командой `php artisan key:generate --show` в защищенном окружении.
 5. Настроить PostgreSQL, Redis, SMTP, домен и TLS.
 6. Установить конфиги из `deploy/nginx`, `deploy/php-fpm`, `deploy/systemd` и `deploy/logrotate`.
@@ -85,6 +87,19 @@ php artisan bot-api:client issue --name="Production Telegram Bot"
 
 Service token показывается один раз и помещается только в `shared/bot/.env`. Для администратора
 до запуска подтверждается email и включается TOTP 2FA или passkey.
+
+После запуска bot/API каждый получатель самостоятельно открывает в админке
+`Настройки -> Уведомления Telegram`, подтверждает пароль, создает одноразовый код и отправляет
+команду `/bind XXXX-XXXX` боту в личном чате. На странице нужно выполнить тестовую отправку.
+Повторить для каждого администратора. Первый bind отключает bootstrap fallback навсегда;
+пустой список после последующей отвязки является намеренным состоянием, а не поводом возвращать
+старый env ID.
+
+Для смены Telegram-аккаунта используется кнопка замены на той же странице: сначала создается
+и принимается новый код, старый аккаунт до этого момента остается рабочим. Не отключайте старую
+привязку заранее без необходимости. Код, опубликованный в группе, считается раскрытым: бот
+сразу попытается удалить команду и отозвать код. Независимо от ответа бота нужно создать
+новый код и проверить текущий подключенный аккаунт на странице настроек.
 
 ## 5. Release
 
@@ -177,15 +192,16 @@ php artisan notifications:retry-failed --all
 php artisan notifications:dispatch-outbox
 ```
 
-Сначала устраняется причина ошибки. Массовый retry не запускается, пока Telegram token, chat ID,
-сеть и шаблоны не проверены.
+Сначала устраняется причина ошибки. Массовый retry не запускается, пока Telegram token,
+bot username, активные DB-привязки, сеть и шаблоны не проверены.
 
 Если outbox содержит давно просроченные `pending`-записи без `last_error`, а
 `failed_jobs` пуст, сначала проверьте, что одновременно работают scheduler и worker
 очереди `notifications`; такой backlog обычно означает, что dispatcher не запускался,
 а не ошибку Telegram API. До ручного `notifications:dispatch-outbox` убедитесь, что
-`TELEGRAM_BOT_TOKEN` и numeric `TELEGRAM_ADMIN_CHAT_ID` относятся к нужному окружению,
-администратор начал диалог с ботом, Laravel config cache обновлён, а исходящие запросы
+`TELEGRAM_BOT_TOKEN`/`TELEGRAM_BOT_USERNAME` относятся к нужному окружению,
+нужные администраторы отображаются подключенными и получили тестовое сообщение, Laravel
+config cache обновлён, а исходящие запросы
 к `api.telegram.org` разрешены. После исправления используйте monitor и точечный retry;
 массовая отправка старого локального backlog в production-чат запрещена.
 

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
+use App\Http\Controllers\Settings\TelegramController;
 /* @chisel-password-confirmation */
 use Illuminate\Auth\Middleware\RequirePassword;
 /* @end-chisel-password-confirmation */
@@ -28,6 +29,20 @@ Route::middleware(['auth', 'admin.active', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
+
+    Route::middleware(RequirePassword::class)->group(function (): void {
+        Route::get('settings/telegram', [TelegramController::class, 'edit'])
+            ->name('telegram.edit');
+        Route::post('settings/telegram/binding-code', [TelegramController::class, 'issueCode'])
+            ->middleware('throttle:5,1')
+            ->name('telegram.binding-code.store');
+        Route::post('settings/telegram/test', [TelegramController::class, 'test'])
+            ->middleware('throttle:3,1')
+            ->name('telegram.test');
+        Route::delete('settings/telegram/binding', [TelegramController::class, 'destroy'])
+            ->middleware('throttle:5,1')
+            ->name('telegram.binding.destroy');
+    });
 });
 
 /* @chisel-passkeys */

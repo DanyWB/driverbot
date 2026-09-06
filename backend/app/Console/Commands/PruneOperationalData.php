@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\AdminTelegramBindingCode;
 use App\Models\IdempotencyKey;
 use App\Models\NotificationOutbox;
 use Illuminate\Console\Command;
@@ -10,14 +11,21 @@ class PruneOperationalData extends Command
 {
     protected $signature = 'operations:housekeeping {--dry-run : Count records without deleting them}';
 
-    protected $description = 'Prune expired idempotency keys and delivered notification history';
+    protected $description = 'Prune expired idempotency keys, Telegram binding codes, and delivered notification history';
 
     public function handle(): int
     {
         $sentBefore = now()->subDays(max(1, (int) config('notifications.outbox.sent_retention_days', 90)));
         $discardedBefore = now()->subDays(max(1, (int) config('notifications.outbox.discarded_retention_days', 30)));
+        $bindingCodeBefore = now()->subDays(max(1, (int) config('notifications.telegram.binding_code_retention_days', 7)));
         $queries = [
             'idempotency_keys' => IdempotencyKey::query()->where('expires_at', '<=', now()),
+            'telegram_binding_codes' => AdminTelegramBindingCode::query()
+                ->where(function ($query) use ($bindingCodeBefore): void {
+                    $query->where('expires_at', '<=', $bindingCodeBefore)
+                        ->orWhere('consumed_at', '<=', $bindingCodeBefore)
+                        ->orWhere('revoked_at', '<=', $bindingCodeBefore);
+                }),
             'sent_notifications' => NotificationOutbox::query()
                 ->where('status', NotificationOutbox::STATUS_SENT)
                 ->where('sent_at', '<=', $sentBefore),

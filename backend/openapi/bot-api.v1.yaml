@@ -13,6 +13,7 @@ security:
   - serviceToken: []
 tags:
   - name: Configuration
+  - name: Administration
   - name: Customers
   - name: Catalog
   - name: Pricing
@@ -36,6 +37,67 @@ paths:
                         $ref: '#/components/schemas/Configuration'
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /admin-telegram-bindings:
+    post:
+      tags: [Administration]
+      operationId: consumeAdminTelegramBindingCode
+      description: >-
+        Consumes a short-lived code created by the authenticated web administrator.
+        The Telegram identity is taken from X-Telegram-User-ID and can only be linked
+        from that user's private chat with the bot.
+      parameters:
+        - $ref: '#/components/parameters/TelegramUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AdminTelegramBindingRequest'}
+      responses:
+        '200':
+          description: Telegram account linked to the administrator.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: {$ref: '#/components/schemas/AdminTelegramBindingResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /admin-telegram-binding-codes/revoke:
+    post:
+      tags: [Administration]
+      operationId: revokeExposedAdminTelegramBindingCode
+      description: >-
+        Revokes a one-time binding code that was sent to the bot outside a private
+        chat. The response deliberately does not reveal whether the code existed.
+      parameters:
+        - $ref: '#/components/parameters/TelegramUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AdminTelegramBindingCodeRevocationRequest'}
+      responses:
+        '200':
+          description: The code is no longer usable, or was already unknown or terminal.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: {$ref: '#/components/schemas/AdminTelegramBindingCodeRevocationResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
         '429': {$ref: '#/components/responses/RateLimited'}
   /customers/sync:
     post:
@@ -505,13 +567,57 @@ components:
       required: [telegram_id]
       properties:
         telegram_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
-        username: {type: [string, 'null'], maxLength: 64}
+        username:
+          type: [string, 'null']
+          maxLength: 64
+          pattern: '^@?[A-Za-z0-9_]+$'
         first_name: {type: [string, 'null'], maxLength: 255}
         last_name: {type: [string, 'null'], maxLength: 255}
         locale:
           type: [string, 'null']
           maxLength: 35
           description: Raw Telegram language code; `uk` is normalized to the internal `ua` locale.
+    AdminTelegramBindingRequest:
+      type: object
+      required: [code, chat_id, chat_type]
+      properties:
+        code:
+          type: string
+          pattern: '^[A-HJ-NP-Z2-9]{4}-?[A-HJ-NP-Z2-9]{4}$'
+        chat_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+        chat_type: {type: string, enum: [private]}
+        username:
+          type: [string, 'null']
+          maxLength: 64
+          pattern: '^@?[A-Za-z0-9_]+$'
+        first_name: {type: [string, 'null'], maxLength: 255}
+        last_name: {type: [string, 'null'], maxLength: 255}
+        locale:
+          type: [string, 'null']
+          maxLength: 35
+          description: Raw Telegram language code; `uk` is normalized to the internal `ua` locale.
+    AdminTelegramBindingResult:
+      type: object
+      required: [connected, admin_name, telegram_id, username, generation, connected_at]
+      properties:
+        connected: {type: boolean, const: true}
+        admin_name: {type: string, maxLength: 255}
+        telegram_id: {type: string, pattern: '^[1-9][0-9]{0,19}$'}
+        username: {type: [string, 'null'], maxLength: 64}
+        generation: {type: integer, minimum: 1}
+        connected_at: {type: string, format: date-time}
+    AdminTelegramBindingCodeRevocationRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^[A-HJ-NP-Z2-9]{4}-?[A-HJ-NP-Z2-9]{4}$'
+    AdminTelegramBindingCodeRevocationResult:
+      type: object
+      required: [revoked]
+      properties:
+        revoked: {type: boolean, const: true}
     CustomerUpdateRequest:
       type: object
       minProperties: 1

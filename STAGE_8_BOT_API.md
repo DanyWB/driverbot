@@ -37,6 +37,8 @@ OpenAPI является машинно-проверяемым контракт�
 | `GET` | `/vehicles/{id}` | карточка техники |
 | `GET` | `/vehicles/{id}/availability` | недоступные даты, диапазон до 93 дней |
 | `POST` | `/quotes` | расчет текущей цены и проверка доступности |
+| `POST` | `/admin-telegram-bindings` | одноразовая персональная привязка Telegram к web-администратору |
+| `POST` | `/admin-telegram-binding-codes/revoke` | безопасный отзыв кода, раскрытого вне личного чата |
 | `POST` | `/customers/sync` | идемпотентный upsert Telegram identity |
 | `GET` | `/customers/me` | клиентский профиль |
 | `PATCH` | `/customers/me` | имя, язык, телефон, username, номер паспорта |
@@ -56,7 +58,8 @@ Bot API не выдаются.
 Service token хранится в БД только как SHA-256 hash. Доступ разделен abilities:
 
 - `bot:read` - конфигурация, каталог, цены и чтение броней;
-- `bot:write` - sync/update клиента, создание и отмена;
+- `bot:write` - sync/update клиента, создание и отмена, привязка Telegram
+  администратора и отзыв раскрытого кода;
 - `bot:documents` - загрузка документов.
 
 Команды управления:
@@ -76,6 +79,9 @@ Rate limit двухуровневый:
 - невалидные bearer tokens: `30/min` на IP;
 - общий предел на service token: `600/min` по умолчанию;
 - предел на одного Telegram-пользователя: `90/min` по умолчанию.
+- попытки привязки администратора: отдельный предел `10/min` на Telegram ID;
+- отзыв раскрытого кода: независимые пределы `120/min` на service client и `30/min`
+  на Telegram ID; этот маршрут не расходует общий bucket обычных bot-запросов.
 
 Так один клиент не блокирует остальных, а скомпрометированный token не получает
 неограниченный трафик. Лимиты настраиваются через env.
@@ -168,6 +174,9 @@ CUSTOMER_DOCUMENT_MAX_MB=10
 BOT_API_AUTH_RATE_LIMIT_PER_MINUTE=30
 BOT_API_SERVICE_RATE_LIMIT_PER_MINUTE=600
 BOT_API_USER_RATE_LIMIT_PER_MINUTE=90
+BOT_API_BINDING_RATE_LIMIT_PER_MINUTE=10
+BOT_API_BINDING_REVOKE_SERVICE_RATE_LIMIT_PER_MINUTE=120
+BOT_API_BINDING_REVOKE_RATE_LIMIT_PER_MINUTE=30
 BOT_API_IDEMPOTENCY_TTL_HOURS=72
 BOT_API_MAX_BATCH_SIZE=10
 BOT_API_MAX_RENTAL_DAYS=366

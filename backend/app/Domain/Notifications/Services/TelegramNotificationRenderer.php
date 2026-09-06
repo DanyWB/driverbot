@@ -16,10 +16,13 @@ use Illuminate\Support\Facades\Lang;
 
 class TelegramNotificationRenderer
 {
+    public function __construct(private readonly AdminTelegramRecipientResolver $adminRecipients) {}
+
     public function render(NotificationOutbox $notification): RenderedTelegramMessage
     {
         $payload = $this->payload($notification);
         $publicId = trim((string) ($payload['booking_public_id'] ?? ''));
+        $admin = $notification->channel === 'internal';
 
         if ($publicId === '') {
             throw NotificationDeliveryException::permanent('Notification payload has no booking_public_id.');
@@ -38,18 +41,17 @@ class TelegramNotificationRenderer
             $this->assertCurrentReminder($booking, $payload);
         }
 
-        $admin = $notification->channel === 'internal' && $notification->recipient === 'admin';
-        $locale = $admin
-            ? $this->locale(config('notifications.telegram.admin_locale', 'ru'))
-            : $this->locale($booking->customer->locale);
-        $chatId = $admin
-            ? trim((string) config('notifications.telegram.admin_chat_id'))
-            : trim((string) $notification->recipient);
+        if ($admin) {
+            $adminRecipient = $this->adminRecipients->resolve((string) $notification->recipient);
+            $locale = $adminRecipient->locale;
+            $chatId = $adminRecipient->chatId;
+        } else {
+            $locale = $this->locale($booking->customer->locale);
+            $chatId = trim((string) $notification->recipient);
+        }
 
         if ($chatId === '') {
-            throw NotificationDeliveryException::permanent($admin
-                ? 'TELEGRAM_ADMIN_CHAT_ID is not configured.'
-                : 'Telegram recipient is empty.');
+            throw NotificationDeliveryException::permanent('Telegram recipient is empty.');
         }
 
         $reason = $this->cancellationReason($booking, $payload);

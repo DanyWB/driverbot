@@ -40,6 +40,8 @@ class DomainSchemaTest extends TestCase
             'customer_documents',
             'audit_logs',
             'notification_outbox',
+            'admin_telegram_bindings',
+            'admin_telegram_binding_codes',
             'service_api_clients',
             'idempotency_keys',
             'data_import_runs',

@@ -6,9 +6,11 @@ module.exports = async (ctx, next) => {
   ctx.backend = getBotApiClient();
   ctx.backendIdempotencyKey = (operation) => idempotencyKey(ctx, operation);
 
-  const isStartCommand = /^\/start(?:@[A-Za-z0-9_]+)?(?:\s|$)/.test(ctx.message?.text || "");
+  const skipsCustomerSync = /^\/(?:start|bind)(?:@[A-Za-z0-9_]+)?(?:\s|$)/.test(
+    ctx.message?.text || ""
+  );
 
-  if (ctx.from && !isStartCommand) {
+  if (ctx.from && !skipsCustomerSync) {
     const ttlMs = positiveInteger("BOT_CUSTOMER_SYNC_TTL_SECONDS", 86400) * 1000;
     const lastSyncedAt = Number(ctx.session?.backendCustomerSyncedAt || 0);
 
