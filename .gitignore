@@ -3,3 +3,13 @@
 .runtime/
 .tmp/
 /bot/logs/
+
+# Database exports must stay outside Git. Schema changes belong in migrations.
+*.dump
+*.backup
+*.sql.gz
+/driverbot.sql
+/bd.sql
+/insert.sql
+/bot/bd.sql
+/bot/insert.sql

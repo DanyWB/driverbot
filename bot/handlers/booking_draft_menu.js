@@ -82,6 +82,7 @@ async function buildDraftMenuPayload(ctx, options = {}) {
       days,
       days_label: t(lang, "days_label"),
       price: rental.total_price || t(lang, "booking_price_tbd"),
+      currency: rental.currency || "THB",
     });
   }
 

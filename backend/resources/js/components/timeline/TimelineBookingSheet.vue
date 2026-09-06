@@ -299,7 +299,6 @@ function domainError(key: string): string | undefined {
         <SheetContent
             side="right"
             class="w-full gap-0 overflow-hidden p-0 sm:max-w-xl lg:max-w-2xl"
-            :disable-outside-pointer-events="false"
         >
             <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="submit">
                 <SheetHeader class="shrink-0 border-b px-5 py-4 pr-12">

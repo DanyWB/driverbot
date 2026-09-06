@@ -34,6 +34,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -47,11 +48,16 @@ jobs:
 
       - name: Scan tracked files for secrets
         working-directory: .
-        run: node scripts/check-secrets.js
+        run: |
+          node --test scripts/check-secrets.test.js
+          node scripts/check-secrets.js
+          node scripts/check-sensitive-history.js
 
       - name: Validate deployment shell scripts
         working-directory: .
-        run: bash -n deploy/scripts/*.sh
+        run: |
+          bash -n deploy/scripts/*.sh deploy/tests/*.sh
+          bash deploy/tests/release-hardening.test.sh
 
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high

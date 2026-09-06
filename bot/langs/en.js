@@ -251,8 +251,10 @@ module.exports = {
   booking_not_enough_data: "Not enough data to create a rental.",
   booking_current_title: "🧾 <b>Current rental:</b>\n\n",
   booking_item:
-    "{emoji} <b>{name}</b>\n{start} - {end} ({days} {days_label})\nPrice: {price} THB\n\n",
+    "{emoji} <b>{name}</b>\n{start} - {end} ({days} {days_label})\nPrice: {price} {currency}\n\n",
   booking_confirm_btn: "✅ Confirm booking",
+  booking_quote_changed_reconfirm:
+    "⚠️ The price has changed. We updated the draft total. Please review it and tap “Confirm booking” again.",
   booking_add_bike_btn: "➕ Add vehicle",
   booking_delete_bike_btn: "🗑️ Remove vehicle",
   booking_reset_btn: "♻️ Reset",

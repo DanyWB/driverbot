@@ -3,16 +3,18 @@ Description=Drive Phangan Laravel notification queue worker
 PartOf=drive-phangan.target
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
 
 [Service]
 Type=simple
 User=drive-phangan
 Group=drive-phangan
 WorkingDirectory=/srv/drive-phangan/current/backend
-ExecStart=/usr/bin/php artisan queue:work redis --queue=notifications --sleep=1 --tries=1 --timeout=60 --max-time=3600
+ExecStart=/usr/bin/php artisan queue:work redis --queue=notifications --sleep=1 --tries=1 --timeout=60
 ExecReload=/bin/kill -USR2 $MAINPID
-Restart=always
-RestartSec=5s
+Restart=on-failure
+RestartSec=30s
 TimeoutStopSec=75s
 KillSignal=SIGTERM
 UMask=0027

@@ -248,8 +248,10 @@ module.exports = {
   booking_not_enough_data: "Недостатньо даних для оренди.",
   booking_current_title: "🧾 <b>Поточна оренда:</b>\n\n",
   booking_item:
-    "{emoji} <b>{name}</b>\n{start} - {end} ({days} {days_label})\nВартість: {price} THB\n\n",
+    "{emoji} <b>{name}</b>\n{start} - {end} ({days} {days_label})\nВартість: {price} {currency}\n\n",
   booking_confirm_btn: "✅ Підтвердити бронювання",
+  booking_quote_changed_reconfirm:
+    "⚠️ Ціна змінилася. Ми оновили вартість у чернетці. Перевірте її та натисніть «Підтвердити бронювання» ще раз.",
   booking_add_bike_btn: "➕ Додати транспорт",
   booking_delete_bike_btn: "🗑️ Видалити транспорт",
   booking_reset_btn: "♻️ Скинути",

@@ -34,7 +34,7 @@ async function showBookingDraft(ctx, options = {}) {
 
   return renderer.renderText(ctx, {
     screen: "booking_confirmation",
-    text: payload.text,
+    text: options.notice ? `${options.notice}\n\n${payload.text}` : payload.text,
     parseMode: "HTML",
     replyMarkup: payload.reply_markup,
     returnContext: {origin: options.origin || "booking_flow"},

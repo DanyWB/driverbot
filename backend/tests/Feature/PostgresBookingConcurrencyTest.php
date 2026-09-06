@@ -77,6 +77,7 @@ class PostgresBookingConcurrencyTest extends TestCase
             'DB_DATABASE' => (string) $connection['database'],
             'DB_USERNAME' => (string) $connection['username'],
             'DB_PASSWORD' => (string) $connection['password'],
+            'DB_SEARCH_PATH' => (string) $connection['search_path'],
             'DB_SSLMODE' => (string) $connection['sslmode'],
             'CACHE_STORE' => 'array',
             'QUEUE_CONNECTION' => 'sync',

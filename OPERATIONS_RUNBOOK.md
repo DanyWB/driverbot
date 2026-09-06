@@ -1,6 +1,6 @@
 # Operations runbook
 
-Дата актуализации: 2026-07-22.
+Дата актуализации: 2026-09-02.
 
 ## 1. Production topology
 
@@ -13,6 +13,9 @@
 - Laravel `schedule:work`;
 - Node.js Telegram-бот в long polling режиме;
 - локальные persistent files: публичные фото и приватные документы.
+
+Для `default` worker с `--timeout=90` значение `REDIS_QUEUE_RETRY_AFTER` должно быть не меньше
+`120`, чтобы Redis не выдал длительную задачу повторно до завершения первого процесса.
 
 Бот не принимает входящий HTTP-трафик и не имеет прямого доступа к business DB. Он делает
 исходящие запросы в Telegram и Laravel Bot API.
@@ -45,7 +48,8 @@ backup завершится ошибкой, а неполный архив не 
 ```
 
 Код release неизменяемый. Между release сохраняются только `.env`, Laravel `storage` и
-backup. В Git секретов и пользовательских файлов нет.
+backup. Каждый release содержит `release-manifest.env` с UTC ID, Git revision и ref; source
+обязан быть чистым Git checkout. В Git секретов и пользовательских файлов нет.
 
 ## 4. Первичная настройка
 
@@ -62,6 +66,16 @@ backup. В Git секретов и пользовательских файлов
 9. Выполнить `systemctl daemon-reload` и включить `drive-phangan.target` и
    `drive-phangan-backup.timer`.
 
+Шаблон FPM ограничивает pool шестью children. Четыре long-running service имеют 30-секундный
+restart backoff, `Restart=on-failure` и start limit `5/600s`; после установки unit-файлов это проверяется через
+`systemctl cat` и `systemctl show`.
+
+До public launch нужно разделить runtime identities: создать отдельного пользователя
+`drive-phangan-bot`, передать ему только `shared/bot/.env`, переключить `User`/`Group` bot unit и
+добавить ему `InaccessiblePaths=/srv/drive-phangan/shared/backend`. После этого повторно проверить
+`release:smoke`, чтение bot env и невозможность чтения backend env/storage. Текущий общий runtime
+user оставлен в шаблонах только до выполнения этого provisioning шага.
+
 До первого cutover создать администратора и service client:
 
 ```bash
@@ -70,7 +84,7 @@ php artisan bot-api:client issue --name="Production Telegram Bot"
 ```
 
 Service token показывается один раз и помещается только в `shared/bot/.env`. Для администратора
-до запуска включается TOTP 2FA или passkey.
+до запуска подтверждается email и включается TOTP 2FA или passkey.
 
 ## 5. Release
 
@@ -80,20 +94,34 @@ Service token показывается один раз и помещается �
 APP_ROOT=/srv/drive-phangan \
 SMOKE_BASE_URL=https://admin.real-domain.example \
 PHP_FPM_SERVICE=php8.3-fpm \
+DEPLOY_MIN_FREE_MB=2048 \
+DEPLOY_CUTOVER_MIN_FREE_MB=768 \
+RELEASE_RETENTION_COUNT=2 \
 bash deploy/scripts/deploy-release.sh /path/to/checkout
 ```
 
+Checkout должен быть корнем Git repository без tracked или untracked изменений. Deploy и
+rollback используют общий non-blocking lock: параллельный запуск завершается до любых изменений.
+Перед build требуется минимум `DEPLOY_MIN_FREE_MB`, перед maintenance/cutover — минимум
+`DEPLOY_CUTOVER_MIN_FREE_MB` свободного места. Значения можно только осознанно повысить или
+адаптировать под размер диска; нулевые и отрицательные значения запрещены.
+
 Скрипт выполняет:
 
-1. Копирование кода в новый release.
-2. Production install Composer/npm и Vite build.
-3. Связывание shared env/storage.
-4. Maintenance mode и остановку bot/worker/scheduler.
-5. Backup БД и persistent files.
-6. `migrate --force`, `optimize` и строгий release preflight.
-7. Атомарное переключение `current`.
-8. Запуск процессов, reload PHP-FPM и smoke.
+1. Удаление expired releases и проверка свободного места.
+2. Копирование чистого Git revision в новый release без legacy SQL/data dumps.
+3. Production install Composer/npm, Vite build и обязательные locked production dependency audits;
+   backend `node_modules` после build удаляется.
+4. Создание revision manifest и связывание shared env/storage.
+5. Maintenance mode и остановку bot/worker/scheduler.
+6. Backup БД и persistent files.
+7. `migrate --force`, `optimize` и строгий release preflight.
+8. Перевод code tree в root-owned read-only режим без обхода shared symlinks.
+9. Атомарное переключение `current`.
+10. Запуск процессов, reload PHP-FPM и полный smoke.
+11. Retention: текущий и один соседний release для code rollback.
 
+Неполный release до/после неуспешного cutover удаляется только после проверки безопасного пути.
 При ошибке после начала cutover скрипт возвращает `current` на предыдущий код. Миграции
 автоматически назад не откатываются. Все production migrations должны быть backward-compatible
 с предыдущим release; восстановление БД выполняется только по incident decision.
@@ -110,6 +138,20 @@ curl --fail https://admin.real-domain.example/health/ready
 
 `runtime-status` проверяет PostgreSQL, Redis, свежий scheduler heartbeat и отправляет harmless
 job в default queue. `/health/ready` в production также требует свежий scheduler heartbeat.
+Release smoke дополнительно требует active state обоих workers, scheduler и bot, затем запускает
+online bot preflight для Laravel Bot API, Redis и Telegram `getMe`.
+
+Только до cutover, когда production processes намеренно еще не подняты, разрешен ограниченный
+smoke без readiness, process checks и online bot calls:
+
+```bash
+ALLOW_PRE_CUTOVER_SMOKE=true \
+SMOKE_BASE_URL=https://admin.real-domain.example \
+deploy/scripts/smoke.sh
+```
+
+После cutover и для deploy/rollback этот флаг запрещен: отсутствие флага всегда означает полный
+smoke. Старый opt-in `RUN_BOT_API_SMOKE` больше не используется.
 
 Процессы и logs:
 
@@ -159,6 +201,10 @@ deploy/scripts/verify-backup.sh /srv/drive-phangan/backups/<timestamp>
 Backup содержит PostgreSQL custom dump, `storage/app/public`, `storage/app/private`, manifest и
 SHA-256 checksums. `.env` и другие секреты в него не входят. Копия должна регулярно уходить на
 второй сервер или object storage; локальная копия не защищает от потери всего сервера.
+При `ENABLE_BACKUP_PRUNE=true` expired timestamp-каталоги удаляются под backup lock до создания
+нового dump (это освобождает место при заполненном диске) и повторно после успешного backup.
+Root-запуск нормализует backup tree к `BACKUP_OWNER=drive-phangan`, `0700/0600`, чтобы следующий
+systemd-запуск и retention от service user не блокировались root-owned файлами.
 
 Тест восстановления:
 
@@ -182,6 +228,10 @@ Rollback только кода:
 SMOKE_BASE_URL=https://admin.real-domain.example \
 deploy/scripts/rollback-release.sh /srv/drive-phangan/releases/<timestamp>
 ```
+
+Rollback использует тот же deploy lock. Если target release не проходит полный smoke, скрипт
+автоматически возвращает исходный `current`, поднимает приложение и services. БД при этом не
+откатывается.
 
 Полное восстановление БД требует отдельного решения:
 

@@ -3,6 +3,8 @@ Description=Drive Phangan Telegram bot
 PartOf=drive-phangan.target
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -10,10 +12,10 @@ User=drive-phangan
 Group=drive-phangan
 WorkingDirectory=/srv/drive-phangan/current/bot
 Environment=NODE_ENV=production
-ExecStartPre=/usr/bin/npm run check:api
+ExecStartPre=/usr/bin/npm run release:smoke
 ExecStart=/usr/bin/node index.js
-Restart=always
-RestartSec=5s
+Restart=on-failure
+RestartSec=30s
 TimeoutStopSec=30s
 KillSignal=SIGTERM
 UMask=0027

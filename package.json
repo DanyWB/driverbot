@@ -8,6 +8,8 @@
     "check": "npm run precheck",
     "precheck": "node scripts/precheck.js",
     "check:secrets": "node scripts/check-secrets.js",
+    "check:history": "node scripts/check-sensitive-history.js",
+    "test:security": "node --test scripts/check-secrets.test.js",
     "preflight": "npm --prefix bot run preflight",
     "check:environment": "node scripts/check-environment.js",
     "setup:laravel-local": "node scripts/setup-laravel-local.js",

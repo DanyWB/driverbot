@@ -1,6 +1,6 @@
 # Production release acceptance checklist
 
-Дата актуализации: 2026-07-22.
+Дата актуализации: 2026-09-02.
 
 Release разрешен только после прохождения всех обязательных пунктов на staging с production-like
 Nginx/PHP-FPM, PostgreSQL и Redis.
@@ -14,7 +14,7 @@ Nginx/PHP-FPM, PostgreSQL и Redis.
 - [ ] Получены домен/TLS, Telegram token, numeric admin chat ID и manager username.
 - [ ] `BOT_TOKEN` бота и `TELEGRAM_BOT_TOKEN` backend содержат один и тот же Telegram token.
 - [ ] Настроен рабочий SMTP для password reset.
-- [ ] Создан один active admin, включены 2FA/passkey.
+- [ ] Создан один active admin, email подтверждён, включены 2FA/passkey.
 - [ ] Выпущен отдельный production Bot API service token.
 - [ ] `operations:release-preflight --strict` завершен успешно.
 
@@ -47,7 +47,9 @@ Nginx/PHP-FPM, PostgreSQL и Redis.
 
 - [ ] `/health/live` и `/health/ready` возвращают 200.
 - [ ] `operations:runtime-status --wait=20` проходит.
+- [ ] `REDIS_QUEUE_RETRY_AFTER` больше максимального worker timeout (`120 > 90`).
 - [ ] Принудительный restart каждого worker/scheduler/bot завершается автоматическим запуском.
+- [ ] Bot работает отдельным system user; bot unit не видит `shared/backend` через `InaccessiblePaths`.
 - [ ] Notification worker retry проверен на временной Telegram ошибке.
 - [ ] Backup создан и `verify-backup.sh` проходит.
 - [ ] Backup реально восстановлен в отдельную `_restore_test` БД.

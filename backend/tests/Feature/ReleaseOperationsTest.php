@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Operations\Data\ReleaseCheck;
 use App\Domain\Operations\Services\ReleasePreflightService;
 use App\Domain\Operations\Services\SchedulerHeartbeat;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -45,5 +47,33 @@ class ReleaseOperationsTest extends TestCase
             ->assertJsonPath('checks.scheduler', 'ok');
 
         $this->assertTrue(app(SchedulerHeartbeat::class)->isFresh());
+    }
+
+    public function test_strict_release_preflight_fails_when_an_active_admin_lacks_two_factor(): void
+    {
+        User::factory()->create(['two_factor_confirmed_at' => null]);
+        $preflight = app(ReleasePreflightService::class);
+
+        $strictCheck = collect($preflight->inspect(true))->firstWhere('id', 'admin.accounts');
+        $advisoryCheck = collect($preflight->inspect(false))->firstWhere('id', 'admin.accounts');
+
+        $this->assertInstanceOf(ReleaseCheck::class, $strictCheck);
+        $this->assertSame(ReleaseCheck::FAILURE, $strictCheck->status);
+        $this->assertInstanceOf(ReleaseCheck::class, $advisoryCheck);
+        $this->assertSame(ReleaseCheck::WARNING, $advisoryCheck->status);
+    }
+
+    public function test_strict_release_preflight_fails_when_an_active_admin_email_is_unverified(): void
+    {
+        User::factory()->unverified()->withTwoFactor()->create();
+        $preflight = app(ReleasePreflightService::class);
+
+        $strictCheck = collect($preflight->inspect(true))->firstWhere('id', 'admin.accounts');
+        $advisoryCheck = collect($preflight->inspect(false))->firstWhere('id', 'admin.accounts');
+
+        $this->assertInstanceOf(ReleaseCheck::class, $strictCheck);
+        $this->assertSame(ReleaseCheck::FAILURE, $strictCheck->status);
+        $this->assertInstanceOf(ReleaseCheck::class, $advisoryCheck);
+        $this->assertSame(ReleaseCheck::WARNING, $advisoryCheck->status);
     }
 }

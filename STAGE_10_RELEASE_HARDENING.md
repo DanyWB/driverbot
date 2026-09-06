@@ -1,6 +1,6 @@
 # Этап 10. Release hardening и deployment
 
-Дата реализации локальной части: 2026-07-22.
+Дата реализации локальной части: 2026-07-22. Release pipeline дополнительно усилен 2026-09-02.
 
 Статус: engineering scope выполнен и локально проверен. Production acceptance gate остается
 открытым до развертывания на реальном сервере, передачи секретов/контента и приемки заказчиком.
@@ -12,6 +12,12 @@
 - отдельные auto-restart services для default worker, notification worker, scheduler и bot;
 - immutable releases + shared env/storage + atomic `current` symlink;
 - deploy и code rollback scripts;
+- общий deploy/rollback lock, disk gates и безопасная очистка неполного release;
+- retention двух releases, revision manifest и удаление build-only backend `node_modules`;
+- locked Composer/npm production audits до cutover и root-owned read-only release после optimize;
+- rollback автоматически возвращает исходный `current`, если target не проходит smoke;
+- полный smoke проверяет оба worker, scheduler, bot и online Laravel/Redis/Telegram integrations;
+- FPM pool ограничен шестью children, process restart storm ограничен systemd start limits;
 - PostgreSQL + public/private files backup, checksums, verify и destructive-safe restore-test;
 - строгий `operations:release-preflight --strict`;
 - scheduler heartbeat, optional readiness gate и реальный queue probe;

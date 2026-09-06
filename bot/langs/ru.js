@@ -249,8 +249,10 @@ module.exports = {
   booking_not_enough_data: "Недостаточно данных для аренды.",
   booking_current_title: "🧾 <b>Текущая аренда:</b>\n\n",
   booking_item:
-    "{emoji} <b>{name}</b>\n{start} - {end} ({days} {days_label})\nСтоимость: {price} THB\n\n",
+    "{emoji} <b>{name}</b>\n{start} - {end} ({days} {days_label})\nСтоимость: {price} {currency}\n\n",
   booking_confirm_btn: "✅ Подтвердить бронирование",
+  booking_quote_changed_reconfirm:
+    "⚠️ Цена изменилась. Мы обновили стоимость в черновике. Проверьте её и нажмите «Подтвердить бронирование» ещё раз.",
   booking_add_bike_btn: "➕ Добавить технику",
   booking_delete_bike_btn: "🗑️ Удалить технику",
   booking_reset_btn: "♻️ Сбросить",

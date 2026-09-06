@@ -137,13 +137,42 @@ module.exports = async (ctx) => {
       });
     }
 
-    const confirmedRentals = isLaravelMode()
-      ? (await gateway.createBookings(
-          ctx,
-          sessionCart.toApiItems(ctx),
-          sessionCart.confirmationKey(ctx)
-        )).map((entry) => entry.booking)
-      : await confirmDraftRentals(db, {userId: user.id});
+    let confirmedRentals;
+    if (isLaravelMode()) {
+      const confirmationKey = sessionCart.confirmationKey(ctx);
+
+      if (!sessionCart.hasConfirmationAttempt(ctx, confirmationKey)) {
+        const quotes = await Promise.all(rentals.map((rental) => gateway.quote(
+          rental.bike_id,
+          rental.start_date,
+          rental.end_date
+        )));
+        if (quotes.some((quote) => !quote.available)) {
+          const error = new Error("overlap_conflict");
+          error.code = "overlap_conflict";
+          throw error;
+        }
+
+        if (sessionCart.applyAuthoritativeQuotes(ctx, quotes)) {
+          return require("./book_draft").showBookingDraft(ctx, {
+            lang,
+            user,
+            notice: t(lang, "booking_quote_changed_reconfirm"),
+            backAction: "menu:main",
+            navigationMode: "replace",
+          });
+        }
+      }
+
+      sessionCart.markConfirmationAttempt(ctx, confirmationKey);
+      confirmedRentals = (await gateway.createBookings(
+        ctx,
+        sessionCart.toApiItems(ctx),
+        confirmationKey
+      )).map((entry) => entry.booking);
+    } else {
+      confirmedRentals = await confirmDraftRentals(db, {userId: user.id});
+    }
 
     if (!confirmedRentals.length) {
       return ctx.answerCallbackQuery(t(lang, "booking_no_bookings_to_confirm"));
@@ -214,6 +243,7 @@ module.exports = async (ctx) => {
   } catch (err) {
     if (err.code === "BOT_API_UNAVAILABLE") throw err;
     if (err.code === "TERMS_VERSION_OUTDATED") {
+      sessionCart.clearConfirmationAttempt(ctx);
       sessionCart.clearTermsAcceptance(ctx);
       ctx.session.termsOrigin = "booking_confirmation";
       return botScreenRenderer.renderText(ctx, {
@@ -230,6 +260,7 @@ module.exports = async (ctx) => {
       });
     }
     if (["overlap_conflict", "VEHICLE_UNAVAILABLE"].includes(err.code)) {
+      sessionCart.clearConfirmationAttempt(ctx);
       return botScreenRenderer.renderText(ctx, {
         screen: "booking_conflict",
         text: t(lang, "booking_bike_busy", {name: ""}),

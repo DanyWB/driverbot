@@ -10,6 +10,13 @@ const appStyles = await readFile(
     new URL('../../resources/css/app.css', import.meta.url),
     'utf8',
 );
+const bookingSheet = await readFile(
+    new URL(
+        '../../resources/js/components/timeline/TimelineBookingSheet.vue',
+        import.meta.url,
+    ),
+    'utf8',
+);
 
 test('fullscreen hides all timeline chrome and gives the grid the viewport', () => {
     assert.match(
@@ -57,5 +64,18 @@ test('timeline has a taller horizontal scrollbar target', () => {
     assert.match(
         appStyles,
         /\.timeline-scroll-area::-webkit-scrollbar\s*{[^}]*height:\s*18px;/s,
+    );
+});
+
+test('quick booking keeps modal pointer-event isolation', () => {
+    assert.doesNotMatch(
+        bookingSheet,
+        /:?disable-outside-pointer-events\s*=\s*["'][^"']*false[^"']*["']/,
+        'the sheet overlay locks body pointer events, so modal content must retain the Reka default that restores pointer events inside the sheet',
+    );
+    assert.doesNotMatch(
+        bookingSheet,
+        /<Sheet\b[^>]*:?modal\s*=\s*["'][^"']*false[^"']*["']/s,
+        'quick booking must remain modal while its overlay is mounted',
     );
 });
