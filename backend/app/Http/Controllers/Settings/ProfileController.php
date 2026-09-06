@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Domain\Administration\Services\AdminAccountService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileDeleteRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
-use App\Models\User;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,19 +47,13 @@ class ProfileController extends Controller
     /**
      * Delete the user's profile.
      */
-    public function destroy(ProfileDeleteRequest $request): RedirectResponse
+    public function destroy(ProfileDeleteRequest $request, AdminAccountService $accounts): RedirectResponse
     {
         $user = $request->user();
 
-        if (! User::query()->where('is_active', true)->whereKeyNot($user->getKey())->exists()) {
-            throw ValidationException::withMessages([
-                'password' => 'The last active administrator account cannot be deleted.',
-            ]);
-        }
+        $accounts->delete($user);
 
         Auth::logout();
-
-        $user->delete();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

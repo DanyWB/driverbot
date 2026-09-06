@@ -1,11 +1,11 @@
 const assert = require("node:assert/strict");
 require("dotenv").config();
-const {requireLaravelConfig} = require("../config/runtime");
+const {requireExplicitLaravelMode} = require("../config/runtime");
 const {BotApiClient} = require("../services/botApiClient");
 
-async function main() {
-  requireLaravelConfig();
-  const client = new BotApiClient();
+async function main({env = process.env, Client = BotApiClient} = {}) {
+  requireExplicitLaravelMode(env);
+  const client = new Client();
   const [configuration, categories] = await Promise.all([
     client.get("/configuration"),
     client.get("/categories"),
@@ -17,7 +17,11 @@ async function main() {
   console.log("[ok] Laravel Bot API authentication and read endpoints");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {main};

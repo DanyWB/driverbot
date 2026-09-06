@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\Bookings\Exceptions\BookingException;
+use App\Domain\Integrations\Bot\Exceptions\BotApiException;
+use App\Domain\Pricing\Exceptions\PricingException;
 use App\Http\Controllers\HealthController;
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\AssignRequestId;
@@ -52,6 +55,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->dontReportWhen(fn (Throwable $exception): bool => match (true) {
+            $exception instanceof BotApiException => $exception->httpStatus < 500,
+            $exception instanceof BookingException => $exception->httpStatus < 500,
+            $exception instanceof PricingException => true,
+            default => false,
+        });
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

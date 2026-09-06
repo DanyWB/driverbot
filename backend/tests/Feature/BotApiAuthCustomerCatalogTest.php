@@ -9,6 +9,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleOccupancy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 
 class BotApiAuthCustomerCatalogTest extends BotApiTestCase
@@ -38,6 +39,19 @@ class BotApiAuthCustomerCatalogTest extends BotApiTestCase
             ->postJson('/api/v1/bot/customers/sync', ['telegram_id' => '100001'])
             ->assertForbidden()
             ->assertJsonPath('error.code', 'ABILITY_FORBIDDEN');
+    }
+
+    public function test_expected_bot_api_client_errors_are_not_reported_as_server_errors(): void
+    {
+        Log::spy();
+
+        $this->getJson('/api/v1/bot/vehicles')->assertUnauthorized();
+        $this->syncCustomer('100099');
+        $this->withHeaders($this->apiHeaders('100099'))
+            ->getJson('/api/v1/bot/bookings/00000000-0000-4000-8000-000000000000')
+            ->assertNotFound();
+
+        Log::shouldNotHaveReceived('error');
     }
 
     public function test_rate_limit_is_scoped_to_authenticated_service_client(): void

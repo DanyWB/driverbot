@@ -264,14 +264,22 @@ class ReleasePreflightService
             ->where('is_active', true)
             ->whereNull('two_factor_confirmed_at')
             ->count();
+        $withoutVerifiedEmail = User::query()
+            ->where('is_active', true)
+            ->whereNull('email_verified_at')
+            ->count();
 
         if ($active === 0) {
             return $this->requirement('admin.accounts', false, $strict, '', 'No active administrator exists.');
         }
 
-        return $withoutTwoFactor === 0
-            ? $this->pass('admin.accounts', "Active administrators: {$active}; two-factor authentication is enabled.")
-            : $this->warn('admin.accounts', "Active administrators: {$active}; {$withoutTwoFactor} still require two-factor setup.");
+        return $this->requirement(
+            'admin.accounts',
+            $withoutTwoFactor === 0 && $withoutVerifiedEmail === 0,
+            $strict,
+            "Active administrators: {$active}; verified email and two-factor authentication are enabled.",
+            "Active administrators: {$active}; {$withoutVerifiedEmail} require email verification and {$withoutTwoFactor} require two-factor setup.",
+        );
     }
 
     private function serviceClient(bool $strict): ReleaseCheck

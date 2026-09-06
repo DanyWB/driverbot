@@ -3,6 +3,8 @@ Description=Drive Phangan Laravel scheduler
 PartOf=drive-phangan.target
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -10,8 +12,8 @@ User=drive-phangan
 Group=drive-phangan
 WorkingDirectory=/srv/drive-phangan/current/backend
 ExecStart=/usr/bin/php artisan schedule:work
-Restart=always
-RestartSec=5s
+Restart=on-failure
+RestartSec=30s
 TimeoutStopSec=30s
 KillSignal=SIGTERM
 UMask=0027

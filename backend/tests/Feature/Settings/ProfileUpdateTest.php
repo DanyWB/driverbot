@@ -92,6 +92,24 @@ class ProfileUpdateTest extends TestCase
         $this->assertNotNull($user->fresh());
     }
 
+    public function test_deleting_one_of_two_administrators_keeps_the_last_account_active(): void
+    {
+        $first = User::factory()->create();
+        $second = User::factory()->create();
+
+        $this->actingAs($first)
+            ->delete(route('profile.destroy'), ['password' => 'password'])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($second)
+            ->delete(route('profile.destroy'), ['password' => 'password'])
+            ->assertSessionHasErrors('password');
+
+        $this->assertNull($first->fresh());
+        $this->assertNotNull($second->fresh());
+        $this->assertSame(1, User::query()->where('is_active', true)->count());
+    }
+
     public function test_correct_password_must_be_provided_to_delete_account()
     {
         $user = User::factory()->create();

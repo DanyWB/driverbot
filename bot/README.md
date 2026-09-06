@@ -138,18 +138,15 @@ npm install
 ```powershell
 psql -U postgres -c "CREATE USER driverbot_user WITH PASSWORD 'CHANGE_ME_LOCAL';"
 psql -U postgres -c "CREATE DATABASE driverbot OWNER driverbot_user;"
-psql -U postgres -d driverbot -f .\bd.sql
-psql -U postgres -d driverbot -c "REASSIGN OWNED BY postgres TO driverbot_user;"
-psql -U postgres -d driverbot -c "ALTER DATABASE driverbot OWNER TO driverbot_user;"
 ```
 
-После импорта дампа накати свежие миграции проекта:
+Создай схему только штатными миграциями проекта:
 
 ```powershell
 npm run migrate
 ```
 
-`bd.sql` - основной дамп базы со стартовыми данными. Файл `insert.sql` старый и может не совпадать с текущей схемой после всех миграций, поэтому для обычного локального запуска его лучше не использовать.
+Новая локальная база будет без каталожных и пользовательских данных. Если они нужны для разработки, используй отдельно переданный обезличенный набор данных. SQL-дампы с реальными пользователями, бронированиями или сессиями нельзя хранить в Git.
 
 ## Создать `.env`
 
@@ -303,10 +300,9 @@ PG_PASSWORD=CHANGE_ME_LOCAL
 
 ### `relation "users" does not exist`
 
-Схема базы не создана или не импортирован дамп. Выполни:
+Схема базы не создана. Выполни из папки `bot`:
 
 ```powershell
-psql -U postgres -d driverbot -f .\bd.sql
 npm run migrate
 ```
 

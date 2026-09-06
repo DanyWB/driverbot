@@ -7,11 +7,24 @@ function getCart(ctx) {
 
 function rotateConfirmationNonce(ctx) {
   ctx.session.bookingCartConfirmationNonce = randomUUID();
+  ctx.session.bookingCartConfirmationAttemptKey = null;
 }
 
 function confirmationKey(ctx) {
   ctx.session.bookingCartConfirmationNonce ||= randomUUID();
   return `telegram:${ctx.from.id}:cart:${ctx.session.bookingCartConfirmationNonce}`;
+}
+
+function hasConfirmationAttempt(ctx, key) {
+  return ctx.session.bookingCartConfirmationAttemptKey === key;
+}
+
+function markConfirmationAttempt(ctx, key) {
+  ctx.session.bookingCartConfirmationAttemptKey = key;
+}
+
+function clearConfirmationAttempt(ctx) {
+  ctx.session.bookingCartConfirmationAttemptKey = null;
 }
 
 function dateTime(date, time) {
@@ -61,6 +74,7 @@ function remove(ctx, id) {
 function clear(ctx) {
   ctx.session.bookingCart = [];
   ctx.session.bookingCartConfirmationNonce = null;
+  clearConfirmationAttempt(ctx);
   clearTermsAcceptance(ctx);
 }
 
@@ -110,6 +124,58 @@ function loadOptionsIntoBooking(ctx, booking) {
   return item;
 }
 
+function normalizeMonetaryValue(value) {
+  const input = String(value ?? "").trim();
+  const match = /^([+-]?)(\d+)(?:\.(\d+))?$/.exec(input);
+  if (!match) return input;
+
+  const integer = match[2].replace(/^0+(?=\d)/, "");
+  const fraction = String(match[3] || "").replace(/0+$/, "");
+  const negative = match[1] === "-" && (integer !== "0" || fraction !== "");
+  return `${negative ? "-" : ""}${integer}${fraction ? `.${fraction}` : ""}`;
+}
+
+function applyAuthoritativeQuotes(ctx, quotes) {
+  const cart = getCart(ctx);
+  if (quotes.length !== cart.length) {
+    throw new Error("Authoritative quote count does not match the booking cart");
+  }
+
+  const updates = cart.map((item, index) => {
+    const quote = quotes[index];
+    if (!quote || quote.final_total == null || !String(quote.currency || "").trim()) {
+      throw new Error(`Missing authoritative quote for vehicle ${item.bike_id}`);
+    }
+    if (String(quote.vehicle_id) !== String(item.bike_id)) {
+      throw new Error(`Authoritative quote vehicle mismatch at cart position ${index}`);
+    }
+
+    const totalChanged =
+      normalizeMonetaryValue(item.total_price) !==
+      normalizeMonetaryValue(quote.final_total);
+    const currencyChanged =
+      String(item.currency || "").trim().toUpperCase() !==
+      String(quote.currency).trim().toUpperCase();
+    return {
+      item,
+      quote,
+      changed: totalChanged || currencyChanged,
+    };
+  });
+
+  const changed = updates.some((update) => update.changed);
+  if (!changed) return false;
+
+  for (const {item, quote, changed: itemChanged} of updates) {
+    if (!itemChanged) continue;
+    item.total_price = quote.final_total;
+    item.currency = String(quote.currency).trim();
+  }
+
+  rotateConfirmationNonce(ctx);
+  return true;
+}
+
 function toApiItems(ctx) {
   return getCart(ctx).map((item) => ({
     client_reference: item.client_reference,
@@ -127,13 +193,17 @@ function toApiItems(ctx) {
 
 module.exports = {
   add,
+  applyAuthoritativeQuotes,
   applyOptions,
   clear,
+  clearConfirmationAttempt,
   clearTermsAcceptance,
   confirmationKey,
   getCart,
+  hasConfirmationAttempt,
   loadOptionsIntoBooking,
   markTermsAccepted,
+  markConfirmationAttempt,
   remove,
   toApiItems,
 };
