@@ -1,12 +1,15 @@
 # Operations runbook
 
-Дата актуализации: 2026-09-02.
+Дата актуализации: 2026-09-08.
 
 ## 1. Production topology
 
 Один production-сервер содержит:
 
-- Nginx -> PHP-FPM -> Laravel web/admin и `/api/v1/bot`;
+- публичную заглушку сайта на `https://drivephangan.com`; `www` всегда перенаправляется
+  на канонический адрес без `www`;
+- Nginx -> PHP-FPM -> Laravel web/admin и `/api/v1/bot` только на
+  `https://admin.drivephangan.com`;
 - PostgreSQL как единственный источник бизнес-данных;
 - Redis для cache, session, queue и bot sessions;
 - два Laravel worker: `default` и `notifications`;
@@ -44,6 +47,7 @@ backup завершится ошибкой, а неполный архив не 
   shared/backend/.env
   shared/backend/storage/
   shared/bot/.env
+  shared/landing/
   backups/
 ```
 
@@ -61,12 +65,17 @@ backup. Каждый release содержит `release-manifest.env` с UTC ID, 
    В backend env также указать публичный `TELEGRAM_BOT_USERNAME`. Numeric
    `TELEGRAM_ADMIN_CHAT_ID` допустим только как bootstrap до первой web-привязки.
 4. Создать `APP_KEY` командой `php artisan key:generate --show` в защищенном окружении.
-5. Настроить PostgreSQL, Redis, SMTP, домен и TLS.
-6. Установить конфиги из `deploy/nginx`, `deploy/php-fpm`, `deploy/systemd` и `deploy/logrotate`.
-7. Заменить `admin.example.com`, путь сертификата и имя PHP-FPM service.
+5. Настроить PostgreSQL, Redis и SMTP. В DNS направить `@`, `www` и `admin` на VPS.
+6. Выпустить сертификат `drive-phangan-site` для `drivephangan.com` и
+   `www.drivephangan.com`, а также `drive-phangan-admin` для
+   `admin.drivephangan.com`.
+7. Установить конфиги из `deploy/nginx`, `deploy/php-fpm`, `deploy/systemd` и
+   `deploy/logrotate`, затем скопировать `deploy/landing/index.html` в
+   `/srv/drive-phangan/shared/landing/index.html`.
 8. Выполнить `chmod 0750 deploy/scripts/*.sh` в deployment checkout.
-9. Выполнить `systemctl daemon-reload` и включить `drive-phangan.target` и
-   `drive-phangan-backup.timer`.
+9. Выполнить `systemctl daemon-reload` и включить `drive-phangan.target`.
+   `certbot.timer` должен быть активен. `drive-phangan-backup.timer` оставлять
+   выключенным до отдельного решения владельца о резервном копировании.
 
 Шаблон FPM ограничивает pool шестью children. Четыре long-running service имеют 30-секундный
 restart backoff, `Restart=on-failure` и start limit `5/600s`; после установки unit-файлов это проверяется через
@@ -88,6 +97,10 @@ php artisan bot-api:client issue --name="Production Telegram Bot"
 Service token показывается один раз и помещается только в `shared/bot/.env`. Для администратора
 до запуска подтверждается email и включается TOTP 2FA или passkey.
 
+После смены домена все старые web-сессии завершаются: администратор входит заново.
+Passkey привязан к origin, поэтому ключи, созданные на временном hostname, нужно
+перерегистрировать на `admin.drivephangan.com`.
+
 После запуска bot/API каждый получатель самостоятельно открывает в админке
 `Настройки -> Уведомления Telegram`, подтверждает пароль, создает одноразовый код и отправляет
 команду `/bind XXXX-XXXX` боту в личном чате. На странице нужно выполнить тестовую отправку.
@@ -107,7 +120,7 @@ Service token показывается один раз и помещается �
 
 ```bash
 APP_ROOT=/srv/drive-phangan \
-SMOKE_BASE_URL=https://admin.real-domain.example \
+SMOKE_BASE_URL=https://admin.drivephangan.com \
 PHP_FPM_SERVICE=php8.3-fpm \
 DEPLOY_MIN_FREE_MB=2048 \
 DEPLOY_CUTOVER_MIN_FREE_MB=768 \
