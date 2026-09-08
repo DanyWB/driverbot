@@ -2,7 +2,7 @@ NODE_ENV=production
 BOT_TOKEN="CHANGE_ME_TELEGRAM_BOT_TOKEN"
 BOT_DATA_MODE=laravel
 
-BOT_API_URL=https://admin.example.com/api/v1/bot
+BOT_API_URL=https://admin.drivephangan.com/api/v1/bot
 BOT_API_TOKEN="CHANGE_ME_LARAVEL_SERVICE_TOKEN"
 BOT_API_TIMEOUT_MS=7000
 BOT_API_MAX_ATTEMPTS=3
