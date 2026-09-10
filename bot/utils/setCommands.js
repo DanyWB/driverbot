@@ -8,6 +8,7 @@ async function setUserCommands(user, ctx, langOverride) {
 
   const commands = [
     {command: "start", description: t(lang, "cmd_start")},
+    {command: "menu", description: t(lang, "cmd_menu")},
     {command: "language", description: t(lang, "cmd_language")},
   ];
   if (user.is_admin) {

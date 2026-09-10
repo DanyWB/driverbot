@@ -278,3 +278,34 @@ test("sends a new UI message without touching a transactional callback when none
   assert.equal(ctx.session.activeUiMessageId, 1000);
   assert.equal(ctx.session.currentScreen, "main_menu");
 });
+
+test("force-new mode replaces a stale UI anchor with a message at the bottom", async () => {
+  const {ctx, calls} = fakeContext({
+    session: {
+      activeUiMessageId: 321,
+      activeUiMessageType: "text",
+      currentScreen: "main_menu",
+    },
+  });
+  delete ctx.callbackQuery;
+  ctx.api.editMessageText = async () => {
+    throw new Error("force-new mode must not edit an old message");
+  };
+  const renderer = new BotScreenRenderer({logger: fakeLogger()});
+
+  const result = await renderer.renderText(ctx, {
+    screen: "main_menu",
+    text: "Main menu",
+    replyMarkup: {inline_keyboard: []},
+    navigationMode: "reset",
+    forceNewMessage: true,
+  });
+
+  assert.equal(result.mode, "replaced");
+  assert.deepEqual(calls.editText, []);
+  assert.deepEqual(calls.delete, [{chatId: 77, messageId: 321}]);
+  assert.equal(calls.sendMessage.length, 1);
+  assert.equal(calls.sendMessage[0].text, "Main menu");
+  assert.equal(ctx.session.activeUiMessageId, 1000);
+  assert.equal(ctx.session.currentScreen, "main_menu");
+});

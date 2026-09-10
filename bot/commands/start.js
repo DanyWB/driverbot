@@ -82,6 +82,7 @@ module.exports = async (ctx) => {
       screen: "registration_name",
       text: t(lang, "enter_name"),
       navigationMode: "reset",
+      forceNewMessage: true,
     });
   }
 
@@ -92,6 +93,7 @@ module.exports = async (ctx) => {
       screen: "registration_phone",
       text: t(lang, "enter_phone"),
       navigationMode: "reset",
+      forceNewMessage: true,
     });
   }
 
@@ -102,10 +104,14 @@ module.exports = async (ctx) => {
       screen: "registration_passport",
       text: t(lang, "enter_passport"),
       navigationMode: "reset",
+      forceNewMessage: true,
     });
   }
 
-  return showMainMenu(ctx, lang, {navigationMode: "reset"});
+  return showMainMenu(ctx, lang, {
+    navigationMode: "reset",
+    forceNewMessage: true,
+  });
 };
 
 function startBindingCode(ctx) {

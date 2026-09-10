@@ -16,6 +16,7 @@ async function showMainMenu(ctx, langOverride, options = {}) {
     replyMarkup: getInlineMainMenuKeyboard(lang),
     returnContext: null,
     navigationMode: options.navigationMode || "reset",
+    forceNewMessage: Boolean(options.forceNewMessage),
   });
 }
 

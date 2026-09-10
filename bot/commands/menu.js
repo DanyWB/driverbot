@@ -5,5 +5,8 @@ module.exports = async (ctx) => {
     ctx.session.step = null;
     ctx.session.scenario = null;
   }
-  return require("../handlers/main_menu").showMainMenu(ctx);
+  return require("../handlers/main_menu").showMainMenu(ctx, undefined, {
+    navigationMode: "reset",
+    forceNewMessage: true,
+  });
 };

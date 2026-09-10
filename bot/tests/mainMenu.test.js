@@ -57,7 +57,11 @@ test("the /menu command opens the menu screen without invoking /start", async ()
   const startPath = require.resolve("../commands/start");
   const originalStartEntry = require.cache[startPath];
   let shown = 0;
-  mainMenu.showMainMenu = async () => { shown += 1; };
+  let showArgs;
+  mainMenu.showMainMenu = async (...args) => {
+    shown += 1;
+    showArgs = args;
+  };
   require.cache[startPath] = {
     id: startPath,
     filename: startPath,
@@ -77,6 +81,73 @@ test("the /menu command opens the menu screen without invoking /start", async ()
     else delete require.cache[startPath];
   }
   assert.equal(shown, 1);
+  assert.deepEqual(showArgs.slice(1), [
+    undefined,
+    {navigationMode: "reset", forceNewMessage: true},
+  ]);
+});
+
+test("regular /start requests a fresh visible main-menu message", async () => {
+  const userService = require("../services/userService");
+  const commandService = require("../utils/setCommands");
+  const mainMenu = require("../handlers/main_menu");
+  const startPath = require.resolve("../commands/start");
+  const originalStartEntry = require.cache[startPath];
+  const originals = {
+    getUserByTelegramId: userService.getUserByTelegramId,
+    registerUser: userService.registerUser,
+    setUserCommands: commandService.setUserCommands,
+    showMainMenu: mainMenu.showMainMenu,
+  };
+  const profile = {
+    telegram_id: 77,
+    name: "Test User",
+    phone: "+66000000000",
+    lang: "ru",
+    passport_photo_file_id: "stored",
+    meta: {},
+  };
+  const replies = [];
+  let menuOptions;
+
+  userService.getUserByTelegramId = async () => profile;
+  userService.registerUser = async () => profile;
+  commandService.setUserCommands = async () => {};
+  mainMenu.showMainMenu = async (_ctx, _lang, options) => {
+    menuOptions = options;
+  };
+  delete require.cache[startPath];
+
+  try {
+    const start = require("../commands/start");
+    await start({
+      from: {id: 77, first_name: "Test"},
+      message: {text: "/start"},
+      session: {
+        activeUiMessageId: 321,
+        activeUiMessageType: "text",
+        currentScreen: "prices_menu",
+      },
+      async reply(text, options) {
+        replies.push({text, options});
+        return {message_id: 900};
+      },
+    });
+  } finally {
+    userService.getUserByTelegramId = originals.getUserByTelegramId;
+    userService.registerUser = originals.registerUser;
+    commandService.setUserCommands = originals.setUserCommands;
+    mainMenu.showMainMenu = originals.showMainMenu;
+    if (originalStartEntry) require.cache[startPath] = originalStartEntry;
+    else delete require.cache[startPath];
+  }
+
+  assert.equal(replies.length, 1);
+  assert.ok(replies[0].options.reply_markup.keyboard);
+  assert.deepEqual(menuOptions, {
+    navigationMode: "reset",
+    forceNewMessage: true,
+  });
 });
 
 test("quick actions delete only the incoming command and reuse route handlers", async () => {

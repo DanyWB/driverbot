@@ -197,5 +197,6 @@ test("bind remains hidden from public and legacy admin command menus", async () 
 
     await setUserCommands({telegram_id: 12345, lang: "en", is_admin: isAdmin}, ctx);
     assert.equal(commands.some(({command}) => command === "bind"), false);
+    assert.equal(commands.some(({command}) => command === "menu"), true);
   }
 });
