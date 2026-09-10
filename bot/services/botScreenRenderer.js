@@ -61,6 +61,7 @@ class BotScreenRenderer {
       options,
       returnContext = null,
       navigationMode = "push",
+      forceNewMessage = false,
     }
   ) {
     if (typeof text !== "string") {
@@ -74,6 +75,7 @@ class BotScreenRenderer {
       apiOptions: telegramOptions(options, parseMode, replyMarkup),
       returnContext,
       navigationMode,
+      forceNewMessage,
     });
   }
 
@@ -88,6 +90,7 @@ class BotScreenRenderer {
       options,
       returnContext = null,
       navigationMode = "push",
+      forceNewMessage = false,
     }
   ) {
     if (photo === null || photo === undefined || photo === "") {
@@ -104,12 +107,21 @@ class BotScreenRenderer {
       apiOptions,
       returnContext,
       navigationMode,
+      forceNewMessage,
     });
   }
 
   async #render(
     ctx,
-    {type, screen, payload, apiOptions, returnContext, navigationMode}
+    {
+      type,
+      screen,
+      payload,
+      apiOptions,
+      returnContext,
+      navigationMode,
+      forceNewMessage,
+    }
   ) {
     await this.#answerCallback(ctx);
 
@@ -138,7 +150,10 @@ class BotScreenRenderer {
 
     const active = getActiveUiMessage(session);
     const canEditText =
-      type === "text" && active && (!active.type || active.type === "text");
+      !forceNewMessage &&
+      type === "text" &&
+      active &&
+      (!active.type || active.type === "text");
 
     if (canEditText) {
       try {
