@@ -38,6 +38,7 @@ class PendingRequestPolicyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config()->set('notifications.telegram.admin_chat_id', '-100500');
         $this->travelTo(CarbonImmutable::parse('2026-08-01 10:00', 'Asia/Bangkok'));
         $this->seed();
         $this->vehicle = Vehicle::factory()->create(['is_active' => true, 'is_visible_for_booking' => true]);
