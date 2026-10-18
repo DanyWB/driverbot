@@ -5,9 +5,13 @@ namespace Tests\Feature;
 use App\Domain\Operations\Data\ReleaseCheck;
 use App\Domain\Operations\Services\ReleasePreflightService;
 use App\Domain\Operations\Services\SchedulerHeartbeat;
+use App\Domain\Vehicles\Services\TelegramPhotoOptimizer;
 use App\Models\AdminTelegramBinding;
 use App\Models\User;
+use App\Models\Vehicle;
+use App\Models\VehiclePhoto;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ReleaseOperationsTest extends TestCase
@@ -116,5 +120,42 @@ class ReleaseOperationsTest extends TestCase
 
         $this->assertInstanceOf(ReleaseCheck::class, $check);
         $this->assertSame(ReleaseCheck::FAILURE, $check->status);
+    }
+
+    public function test_release_preflight_requires_telegram_copies_for_every_published_vehicle_photo(): void
+    {
+        Storage::fake('public');
+        $vehicle = Vehicle::factory()->create([
+            'is_active' => true,
+            'is_visible_for_booking' => true,
+        ]);
+        $primary = VehiclePhoto::query()->create([
+            'vehicle_id' => $vehicle->id,
+            'disk' => 'public',
+            'file_path' => "vehicles/{$vehicle->id}/primary.jpg",
+            'sort_order' => 0,
+            'is_primary' => true,
+        ]);
+        $secondary = VehiclePhoto::query()->create([
+            'vehicle_id' => $vehicle->id,
+            'disk' => 'public',
+            'file_path' => "vehicles/{$vehicle->id}/secondary.jpg",
+            'sort_order' => 1,
+            'is_primary' => false,
+        ]);
+        $optimizer = app(TelegramPhotoOptimizer::class);
+        Storage::disk('public')->put($optimizer->path($primary->file_path), 'telegram-ready');
+
+        $check = collect(app(ReleasePreflightService::class)->inspect(true))
+            ->firstWhere('id', 'catalog.telegram_photos');
+        $this->assertInstanceOf(ReleaseCheck::class, $check);
+        $this->assertSame(ReleaseCheck::FAILURE, $check->status);
+        $this->assertStringContainsString('without a Telegram delivery copy: 1', $check->message);
+
+        Storage::disk('public')->put($optimizer->path($secondary->file_path), 'telegram-ready');
+        $check = collect(app(ReleasePreflightService::class)->inspect(true))
+            ->firstWhere('id', 'catalog.telegram_photos');
+        $this->assertInstanceOf(ReleaseCheck::class, $check);
+        $this->assertSame(ReleaseCheck::PASS, $check->status);
     }
 }

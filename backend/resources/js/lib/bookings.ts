@@ -9,6 +9,7 @@ export const bookingStatusLabels: Record<BookingStatus, string> = {
     completed: 'Completed',
     cancelled: 'Cancelled',
     cancelled_by_client: 'Client cancelled',
+    cancelled_unavailable: 'Unavailable on requested dates',
     expired: 'Expired',
     no_show: 'No-show',
 };
@@ -25,6 +26,8 @@ export const bookingStatusClasses: Record<BookingStatus, string> = {
         'border-zinc-200 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
     cancelled:
         'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200',
+    cancelled_unavailable:
+        'border-orange-400 bg-orange-50 text-orange-900 dark:bg-orange-950 dark:text-orange-200',
     cancelled_by_client:
         'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200',
     expired:

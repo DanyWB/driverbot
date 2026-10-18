@@ -56,6 +56,7 @@ module.exports = async (ctx) => {
       navigationMode: "replace",
     });
   } catch (error) {
+    if (await require("../services/bookingErrorScreen").showBookingValidationError(ctx, error, "book:calendar_back_end")) return;
     if (error.code === "BOT_API_UNAVAILABLE") throw error;
     if (error.code === "bike_not_found") {
       return botScreenRenderer.renderText(ctx, {

@@ -10,7 +10,9 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\NotificationOutbox;
 use App\Models\PricingSeason;
+use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\VehicleOccupancy;
 use App\Models\VehiclePriceTier;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -29,7 +31,7 @@ class PostgresBookingConcurrencyTest extends TestCase
         }
     }
 
-    public function test_two_simultaneous_requests_create_one_booking_and_one_conflict(): void
+    public function test_parallel_pending_requests_are_allowed_but_parallel_approval_has_one_winner(): void
     {
         $this->seed();
         $category = Category::factory()->create();
@@ -57,15 +59,35 @@ class PostgresBookingConcurrencyTest extends TestCase
             usort($results, fn (array $left, array $right): int => $left['status'] <=> $right['status']);
 
             $this->assertSame(201, $results[0]['status'], $first->getErrorOutput().$second->getErrorOutput());
-            $this->assertSame(409, $results[1]['status'], $first->getErrorOutput().$second->getErrorOutput());
-            $this->assertSame('vehicle_unavailable', $results[1]['error_code']);
-            $this->assertSame(1, Booking::query()->where('vehicle_id', $vehicle->id)->count());
+            $this->assertSame(201, $results[1]['status'], $first->getErrorOutput().$second->getErrorOutput());
+            $bookings = Booking::query()->where('vehicle_id', $vehicle->id)->orderBy('id')->get();
+            $this->assertCount(2, $bookings);
+            $admin = User::factory()->create();
+            try {
+                $barrier = (string) (microtime(true) + 1.0);
+                $approvals = [$this->worker($bookings[0]->id, $admin->id, $barrier, 'approve'), $this->worker($bookings[1]->id, $admin->id, $barrier, 'approve')];
+                foreach ($approvals as $process) {
+                    $process->start();
+                }
+                foreach ($approvals as $process) {
+                    $process->wait();
+                }
+                $statuses = array_map(fn (Process $process): int => json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR)['status'], $approvals);
+                sort($statuses);
+                $this->assertSame([200, 409], $statuses);
+                $this->assertSame(1, Booking::where('vehicle_id', $vehicle->id)->where('status', 'approved')->count());
+                $this->assertSame(1, Booking::where('vehicle_id', $vehicle->id)->where('status', 'cancelled_unavailable')->count());
+                $this->assertSame(1, VehicleOccupancy::where('vehicle_id', $vehicle->id)->where('blocks_availability', true)->count());
+            } finally {
+                // Booking history has nullable admin foreign keys.
+                $admin->delete();
+            }
         } finally {
             $this->cleanup($vehicle, $category, $customers->pluck('id')->all());
         }
     }
 
-    private function worker(int $customerId, int $vehicleId, string $barrier): Process
+    private function worker(int $customerId, int $vehicleId, string $barrier, string $action = 'create'): Process
     {
         $connection = config('database.connections.pgsql');
         $environment = [
@@ -92,6 +114,7 @@ class PostgresBookingConcurrencyTest extends TestCase
             '2026-08-10',
             '2026-08-12',
             $barrier,
+            $action,
         ], base_path(), $environment, timeout: 20);
     }
 

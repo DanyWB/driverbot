@@ -18,6 +18,7 @@ const {getVehicleById} = require("../services/vehicleService");
 const {isLaravelMode} = require("../config/runtime");
 const {preview} = require("../utils/text");
 const {vehicleEmoji} = require("../utils/vehicle");
+const {vehicleDescription} = require("../utils/vehicleDescription");
 const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 function calendarRange(booking) {
@@ -158,6 +159,7 @@ async function finalizeBikeSelection(
       endTime: booking.endTime,
     });
   } catch (error) {
+    if (await require("../services/bookingErrorScreen").showBookingValidationError(ctx, error, "book:calendar_back_end")) return;
     if (error.code === "season_not_found") {
       return renderer.renderText(ctx, {
         screen: "booking_pricing_missing",
@@ -171,6 +173,7 @@ async function finalizeBikeSelection(
   booking.totalPrice = pricing.totalPrice;
   booking.pricePerDay = pricing.pricePerDay;
   booking.priceUnknown = pricing.priceUnknown;
+  booking.totalDays = pricing.days;
 
   if (pricing.available === false) {
     booking.totalPrice = null;
@@ -206,7 +209,7 @@ async function showBikeSummary(ctx, bike, bookingOverride, options = {}) {
   if (booking.endTime) endLabel += ` ${booking.endTime}`;
   const days =
     booking.startDate && booking.endDate
-      ? dayjs(booking.endDate).diff(dayjs(booking.startDate), "day") + 1
+      ? booking.totalDays ?? Math.max(1, dayjs(booking.endDate).diff(dayjs(booking.startDate), "day"))
       : 0;
 
   const text = tHtml(lang, "booking_bike_summary", {
@@ -220,7 +223,7 @@ async function showBikeSummary(ctx, bike, bookingOverride, options = {}) {
     price_per_day: booking.priceUnknown
       ? t(lang, "booking_price_tbd")
       : booking.pricePerDay || 0,
-    desc: preview(bike.description, 240),
+    desc: "",
   });
 
   const replyMarkup = {
@@ -247,24 +250,27 @@ async function showBikeSummary(ctx, bike, bookingOverride, options = {}) {
     ],
   };
 
-  if (bike.image_url) {
-    try {
-      return await renderer.renderPhoto(ctx, {
-        screen: "booking_bike_summary",
-        photo: bike.image_url,
-        caption: text,
-        parseMode: "HTML",
-        replyMarkup,
-        returnContext: {
-          scenario: booking.scenario,
-          categoryId: booking.categoryId || null,
-          selectedBikeId: bike.id,
-        },
-        navigationMode: options.navigationMode || "push",
-      });
-    } catch (error) {
-      console.warn(`Could not send photo for vehicle ${bike.id}:`, error.message);
-    }
+  const photos = [...new Set([
+    bike.primary_photo?.url || bike.image_url,
+    ...(bike.photos || []).map(photo => photo.url),
+  ].filter(Boolean))];
+
+  const description = vehicleDescription(bike, lang);
+  if (photos.length || description) {
+    return renderer.renderGallery(ctx, {
+      screen: "booking_bike_summary",
+      photos,
+      description,
+      text,
+      parseMode: "HTML",
+      replyMarkup,
+      returnContext: {
+        scenario: booking.scenario,
+        categoryId: booking.categoryId || null,
+        selectedBikeId: bike.id,
+      },
+      navigationMode: options.navigationMode || "push",
+    });
   }
 
   return renderer.renderText(ctx, {

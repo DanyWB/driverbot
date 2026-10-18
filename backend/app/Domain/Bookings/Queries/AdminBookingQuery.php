@@ -106,6 +106,7 @@ class AdminBookingQuery
                     BookingStatus::Completed->value,
                     BookingStatus::Cancelled->value,
                     BookingStatus::CancelledByClient->value,
+                    BookingStatus::CancelledUnavailable->value,
                     BookingStatus::Expired->value,
                     BookingStatus::NoShow->value,
                 ]);

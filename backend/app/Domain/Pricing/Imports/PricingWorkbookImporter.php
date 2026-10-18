@@ -23,8 +23,20 @@ class PricingWorkbookImporter
 {
     public function preview(PricingWorkbookData $data): PricingImportReport
     {
+        $importedCodes = array_map(fn (ImportedVehicle $vehicle): string => $vehicle->externalCode, $data->vehicles);
+        $linkedCodes = Vehicle::query()
+            ->whereIn('external_code', $importedCodes)
+            ->whereNotNull('pricing_preset_id')
+            ->orderBy('external_code')
+            ->pluck('external_code')
+            ->all();
+
+        if ($linkedCodes !== []) {
+            throw new RuntimeException('Workbook import cannot overwrite vehicles linked to pricing presets: '.implode(', ', $linkedCodes).'.');
+        }
+
         $existingCodes = Vehicle::query()
-            ->whereIn('external_code', array_map(fn (ImportedVehicle $vehicle): string => $vehicle->externalCode, $data->vehicles))
+            ->whereIn('external_code', $importedCodes)
             ->pluck('external_code')
             ->flip();
 
@@ -74,7 +86,14 @@ class PricingWorkbookImporter
                         ],
                     );
 
-                    $vehicle = Vehicle::query()->where('external_code', $importedVehicle->externalCode)->first();
+                    $vehicle = Vehicle::query()
+                        ->where('external_code', $importedVehicle->externalCode)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($vehicle instanceof Vehicle && $vehicle->pricing_preset_id !== null) {
+                        throw new RuntimeException("Workbook import cannot overwrite vehicle {$vehicle->external_code} while it is linked to a pricing preset.");
+                    }
                     $targetActive = $vehicle === null || $importedVehicle->hasExplicitActiveMarker
                         ? $importedVehicle->isActive
                         : (bool) $vehicle->is_active;
@@ -148,6 +167,10 @@ class PricingWorkbookImporter
                     } else {
                         $stalePrices->whereNotIn('id', $priceIds)->delete();
                     }
+
+                    $vehicle->forceFill([
+                        'pricing_version' => (int) $vehicle->pricing_version + 1,
+                    ])->save();
                 }
 
                 $report = $this->report($data, false, $created, $updated, (string) $run->public_id);

@@ -4,6 +4,7 @@ namespace App\Domain\Bookings\Presenters;
 
 use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Customers\Enums\ContactType;
+use App\Domain\Vehicles\Services\VehiclePhotoService;
 use App\Models\Booking;
 use App\Models\BookingPriceSnapshot;
 use App\Models\BookingStatusHistory;
@@ -27,9 +28,9 @@ class AdminBookingPresenter
             'source' => (string) $booking->getRawOriginal('source'),
             'customer' => [
                 'id' => (int) $booking->customer->id,
-                'name' => (string) $booking->customer->name,
-                'phone' => $this->contact($booking, ContactType::Phone),
-                'telegram' => $this->contact($booking, ContactType::TelegramUsername),
+                'name' => (string) ($booking->contact_name ?? $booking->customer->name),
+                'phone' => $booking->contact_phone ?? $this->contact($booking, ContactType::Phone),
+                'telegram' => $booking->contact_telegram ?? $this->contact($booking, ContactType::TelegramUsername),
             ],
             'vehicle' => [
                 'id' => (int) $booking->vehicle->id,
@@ -47,6 +48,8 @@ class AdminBookingPresenter
             'client_comment' => $this->nullableString($booking->client_comment),
             'admin_note' => $this->nullableString($booking->admin_note),
             'deposit_note' => $this->nullableString($booking->deposit_note),
+            'details_version' => (int) $booking->details_version,
+            'payments' => $booking->paymentsSummary(),
             'created_at' => $this->dateTime($booking->created_at),
             'updated_at' => $this->dateTime($booking->updated_at),
         ];
@@ -94,9 +97,9 @@ class AdminBookingPresenter
             (string) $booking->public_id,
             $booking->bookingStatus()->value,
             (string) $booking->getRawOriginal('source'),
-            (string) $booking->customer->name,
-            $this->contact($booking, ContactType::Phone),
-            $this->contact($booking, ContactType::TelegramUsername),
+            (string) ($booking->contact_name ?? $booking->customer->name),
+            $booking->contact_phone ?? $this->contact($booking, ContactType::Phone),
+            $booking->contact_telegram ?? $this->contact($booking, ContactType::TelegramUsername),
             (string) $booking->vehicle->name,
             (string) $booking->vehicle->getRawOriginal('type'),
             $this->date($booking, 'starts_on'),
@@ -123,8 +126,11 @@ class AdminBookingPresenter
     /** @return array<string, mixed> */
     public function detail(Booking $booking): array
     {
+        $photo = $booking->vehicle->photos->firstWhere('is_primary', true) ?? $booking->vehicle->photos->first();
+
         return [
             ...$this->listItem($booking),
+            'vehicle_photo_url' => $photo === null ? null : app(VehiclePhotoService::class)->url($photo),
             'cancellation_reason' => $this->nullableString($booking->cancellation_reason),
             'no_show_reason' => $this->nullableString($booking->no_show_reason),
             'options' => [
@@ -192,7 +198,7 @@ class AdminBookingPresenter
         $status = $booking->bookingStatus();
 
         return [
-            'approve' => $status === BookingStatus::Pending,
+            'approve' => $status === BookingStatus::Pending && (bool) $booking->pendingExpiresAt()?->isFuture(),
             'activate' => $status === BookingStatus::Approved,
             'complete' => $status === BookingStatus::Active,
             'cancel' => in_array($status, [BookingStatus::Pending, BookingStatus::Approved, BookingStatus::Active], true),
@@ -228,7 +234,7 @@ class AdminBookingPresenter
         $start = CarbonImmutable::parse($this->date($booking, 'starts_on'), $this->timezone());
         $end = CarbonImmutable::parse($this->date($booking, 'ends_on'), $this->timezone());
 
-        return (int) $start->diffInDays($end) + 1;
+        return max(1, (int) $start->diffInDays($end));
     }
 
     private function actorName(BookingStatusHistory $history): ?string

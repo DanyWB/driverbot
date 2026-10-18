@@ -55,6 +55,7 @@ class AdminTimelineTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->travelTo(CarbonImmutable::parse('2026-08-01 10:00:00', 'Asia/Bangkok'));
 
         $this->seed();
         $this->bookings = app(BookingService::class);
@@ -125,6 +126,7 @@ class AdminTimelineTest extends TestCase
 
     public function test_timeline_clips_booking_and_maintenance_blocks_at_period_boundaries(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-07-28 10:00:00', 'Asia/Bangkok'));
         $leftBooking = $this->createBooking(
             $this->longNameVehicle,
             '2026-07-29',
@@ -158,7 +160,7 @@ class AdminTimelineTest extends TestCase
             ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('timeline.stats.occupancies', 3)
+                ->where('timeline.stats.occupancies', 2)
                 ->where('timeline.rows.0.occupancies.0.booking_public_id', $leftBooking->public_id)
                 ->where('timeline.rows.0.occupancies.0.status', 'pending')
                 ->where('timeline.rows.0.occupancies.0.start_index', 0)
@@ -223,8 +225,8 @@ class AdminTimelineTest extends TestCase
                 ->where('timeline.rows.0.id', $this->car->id)
                 ->where('timeline.rows.0.occupancies.0.booking_public_id', $approved->public_id)
                 ->has('timeline.rows.0.occupancies', 1)
-                ->has('timeline.rows.0.blocked_ranges', 2)
-                ->where('timeline.rows.0.blocked_ranges.1.start_index', 19));
+                ->has('timeline.rows.0.blocked_ranges', 1)
+                ->where('timeline.rows.0.blocked_ranges.0.start_index', 9));
 
         $this->actingAs($this->admin)
             ->get(route('timeline.index', [...$period, 'status' => 'maintenance']))
@@ -259,16 +261,16 @@ class AdminTimelineTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('timeline.index', [
                 'starts_on' => '2026-08-01',
-                'ends_on' => '2026-11-01',
+                'ends_on' => '2027-02-02',
             ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('timeline.range.days', 93));
+                ->where('timeline.range.days', 186));
 
         $this->actingAs($this->admin)
             ->get(route('timeline.index', [
                 'starts_on' => '2026-08-01',
-                'ends_on' => '2026-11-02',
+                'ends_on' => '2027-02-03',
             ]))
             ->assertRedirect()
             ->assertSessionHasErrors('ends_on');

@@ -21,7 +21,7 @@ class AdminTimelineQuery
         $startsOn = (string) $filters['starts_on'];
         $endsOn = (string) $filters['ends_on'];
         $status = (string) ($filters['status'] ?? '');
-        $vehicles = Vehicle::query()->with('category');
+        $vehicles = Vehicle::query()->whereNull('archived_at')->with('category');
 
         $this->applyVehicleFilters($vehicles, $filters);
 
@@ -29,7 +29,7 @@ class AdminTimelineQuery
             $vehicles->whereDoesntHave('occupancies', fn (Builder $query) => $this->overlapping($query, $startsOn, $endsOn));
         } elseif ($status !== '') {
             $vehicles->whereHas('occupancies', function (Builder $query) use ($startsOn, $endsOn, $status): void {
-                $this->overlapping($query, $startsOn, $endsOn);
+                $this->overlapping($query, $startsOn, $endsOn, $status !== 'pending');
                 $this->withStatus($query, $status);
             });
         }
@@ -47,18 +47,19 @@ class AdminTimelineQuery
             ];
         }
 
-        $blockingOccupancies = VehicleOccupancy::query()
+        $allOccupancies = VehicleOccupancy::query()
             ->whereIn('vehicle_id', $vehicleRows->pluck('id'))
             ->with('booking.customer')
             ->where(function (Builder $query) use ($startsOn, $endsOn): void {
-                $this->overlapping($query, $startsOn, $endsOn);
+                $this->overlapping($query, $startsOn, $endsOn, false);
             })
             ->orderBy('starts_on')
             ->orderBy('id')
             ->get();
+        $blockingOccupancies = $allOccupancies->filter(fn (VehicleOccupancy $occupancy): bool => (bool) $occupancy->blocks_availability)->values();
         $occupancyRows = $status === ''
-            ? $blockingOccupancies
-            : $blockingOccupancies
+            ? $allOccupancies
+            : $allOccupancies
                 ->filter(fn (VehicleOccupancy $occupancy): bool => $this->matchesStatus($occupancy, $status))
                 ->values();
 
@@ -101,10 +102,15 @@ class AdminTimelineQuery
      *
      * @param  Builder<TModel>  $query
      */
-    private function overlapping(Builder $query, string $startsOn, string $endsOn): void
+    private function overlapping(Builder $query, string $startsOn, string $endsOn, bool $blockingOnly = true): void
     {
+        if ($blockingOnly) {
+            $query->where('blocks_availability', true);
+        } else {
+            $query->where(fn (Builder $query) => $query->where('blocks_availability', true)
+                ->orWhereHas('booking', fn (Builder $booking) => $booking->where('status', 'pending')));
+        }
         $query
-            ->where('blocks_availability', true)
             ->where('starts_on', '<=', $endsOn)
             ->where('ends_on', '>=', $startsOn);
     }

@@ -4,7 +4,7 @@ const {t, getCtxLang} = require("../utils/i18n");
 const {escapeHtml, tHtml} = require("../utils/html");
 const {isLaravelMode} = require("../config/runtime");
 const {getUserByTelegramId} = require("../services/userService");
-const {getCart} = require("../services/sessionCartService");
+const {getCart, restoreTermsAcceptance} = require("../services/sessionCartService");
 const {preview} = require("../utils/text");
 const {vehicleEmoji} = require("../utils/vehicle");
 
@@ -27,6 +27,7 @@ async function buildDraftMenuPayload(ctx, options = {}) {
   if (!user) {
     return {error: t(lang, "not_registered")};
   }
+  if (isLaravelMode()) restoreTermsAcceptance(ctx, user);
 
   const rentals = isLaravelMode()
     ? getCart(ctx)
@@ -66,7 +67,7 @@ async function buildDraftMenuPayload(ctx, options = {}) {
 
   for (const rental of rentals) {
     const days =
-      dayjs(rental.end_date).diff(dayjs(rental.start_date), "day") + 1;
+      rental.total_days ?? Math.max(1, dayjs(rental.end_date).diff(dayjs(rental.start_date), "day"));
     const startLabel = rental.start_at
       ? dayjs(rental.start_at).format("DD.MM.YYYY HH:mm")
       : dayjs(rental.start_date).format("DD.MM.YYYY");
@@ -113,9 +114,11 @@ async function buildDraftMenuPayload(ctx, options = {}) {
     text += `\n${t(lang, "conditions_accept_required")}`;
   }
 
-  const acceptButton = accepted
-    ? {text: t(lang, "conditions_accepted_label"), callback_data: "noop"}
-    : {text: t(lang, "conditions_accept_btn"), callback_data: "conditions:accept_toggle"};
+  ctx.session.termsOrigin = "booking_confirmation";
+  const acceptButton = {
+    text: t(lang, accepted ? "conditions_accepted_label" : "conditions_accept_btn"),
+    callback_data: "conditions:open",
+  };
 
   const keyboard = [
     [
@@ -125,7 +128,8 @@ async function buildDraftMenuPayload(ctx, options = {}) {
       },
     ],
     [acceptButton],
-    [
+    [{text: t(lang, ctx.session.draftMenuExpanded ? "booking_menu_hide" : "booking_menu_show"), callback_data: "book:menu"}],
+    ...(ctx.session.draftMenuExpanded ? [[
       {
         text: t(lang, "booking_comment_btn"),
         callback_data: "book:options:process",
@@ -135,7 +139,7 @@ async function buildDraftMenuPayload(ctx, options = {}) {
       {text: t(lang, "booking_add_bike_btn"), callback_data: "book:start"},
       {text: t(lang, "booking_delete_bike_btn"), callback_data: "book:delete_bike"},
     ],
-    [{text: t(lang, "booking_reset_btn"), callback_data: "book:reset_rental"}],
+    [{text: t(lang, "booking_reset_btn"), callback_data: "book:reset_rental"}]] : []),
     [{text: backText, callback_data: backAction}],
   ];
 

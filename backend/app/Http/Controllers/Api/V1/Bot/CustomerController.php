@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Bot;
 
 use App\Domain\Customers\Enums\IdentityProvider;
+use App\Domain\Customers\Services\CustomerTermsService;
 use App\Domain\Integrations\Bot\Presenters\BotApiPresenter;
 use App\Domain\Integrations\Bot\Services\IdempotentBotAction;
 use App\Domain\Integrations\Bot\Services\ServiceAuditService;
@@ -42,6 +43,20 @@ class CustomerController extends Controller
         $customer = $this->customer($request)->load(['contacts', 'identities', 'documents']);
 
         return BotApiResponse::success($request, $presenter->customer($customer));
+    }
+
+    public function acceptTerms(Request $request, CustomerTermsService $terms, BotApiPresenter $presenter, IdempotentBotAction $idempotent, ServiceAuditService $audit): JsonResponse
+    {
+        $data = $request->validate(['terms_version' => ['required', 'string', 'max:100'], 'accepted' => ['required', 'accepted']]);
+        $customer = $this->customer($request);
+
+        return $idempotent->execute($request, "customers.{$customer->id}.terms", $data, function () use ($request, $terms, $presenter, $data, $customer, $audit): array {
+            $updated = $terms->accept($customer, (string) $data['terms_version']);
+            $audit->record($this->serviceClient($request), $updated, 'customer.terms_accepted', null,
+                ['terms_version' => $updated->terms_version, 'terms_accepted_at' => $updated->termsAcceptedAt()?->toIso8601String()], $this->requestId($request));
+
+            return ['status' => 200, 'data' => $presenter->customer($updated->load(['contacts', 'identities', 'documents']))];
+        });
     }
 
     public function update(

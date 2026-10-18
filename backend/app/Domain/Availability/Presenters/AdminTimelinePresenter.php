@@ -40,7 +40,7 @@ class AdminTimelinePresenter
             $vehicleOccupancies = $byVehicle->get($vehicle->id, collect());
             $vehicleBlockingOccupancies = $blockingByVehicle->get($vehicle->id, collect());
 
-            if ($vehicleOccupancies->isNotEmpty()) {
+            if ($vehicleBlockingOccupancies->isNotEmpty()) {
                 $occupiedVehicles++;
             }
 
@@ -81,7 +81,7 @@ class AdminTimelinePresenter
                 'vehicles' => $vehicles->count(),
                 'occupied' => $occupiedVehicles,
                 'available' => max(0, $vehicles->count() - $occupiedVehicles),
-                'occupancies' => $occupancies->count(),
+                'occupancies' => $blockingOccupancies->count(),
             ],
         ];
     }
@@ -90,13 +90,14 @@ class AdminTimelinePresenter
     private function dates(CarbonImmutable $start, CarbonImmutable $end, string $today): array
     {
         $dates = [];
+        $start->locale(request()->cookie('admin_locale') === 'ru' ? 'ru' : 'en');
 
         for ($date = $start; $date->lessThanOrEqualTo($end); $date = $date->addDay()) {
             $dates[] = [
                 'date' => $date->toDateString(),
                 'day' => (int) $date->format('j'),
-                'weekday' => $date->format('D'),
-                'month' => $date->format('M'),
+                'weekday' => $date->translatedFormat('D'),
+                'month' => $date->translatedFormat('F'),
                 'is_weekend' => $date->isWeekend(),
                 'is_today' => $date->toDateString() === $today,
             ];
@@ -124,7 +125,8 @@ class AdminTimelinePresenter
                 : $booking?->bookingStatus()->value,
             'label' => $type === OccupancyType::Maintenance
                 ? ($this->nullableString($occupancy->label) ?? 'Maintenance')
-                : ($customer instanceof Customer ? (string) $customer->name : 'Booking'),
+                : ($booking->contact_name ?? ($customer instanceof Customer ? (string) $customer->name : 'Booking')),
+            'blocks_availability' => (bool) $occupancy->blocks_availability,
             'starts_on' => $start->toDateString(),
             'ends_on' => $end->toDateString(),
             'start_index' => (int) $rangeStart->diffInDays($visibleStart),

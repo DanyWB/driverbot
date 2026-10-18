@@ -68,7 +68,7 @@ class PricingServiceTest extends TestCase
 
         $quote = app(PricingService::class)->quote(
             $this->vehicle,
-            RentalPeriod::fromStrings('2027-03-17', '2027-04-15'),
+            RentalPeriod::fromStrings('2027-03-17', '2027-04-16'),
         );
 
         $this->assertSame(30, $quote->totalDays);
@@ -89,7 +89,7 @@ class PricingServiceTest extends TestCase
         try {
             app(PricingService::class)->quote(
                 $this->vehicle,
-                RentalPeriod::fromStrings('2026-06-01', '2026-06-07'),
+                RentalPeriod::fromStrings('2026-06-01', '2026-06-08'),
             );
             $this->fail('A quote without a price was accepted.');
         } catch (PricingException $exception) {

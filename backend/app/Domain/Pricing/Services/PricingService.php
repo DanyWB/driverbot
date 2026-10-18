@@ -8,6 +8,7 @@ use App\Domain\Pricing\Enums\PricingTier;
 use App\Domain\Pricing\Exceptions\PricingException;
 use App\Domain\Pricing\ValueObjects\RentalPeriod;
 use App\Models\PricingSeasonMonth;
+use App\Models\RentalPolicy;
 use App\Models\Vehicle;
 use App\Models\VehiclePriceTier;
 use Brick\Math\BigRational;
@@ -17,9 +18,18 @@ class PricingService
 {
     public function quote(Vehicle $vehicle, RentalPeriod $period, bool $requireBookable = true): PriceQuote
     {
-        if (! $vehicle->is_active || ($requireBookable && ! $vehicle->is_visible_for_booking)) {
+        if ($vehicle->archived_at !== null || ! $vehicle->is_active || ($requireBookable && ! $vehicle->is_visible_for_booking)) {
             throw new PricingException('vehicle_hidden', 'Vehicle is not available for booking.', [
                 'vehicle_id' => $vehicle->id,
+            ]);
+        }
+
+        $policy = RentalPolicy::query()->find(1);
+        $minimumDays = $policy?->minimumFor($vehicle->category_id === null ? null : (int) $vehicle->category_id) ?? 1;
+        if ($period->totalDays() < $minimumDays) {
+            throw new PricingException('minimum_rental_days', "Minimum rental duration is {$minimumDays} days.", [
+                'minimum_days' => $minimumDays,
+                'total_days' => $period->totalDays(),
             ]);
         }
 

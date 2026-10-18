@@ -40,8 +40,9 @@ if [[ -z "$ORIGINAL_RELEASE" || ! -d "$ORIGINAL_RELEASE" ]]; then
 fi
 require_file "${ORIGINAL_RELEASE}/backend/artisan"
 
-ROLLBACK_STARTED=false
 ROLLBACK_SUCCEEDED=false
+ROLLBACK_BLOCKED=false
+TARGET_ACTIVATED=false
 
 restore_original_on_error() {
     local exit_code=$?
@@ -52,7 +53,10 @@ restore_original_on_error() {
     fi
 
     set +e
-    if [[ "$ROLLBACK_STARTED" == "true" ]]; then
+    if [[ "$ROLLBACK_BLOCKED" == "true" ]]; then
+        printf 'Rollback blocked; original release was not changed and application writers remain stopped: %s\n' \
+            "$ORIGINAL_RELEASE" >&2
+    elif [[ "$TARGET_ACTIVATED" == "true" ]]; then
         printf 'Rollback smoke failed; restoring original application symlink: %s\n' \
             "$ORIGINAL_RELEASE" >&2
         sudo systemctl stop drive-phangan.target >/dev/null 2>&1 || true
@@ -66,10 +70,19 @@ restore_original_on_error() {
 }
 trap restore_original_on_error EXIT
 
-ROLLBACK_STARTED=true
-php "${CURRENT}/backend/artisan" down --retry=30 || true
 sudo systemctl stop drive-phangan.target || true
+if ! php "${ORIGINAL_RELEASE}/backend/artisan" down --retry=30; then
+    printf 'Failed to enter maintenance mode; rollback denied and PHP-FPM will be stopped.\n' >&2
+    sudo systemctl stop "${PHP_FPM_SERVICE:-php8.3-fpm}" >/dev/null 2>&1 || true
+    ROLLBACK_BLOCKED=true
+    exit 1
+fi
+if ! assert_release_rollback_compatible "${ORIGINAL_RELEASE}/backend" "${TARGET_RELEASE}/backend"; then
+    ROLLBACK_BLOCKED=true
+    exit 1
+fi
 atomic_symlink "$TARGET_RELEASE" "$CURRENT"
+TARGET_ACTIVATED=true
 php "${CURRENT}/backend/artisan" up
 sudo systemctl start drive-phangan.target
 sudo systemctl reload "${PHP_FPM_SERVICE:-php8.3-fpm}"

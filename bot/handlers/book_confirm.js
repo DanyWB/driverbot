@@ -65,6 +65,7 @@ module.exports = async (ctx) => {
         navigationMode: "replace",
       });
     }
+    if (isLaravelMode()) sessionCart.restoreTermsAcceptance(ctx, user);
 
     const admin = isLaravelMode() ? null : await db("users").where({is_admin: true}).first();
     if (!isLaravelMode() && !admin) {
@@ -241,6 +242,10 @@ module.exports = async (ctx) => {
       });
     }
   } catch (err) {
+    if (await require("../services/bookingErrorScreen").showBookingValidationError(ctx, err)) {
+      sessionCart.clearConfirmationAttempt(ctx);
+      return;
+    }
     if (err.code === "BOT_API_UNAVAILABLE") throw err;
     if (err.code === "TERMS_VERSION_OUTDATED") {
       sessionCart.clearConfirmationAttempt(ctx);

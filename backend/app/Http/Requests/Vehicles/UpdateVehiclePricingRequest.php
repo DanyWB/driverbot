@@ -19,6 +19,7 @@ class UpdateVehiclePricingRequest extends FormRequest
             'prices' => ['required', 'array'],
             'enabled' => ['required', 'array'],
             'template' => ['nullable', 'string', Rule::in(is_array($templates) ? array_keys($templates) : [])],
+            'expected_vehicle_pricing_revision' => ['sometimes', 'required', 'integer', 'min:1'],
         ];
 
         foreach (PricingSeasonKey::cases() as $season) {
@@ -31,7 +32,6 @@ class UpdateVehiclePricingRequest extends FormRequest
                     'nullable',
                     'integer',
                     'min:1',
-                    'multiple_of:50',
                     'max:100000000',
                 ];
                 $rules["enabled.{$season->value}.{$tier->value}"] = ['required', 'boolean'];
@@ -49,7 +49,9 @@ class UpdateVehiclePricingRequest extends FormRequest
         return [
             'prices.*.*.integer' => $message,
             'prices.*.*.min' => $message,
-            'prices.*.*.multiple_of' => $message,
+            'expected_vehicle_pricing_revision.required' => __('pricing_presets.revision_invalid', [], $this->adminLocale()),
+            'expected_vehicle_pricing_revision.integer' => __('pricing_presets.revision_invalid', [], $this->adminLocale()),
+            'expected_vehicle_pricing_revision.min' => __('pricing_presets.revision_invalid', [], $this->adminLocale()),
         ];
     }
 
@@ -72,6 +74,15 @@ class UpdateVehiclePricingRequest extends FormRequest
                 $validator->errors()->add('template', 'The selected pricing template does not match the vehicle type.');
             }
 
+            if ($vehicle instanceof Vehicle && $vehicle->pricing_preset_id !== null) {
+                $validator->errors()->add(
+                    'prices',
+                    __('pricing_presets.linked_individual_update', [], $this->adminLocale()),
+                );
+
+                return;
+            }
+
             foreach (PricingSeasonKey::cases() as $season) {
                 foreach (PricingTier::cases() as $tier) {
                     $enabled = $this->input("enabled.{$season->value}.{$tier->value}");
@@ -90,8 +101,13 @@ class UpdateVehiclePricingRequest extends FormRequest
 
     private function pricingStepMessage(): string
     {
-        return $this->cookie('admin_locale') === 'ru'
-            ? 'Цена должна быть положительным целым числом и кратна 50 THB.'
-            : 'Price must be a positive whole number divisible by 50 THB.';
+        return $this->adminLocale() === 'ru'
+            ? 'Цена должна быть положительным целым числом.'
+            : 'Price must be a positive whole number.';
+    }
+
+    private function adminLocale(): string
+    {
+        return $this->cookie('admin_locale') === 'ru' ? 'ru' : 'en';
     }
 }

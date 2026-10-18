@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Integrations\Bot\Presenters\BotApiPresenter;
 use App\Domain\Pricing\Enums\PricingSeasonKey;
 use App\Domain\Pricing\Enums\PricingTier;
 use App\Domain\Shared\Services\AdminAuditService;
@@ -41,6 +42,31 @@ class AdminVehicleCatalogTest extends TestCase
         $this->get(route('vehicles.create'))->assertRedirect(route('login'));
         $this->get(route('vehicles.edit', $vehicle))->assertRedirect(route('login'));
         $this->get(route('categories.index'))->assertRedirect(route('login'));
+    }
+
+    public function test_description_translations_are_saved_presented_preserved_and_clearable(): void
+    {
+        $payload = [...$this->vehiclePayload(), 'description' => 'English', 'description_ru' => 'Русский', 'description_ua' => 'Українська'];
+        $this->actingAs($this->admin)->post(route('vehicles.store'), $payload)->assertSessionHasNoErrors();
+        $vehicle = Vehicle::query()->sole();
+        $this->assertSame('English', $vehicle->description);
+        $this->assertSame('Русский', $vehicle->description_ru);
+        $this->assertSame('Українська', $vehicle->description_ua);
+        $this->get(route('vehicles.edit', $vehicle))->assertInertia(fn (Assert $page) => $page
+            ->where('vehicle.description_ru', 'Русский')->where('vehicle.description_ua', 'Українська'));
+        $presented = app(BotApiPresenter::class)->vehicle($vehicle);
+        $this->assertSame(['en' => 'English', 'ru' => 'Русский', 'ua' => 'Українська'], $presented['descriptions']);
+
+        unset($payload['description_ru'], $payload['description_ua']);
+        $this->patch(route('vehicles.update', $vehicle), $payload)->assertSessionHasNoErrors();
+        $this->assertSame('Русский', $vehicle->refresh()->description_ru);
+        $this->assertSame('Українська', $vehicle->description_ua);
+        $this->patch(route('vehicles.update', $vehicle), [...$payload, 'description_ru' => '', 'description_ua' => ''])->assertSessionHasNoErrors();
+        $this->assertNull($vehicle->refresh()->description_ru);
+        $this->assertNull($vehicle->description_ua);
+        $this->assertSame('English', $vehicle->description);
+        $this->patch(route('vehicles.update', $vehicle), [...$payload, 'description_ru' => str_repeat('x', 10001), 'description_ua' => ['invalid']])
+            ->assertSessionHasErrors(['description_ru', 'description_ua']);
     }
 
     public function test_admin_manages_vehicle_lifecycle_without_deleting_history(): void
@@ -118,7 +144,7 @@ class AdminVehicleCatalogTest extends TestCase
             ->getJson(route('vehicles.pricing.quote', [
                 'vehicle' => $vehicle,
                 'starts_on' => '2026-07-01',
-                'ends_on' => '2026-07-07',
+                'ends_on' => '2026-07-08',
             ]))
             ->assertOk()
             ->assertJsonPath('data.total_days', 7)
@@ -148,7 +174,7 @@ class AdminVehicleCatalogTest extends TestCase
     }
 
     #[DataProvider('validCatalogPriceValues')]
-    public function test_catalog_price_update_accepts_positive_multiples_of_fifty(int $value): void
+    public function test_catalog_price_update_accepts_exact_positive_integers(int $value): void
     {
         $vehicle = Vehicle::factory()->create();
         $payload = $this->pricePayload();
@@ -165,6 +191,26 @@ class AdminVehicleCatalogTest extends TestCase
         ]);
     }
 
+    public function test_fleet_price_endpoint_preserves_exact_prices_and_rejects_a_stale_editor(): void
+    {
+        $vehicle = Vehicle::factory()->create();
+        $this->getJson(route('vehicles.pricing.show', $vehicle))->assertUnauthorized();
+        $this->actingAs($this->admin);
+        $data = $this->getJson(route('vehicles.pricing.show', $vehicle))->assertOk()->json('data');
+        $this->assertNull($data['preset']);
+        $payload = $this->pricePayload();
+        $payload['expected_vehicle_pricing_revision'] = $data['revision'];
+        $payload['prices']['high']['1d'] = 337;
+        $this->patchJson(route('vehicles.pricing.update', $vehicle), $payload)->assertOk();
+        $this->getJson(route('vehicles.pricing.show', $vehicle))->assertOk()
+            ->assertJsonPath('data.matrix.high.1d.package_total', 337);
+        $payload['prices']['high']['1d'] = 338;
+        $this->patchJson(route('vehicles.pricing.update', $vehicle), $payload)->assertStatus(422)
+            ->assertJsonValidationErrors('expected_vehicle_pricing_revision');
+        $this->getJson(route('vehicles.pricing.show', $vehicle))
+            ->assertJsonPath('data.matrix.high.1d.package_total', 337);
+    }
+
     /** @return array<string, array{int}> */
     public static function validCatalogPriceValues(): array
     {
@@ -173,11 +219,14 @@ class AdminVehicleCatalogTest extends TestCase
             '150' => [150],
             '1250' => [1250],
             '2300' => [2300],
+            '330' => [330],
+            '370' => [370],
+            '2321' => [2321],
         ];
     }
 
     #[DataProvider('invalidCatalogPriceValues')]
-    public function test_catalog_price_update_rejects_non_multiples_on_the_exact_cell(int $value): void
+    public function test_catalog_price_update_rejects_invalid_values_on_the_exact_cell(int|float $value): void
     {
         $vehicle = Vehicle::factory()->create();
         $payload = $this->pricePayload();
@@ -187,20 +236,19 @@ class AdminVehicleCatalogTest extends TestCase
             ->withUnencryptedCookie('admin_locale', 'en')
             ->patch(route('vehicles.pricing.update', $vehicle), $payload)
             ->assertSessionHasErrors([
-                'prices.low.7d' => 'Price must be a positive whole number divisible by 50 THB.',
+                'prices.low.7d' => 'Price must be a positive whole number.',
             ]);
 
         $this->assertDatabaseCount('vehicle_price_tiers', 0);
     }
 
-    /** @return array<string, array{int}> */
+    /** @return array<string, array{int|float}> */
     public static function invalidCatalogPriceValues(): array
     {
         return [
-            '110' => [110],
-            '120' => [120],
-            '1275' => [1275],
-            '2321' => [2321],
+            'zero' => [0],
+            'negative' => [-120],
+            'fraction' => [1275.5],
         ];
     }
 

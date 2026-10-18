@@ -49,7 +49,6 @@ class DomainEnumsTest extends TestCase
         ));
 
         $this->assertSame([
-            BookingStatus::Pending,
             BookingStatus::Approved,
             BookingStatus::Active,
         ], $blocking);

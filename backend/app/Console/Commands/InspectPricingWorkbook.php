@@ -25,7 +25,8 @@ class InspectPricingWorkbook extends Command
 
     public function handle(): int
     {
-        $path = $this->absolutePath((string) $this->argument('path'));
+        $pathArgument = $this->argument('path');
+        $path = $this->absolutePath(is_string($pathArgument) ? $pathArgument : '');
 
         if (! is_file($path)) {
             $this->error("Workbook not found: {$path}");
@@ -36,8 +37,9 @@ class InspectPricingWorkbook extends Command
         $reader = IOFactory::createReaderForFile($path);
         $this->renderSheetList($reader, $path);
 
+        $sheetOption = $this->option('sheet');
         $sheets = array_values(array_filter(
-            $this->option('sheet'),
+            is_array($sheetOption) ? $sheetOption : [],
             fn (mixed $sheet): bool => is_string($sheet) && $sheet !== '',
         ));
 
@@ -85,7 +87,8 @@ class InspectPricingWorkbook extends Command
     {
         $fromRow = max(1, (int) $this->option('from-row'));
         $toRow = min((int) $this->option('to-row'), $worksheet->getHighestDataRow());
-        $requestedColumn = strtoupper((string) $this->option('max-column'));
+        $maxColumnOption = $this->option('max-column');
+        $requestedColumn = strtoupper(is_string($maxColumnOption) ? $maxColumnOption : '');
         $maxColumn = min(
             Coordinate::columnIndexFromString($requestedColumn),
             Coordinate::columnIndexFromString($worksheet->getHighestDataColumn()),

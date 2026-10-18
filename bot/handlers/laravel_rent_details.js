@@ -16,6 +16,7 @@ const {
 const HISTORY_STATUSES = new Set([
   "cancelled",
   "cancelled_by_client",
+  "cancelled_unavailable",
   "completed",
   "expired",
   "no_show",
@@ -48,6 +49,15 @@ function buildDetailsPayload(rental, lang, {origin = "current", page = 0} = {}) 
     days === null ? "" : tHtml(lang, "rent_details_days", {days}),
     tHtml(lang, "rent_details_price", {
       price: rental.total_price ?? t(lang, "booking_price_tbd"),
+    }),
+    ...["prepayment", "deposit"].map((key) => {
+      const payment = rental.payments?.[key];
+      if (!payment) return "";
+      return tHtml(lang, "rent_payment_line", {
+        label: t(lang, `rent_payment_${key}`),
+        amount: payment.amount === null ? t(lang, "booking_price_tbd") : `${payment.amount} ${payment.currency || ""}`,
+        status: t(lang, payment.received ? "rent_payment_received" : "rent_payment_due"),
+      });
     }),
     created ? tHtml(lang, "rent_details_created", {created}) : "",
     reason ? tHtml(lang, "rent_details_reason", {reason: preview(reason, 300)}) : "",

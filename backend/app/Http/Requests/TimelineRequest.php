@@ -11,7 +11,7 @@ use Illuminate\Validation\Validator;
 
 class TimelineRequest extends FormRequest
 {
-    private const MAX_RANGE_DAYS = 93;
+    private const MAX_RANGE_DAYS = 186;
 
     protected function prepareForValidation(): void
     {
@@ -72,7 +72,7 @@ class TimelineRequest extends FormRequest
             $end = CarbonImmutable::parse((string) $this->input('ends_on'), $timezone);
 
             if (((int) $start->diffInDays($end)) + 1 > self::MAX_RANGE_DAYS) {
-                $validator->errors()->add('ends_on', 'The timeline range cannot exceed 93 days.');
+                $validator->errors()->add('ends_on', 'The timeline range cannot exceed 186 days.');
             }
         }];
     }

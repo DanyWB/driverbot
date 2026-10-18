@@ -23,7 +23,8 @@ class QuoteVehiclePrice extends Command
 
     public function handle(PricingService $pricing): int
     {
-        $vehicleCode = (string) $this->argument('vehicle');
+        $vehicleArgument = $this->argument('vehicle');
+        $vehicleCode = is_string($vehicleArgument) ? $vehicleArgument : '';
         $vehicle = Vehicle::query()->where('external_code', $vehicleCode)->first();
 
         if (! $vehicle instanceof Vehicle) {
@@ -33,9 +34,11 @@ class QuoteVehiclePrice extends Command
         }
 
         try {
+            $startsOnArgument = $this->argument('starts_on');
+            $endsOnArgument = $this->argument('ends_on');
             $period = RentalPeriod::fromStrings(
-                (string) $this->argument('starts_on'),
-                (string) $this->argument('ends_on'),
+                is_string($startsOnArgument) ? $startsOnArgument : '',
+                is_string($endsOnArgument) ? $endsOnArgument : '',
                 (string) config('business.timezone'),
             );
             $quote = $pricing->quote($vehicle, $period, requireBookable: ! $this->option('allow-hidden'));

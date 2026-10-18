@@ -38,14 +38,16 @@ class NotificationOutboxDeliveryTest extends TestCase
 
         $customer = Customer::factory()->create(['name' => 'Alice <script>alert(1)</script>', 'locale' => 'en']);
         $vehicle = Vehicle::factory()->create(['name' => 'Honda <b>ADV</b>']);
-        $this->booking = Booking::factory()->create([
+        $this->booking = app(BookingStatusMutationGuard::class)->run(fn () => Booking::factory()->create([
+            'status' => BookingStatus::Pending,
+            'pending_expires_at' => now()->addHours(48),
             'customer_id' => $customer->id,
             'vehicle_id' => $vehicle->id,
             'starts_on' => '2026-08-20',
             'ends_on' => '2026-08-22',
             'pickup_time' => '10:00:00',
             'return_time' => '12:00:00',
-        ]);
+        ]));
         BookingPriceSnapshot::query()->create([
             'booking_id' => $this->booking->id,
             'version' => 1,

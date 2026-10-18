@@ -10,7 +10,7 @@ class BookingStateMachine
     /** @var array<string, list<BookingStatus>> */
     private const TRANSITIONS = [
         'process' => [BookingStatus::Pending, BookingStatus::CancelledByClient],
-        'pending' => [BookingStatus::Approved, BookingStatus::Cancelled, BookingStatus::CancelledByClient, BookingStatus::Expired],
+        'pending' => [BookingStatus::Approved, BookingStatus::Cancelled, BookingStatus::CancelledByClient, BookingStatus::CancelledUnavailable, BookingStatus::Expired],
         'approved' => [BookingStatus::Active, BookingStatus::Cancelled, BookingStatus::CancelledByClient, BookingStatus::NoShow],
         'active' => [BookingStatus::Completed, BookingStatus::Cancelled],
     ];

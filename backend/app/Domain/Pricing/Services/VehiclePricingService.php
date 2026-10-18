@@ -10,6 +10,7 @@ use App\Models\VehiclePriceTier;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class VehiclePricingService
@@ -18,10 +19,28 @@ class VehiclePricingService
      * @param  array<string, array<string, int|null>>  $prices
      * @param  array<string, array<string, bool>>  $enabled
      */
-    public function replaceMatrix(Vehicle $vehicle, array $prices, array $enabled): Vehicle
-    {
-        return DB::transaction(function () use ($vehicle, $prices, $enabled): Vehicle {
+    public function replaceMatrix(
+        Vehicle $vehicle,
+        array $prices,
+        array $enabled,
+        ?int $expectedPricingVersion = null,
+    ): Vehicle {
+        return DB::transaction(function () use ($vehicle, $prices, $enabled, $expectedPricingVersion): Vehicle {
             $vehicle = Vehicle::query()->whereKey($vehicle->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($expectedPricingVersion !== null && (int) $vehicle->pricing_version !== $expectedPricingVersion) {
+                $locale = request()->cookie('admin_locale') === 'ru' ? 'ru' : 'en';
+                throw ValidationException::withMessages([
+                    'expected_vehicle_pricing_revision' => __('pricing_presets.vehicle_conflict', [], $locale),
+                ]);
+            }
+
+            if ($vehicle->pricing_preset_id !== null) {
+                $locale = request()->cookie('admin_locale') === 'ru' ? 'ru' : 'en';
+                throw ValidationException::withMessages([
+                    'prices' => __('pricing_presets.linked_individual_update', [], $locale),
+                ]);
+            }
             $seasons = PricingSeason::query()
                 ->whereIn('key', array_column(PricingSeasonKey::cases(), 'value'))
                 ->get()
@@ -80,6 +99,8 @@ class VehiclePricingService
             if ($activeCount !== 15 && $vehicle->is_visible_for_booking) {
                 $vehicle->forceFill(['is_visible_for_booking' => false])->save();
             }
+
+            $vehicle->forceFill(['pricing_version' => (int) $vehicle->pricing_version + 1])->save();
 
             return $vehicle->refresh();
         });

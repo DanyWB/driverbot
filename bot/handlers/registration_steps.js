@@ -94,21 +94,6 @@ async function handlePhoneStep(ctx) {
   const returnToProfile = Boolean(ctx.session?.returnToProfile);
   ctx.session.returnToProfile = null;
 
-  const user = await getUserByTelegramId(fromId);
-  const hasPassport = user.passport_photo_file_id || user.meta?.passport_number;
-  if (ctx.session?.scenario === "registration") {
-    ctx.session.step = "waiting_for_passport";
-    ctx.session.scenario = "registration";
-    await ctx.reply(t(lang, "enter_passport"));
-    return true;
-  }
-
-  if (!hasPassport && !returnToProfile) {
-    ctx.session.step = "waiting_for_passport";
-    ctx.session.scenario = "registration";
-    await ctx.reply(t(lang, "enter_passport"));
-    return true;
-  }
 
   if (returnToProfile) {
     const {sendAccountMenu} = require("./account_menu");

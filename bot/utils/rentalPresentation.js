@@ -41,7 +41,7 @@ function rentalDays(rental) {
   const start = validDate(rentalDate(rental, "start"));
   const end = validDate(rentalDate(rental, "end"));
   if (!start || !end) return null;
-  const days = end.startOf("day").diff(start.startOf("day"), "day") + 1;
+  const days = Math.max(1, end.startOf("day").diff(start.startOf("day"), "day"));
   return days > 0 ? days : null;
 }
 

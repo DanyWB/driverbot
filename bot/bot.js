@@ -78,7 +78,12 @@ bot.callbackQuery(
   require("./handlers/book_options")
 );
 
-bot.callbackQuery(/^book:cat:\d+$/, require("./handlers/book_select_category"));
+bot.callbackQuery(/^book:(cat:\d+|model:\d+:(aerox|nmax|pcx|adv|other))$/, require("./handlers/book_select_category"));
+bot.callbackQuery("conditions:contract", require("./handlers/laravel_rent_menu").handleLaravelRentMenuAction);
+bot.callbackQuery("book:menu", async ctx => {
+  ctx.session.draftMenuExpanded = !ctx.session.draftMenuExpanded;
+  return require("./handlers/book_draft").showBookingDraft(ctx, {navigationMode: "replace"});
+});
 bot.callbackQuery("book:back_to_bikes", require("./handlers/book_back_to_bikes"));
 bot.callbackQuery("book:show_available_bikes", require("./handlers/book_show_available_bikes"));
 bot.callbackQuery(
@@ -121,7 +126,7 @@ bot.callbackQuery(
     "rent:payment",
     "rent:settings",
     "rent:support",
-    /^rent:(current|history):\d+$/,
+    /^rent:(current|history|payment):\d+$/,
     /^rent:details:[0-9a-f-]+$/i,
     /^rent:cancel:[0-9a-f-]+$/i,
     /^rent:cancel_confirm:[0-9a-f-]+$/i,

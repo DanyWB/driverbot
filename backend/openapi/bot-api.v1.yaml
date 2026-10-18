@@ -20,6 +20,38 @@ tags:
   - name: Bookings
   - name: Documents
 paths:
+  /customers/me/terms:
+    post:
+      tags: [Customers]
+      operationId: acceptCurrentRentalTerms
+      parameters:
+        - $ref: '#/components/parameters/TelegramUserId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [terms_version, accepted]
+              properties:
+                terms_version: {type: string, maxLength: 100}
+                accepted: {type: boolean, const: true}
+      responses:
+        '200':
+          description: Current terms acceptance saved; repeated acceptance preserves its timestamp.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - properties:
+                      data: {$ref: '#/components/schemas/Customer'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '429': {$ref: '#/components/responses/RateLimited'}
   /configuration:
     get:
       tags: [Configuration]
@@ -629,12 +661,19 @@ components:
         passport_number: {type: [string, 'null'], maxLength: 100}
     Customer:
       type: object
-      required: [id, name, locale, phone, telegram, passport, profile_complete]
+      required: [id, name, locale, phone, telegram, passport, profile_complete, terms]
       properties:
         id: {type: integer}
         name: {type: [string, 'null']}
         locale: {type: [string, 'null'], enum: [ru, en, ua, null]}
         phone: {type: [string, 'null']}
+        terms:
+          type: object
+          required: [version, accepted_at, current]
+          properties:
+            version: {type: [string, 'null']}
+            accepted_at: {type: [string, 'null'], format: date-time}
+            current: {type: boolean}
         telegram:
           type: object
           properties:
@@ -773,11 +812,17 @@ components:
         booking: {$ref: '#/components/schemas/Booking'}
     Booking:
       type: object
-      required: [public_id, status, vehicle, starts_on, ends_on, price, options, terms, documents, can_cancel, cancellation]
+      required: [public_id, status, vehicle, starts_on, ends_on, price, options, terms, documents, can_cancel, cancellation, payments]
       properties:
         public_id: {type: string, format: uuid}
-        status: {type: string, enum: [process, pending, approved, active, completed, cancelled, cancelled_by_client, expired, no_show]}
+        status: {type: string, enum: [process, pending, approved, active, completed, cancelled, cancelled_by_client, cancelled_unavailable, expired, no_show]}
         vehicle: {$ref: '#/components/schemas/Vehicle'}
+        payments:
+          type: object
+          required: [prepayment, deposit]
+          properties:
+            prepayment: {$ref: '#/components/schemas/BookingPayment'}
+            deposit: {$ref: '#/components/schemas/BookingPayment'}
         starts_on: {type: string, format: date}
         ends_on: {type: string, format: date}
         pickup_time: {type: [string, 'null']}
@@ -815,6 +860,14 @@ components:
         pending_expires_at: {type: [string, 'null'], format: date-time}
         created_at: {type: [string, 'null'], format: date-time}
         updated_at: {type: [string, 'null'], format: date-time}
+    BookingPayment:
+      type: object
+      required: [amount, currency, received, received_at]
+      properties:
+        amount: {type: [string, 'null'], description: 'Manual amount; decimal string. No automatic charge.'}
+        currency: {type: [string, 'null'], enum: [THB, USD, null]}
+        received: {type: boolean}
+        received_at: {type: [string, 'null'], format: date-time}
     DocumentUploadRequest:
       type: object
       required: [type, document]

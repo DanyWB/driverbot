@@ -172,7 +172,7 @@ class BookingController extends Controller
     {
         $booking->load([
             'customer.contacts',
-            'vehicle',
+            'vehicle.photos',
             'priceSnapshots.overriddenByAdmin',
             'latestPriceSnapshot',
             'statusHistory.actorAdmin',

@@ -23,6 +23,7 @@ class QuoteController extends Controller
     ): JsonResponse {
         $data = $request->validated();
         $vehicle = Vehicle::query()
+            ->whereNull('archived_at')
             ->where('is_active', true)
             ->where('is_visible_for_booking', true)
             ->find($data['vehicle_id']);

@@ -11,12 +11,13 @@ enum BookingStatus: string
     case Completed = 'completed';
     case Cancelled = 'cancelled';
     case CancelledByClient = 'cancelled_by_client';
+    case CancelledUnavailable = 'cancelled_unavailable';
     case Expired = 'expired';
     case NoShow = 'no_show';
 
     public function blocksAvailability(): bool
     {
-        return in_array($this, [self::Pending, self::Approved, self::Active], true);
+        return in_array($this, [self::Approved, self::Active], true);
     }
 
     public function canBecomeNoShow(): bool

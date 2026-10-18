@@ -18,19 +18,25 @@ class ManageBotApiClient extends Command
 
     public function handle(ServiceApiClientService $clients): int
     {
-        $action = strtolower((string) $this->argument('action'));
+        $actionArgument = $this->argument('action');
+        $action = strtolower(is_string($actionArgument) ? $actionArgument : '');
 
         if ($action === 'issue') {
+            $nameOption = $this->option('name');
+            $abilitiesOption = $this->option('abilities');
             $result = $clients->issue(
-                (string) $this->option('name'),
-                array_values(array_filter(explode(',', (string) $this->option('abilities')))),
+                is_string($nameOption) ? $nameOption : '',
+                array_values(array_filter(explode(',', is_string($abilitiesOption) ? $abilitiesOption : ''))),
             );
             $this->showToken((int) $result['client']->id, $result['token']);
 
             return self::SUCCESS;
         }
 
-        $client = ServiceApiClient::query()->find($this->option('id'));
+        $idOption = $this->option('id');
+        $client = is_string($idOption) || is_int($idOption)
+            ? ServiceApiClient::query()->find($idOption)
+            : null;
 
         if (! $client instanceof ServiceApiClient) {
             $this->error('A valid --id is required for rotate/revoke.');

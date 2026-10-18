@@ -8,15 +8,18 @@ import { Button } from '@/components/ui/button';
 import { useLocale } from '@/composables/useLocale';
 import type {
     CategoryOption,
+    PricingPreset,
     PricingTemplateOption,
     VehicleDetail,
 } from '@/types';
 
 defineProps<{
     vehicle: VehicleDetail;
+    return_to?: string | null;
     types: string[];
     categories: CategoryOption[];
     pricing_templates: PricingTemplateOption[];
+    pricing_presets: PricingPreset[];
 }>();
 
 defineOptions({
@@ -40,7 +43,7 @@ const { t } = useLocale();
                     variant="ghost"
                     size="icon"
                     :title="t('Back to fleet')"
-                    ><Link href="/vehicles"
+                    ><Link :href="return_to || '/vehicles'"
                         ><ArrowLeft /><span class="sr-only">{{
                             t('Back')
                         }}</span></Link
@@ -81,7 +84,7 @@ const { t } = useLocale();
                     </div>
                 </div>
             </div>
-            <Button as-child variant="outline"
+            <Button v-if="!vehicle.archived_at" as-child variant="outline"
                 ><Link :href="`/bookings/create?vehicle_id=${vehicle.id}`"
                     ><CalendarPlus />{{ t('New booking') }}</Link
                 ></Button
@@ -112,6 +115,7 @@ const { t } = useLocale();
                 :vehicle="vehicle"
                 :types="types"
                 :categories="categories"
+                :return-to="return_to"
             />
         </div>
         <VehiclePhotoManager
@@ -123,6 +127,11 @@ const { t } = useLocale();
             :pricing="vehicle.pricing"
             :pricing-profile="vehicle.pricing_profile"
             :templates="pricing_templates"
+            :pricing-preset="vehicle.pricing_preset"
+            :pricing-presets="pricing_presets"
+            :pricing-revision="vehicle.pricing_revision"
+            :vehicle-type="vehicle.type"
+            :vehicle-name="vehicle.name"
         />
     </div>
 </template>

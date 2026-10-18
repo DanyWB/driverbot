@@ -76,7 +76,7 @@ jobs:
       - name: Run CI checks
         run: composer ci:check
 
-      - name: Run PostgreSQL constraints and concurrency tests
+      - name: Run PostgreSQL constraints, concurrency, and timezone tests
         env:
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
@@ -88,3 +88,6 @@ jobs:
         run: |
           php artisan migrate --force
           php artisan test --filter=Postgres
+          for app_timezone in UTC Europe/Moscow Asia/Bangkok; do
+            APP_TIMEZONE="$app_timezone" php artisan test --filter=PendingRequestPolicyTest
+          done

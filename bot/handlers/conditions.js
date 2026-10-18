@@ -1,8 +1,8 @@
 const db = require("../connect");
 const {t, getCtxLang} = require("../utils/i18n");
 const {isLaravelMode} = require("../config/runtime");
-const {markTermsAccepted} = require("../services/sessionCartService");
-const {getConfiguration} = require("../services/laravelGateway");
+const {markTermsAccepted, restoreTermsAcceptance} = require("../services/sessionCartService");
+const gateway = require("../services/laravelGateway");
 const {botScreenRenderer} = require("../services/botScreenRenderer");
 
 const TERMS_ORIGINS = new Set(["main_menu", "booking_confirmation"]);
@@ -11,9 +11,10 @@ function normalizeTermsOrigin(value) {
   return TERMS_ORIGINS.has(value) ? value : "main_menu";
 }
 
-async function acceptCurrentTerms(ctx) {
-  const configuration = await getConfiguration({refresh: true});
-  markTermsAccepted(ctx, configuration.terms_version);
+async function acceptCurrentTerms(ctx, api = gateway) {
+  // Accept the version actually shown, never a newer unseen version.
+  await api.acceptTerms(ctx.from.id, ctx.session.viewedTermsVersion);
+  markTermsAccepted(ctx, ctx.session.viewedTermsVersion);
 }
 
 function conditionsKeyboard(lang, accepted) {
@@ -25,13 +26,15 @@ function conditionsKeyboard(lang, accepted) {
           : t(lang, "conditions_accept_btn"),
         callback_data: accepted ? "noop" : "conditions:accept",
       }],
+      [{text: t(lang, "rent_btn_contract"), callback_data: "conditions:contract"}],
       [{text: t(lang, "btn_back"), callback_data: "conditions:back"}],
     ],
   };
 }
 
-async function hasAcceptedTerms(ctx) {
+async function hasAcceptedTerms(ctx, api = gateway) {
   if (isLaravelMode()) {
+    restoreTermsAcceptance(ctx, await api.getProfile(ctx.from.id));
     return Boolean(ctx.session?.acceptTerms && ctx.session?.acceptedTermsVersion);
   }
   if (ctx.session?.acceptTerms) return true;
@@ -51,11 +54,16 @@ async function sendConditions(ctx, langOverride, options = {}) {
     options.origin || ctx.session?.termsOrigin || "main_menu"
   );
   if (ctx.session) ctx.session.termsOrigin = origin;
-  const accepted = await hasAcceptedTerms(ctx);
+  const api = options.gateway || gateway;
+  const accepted = await hasAcceptedTerms(ctx, api);
+  if (isLaravelMode()) {
+    const configuration = await api.getConfiguration({refresh: true});
+    ctx.session.viewedTermsVersion = configuration.terms_version;
+  }
 
   return (options.renderer || botScreenRenderer).renderText(ctx, {
     screen: "conditions",
-    text: t(lang, "conditions_info"),
+    text: `${t(lang, "booking_request_policy")}\n\n${t(lang, "conditions_info")}`,
     parseMode: "HTML",
     replyMarkup: conditionsKeyboard(lang, accepted),
     returnContext: {termsOrigin: origin},
@@ -63,9 +71,9 @@ async function sendConditions(ctx, langOverride, options = {}) {
   });
 }
 
-async function persistTermsAcceptance(ctx) {
+async function persistTermsAcceptance(ctx, api = gateway) {
   if (isLaravelMode()) {
-    await acceptCurrentTerms(ctx);
+    await acceptCurrentTerms(ctx, api);
     return;
   }
 
@@ -101,9 +109,10 @@ async function handleConditionsActionWithDeps(ctx, dependencies = {}) {
   const action = ctx.callbackQuery?.data;
   const lang = getCtxLang(ctx);
   const renderer = dependencies.renderer || botScreenRenderer;
+  const api = dependencies.gateway || gateway;
 
   if (action === "conditions:open") {
-    return sendConditions(ctx, lang, {renderer});
+    return sendConditions(ctx, lang, {renderer, gateway: api});
   }
   if (action === "conditions:back") {
     return returnFromConditions(ctx, {renderer});
@@ -118,7 +127,15 @@ async function handleConditionsActionWithDeps(ctx, dependencies = {}) {
         ? "booking_confirmation"
         : "main_menu")
   );
-  if (!(await hasAcceptedTerms(ctx))) await persistTermsAcceptance(ctx);
+  if (!(await hasAcceptedTerms(ctx, api))) {
+    if (isLaravelMode()) {
+      const configuration = await api.getConfiguration({refresh: true});
+      if (!ctx.session.viewedTermsVersion || ctx.session.viewedTermsVersion !== configuration.terms_version) {
+        return sendConditions(ctx, lang, {renderer, gateway: api, origin});
+      }
+    }
+    await persistTermsAcceptance(ctx, api);
+  }
   return returnFromConditions(ctx, {origin, renderer});
 }
 

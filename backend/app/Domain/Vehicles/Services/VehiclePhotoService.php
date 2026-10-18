@@ -12,6 +12,8 @@ use RuntimeException;
 
 class VehiclePhotoService
 {
+    public function __construct(private readonly TelegramPhotoOptimizer $telegram) {}
+
     public function store(Vehicle $vehicle, UploadedFile $file, ?string $altText = null): VehiclePhoto
     {
         $disk = 'public';
@@ -28,6 +30,7 @@ class VehiclePhotoService
         }
 
         try {
+            $this->telegram->prepare($disk, $path);
             $thumbnail = $this->thumbnail($file);
             if (! Storage::disk($disk)->put($thumbnailPath, $thumbnail)) {
                 throw new RuntimeException('Vehicle thumbnail could not be stored.');
@@ -47,7 +50,7 @@ class VehiclePhotoService
                 ]);
             });
         } catch (\Throwable $exception) {
-            Storage::disk($disk)->delete([$path, $thumbnailPath]);
+            Storage::disk($disk)->delete([$path, $thumbnailPath, $this->telegram->path($path)]);
 
             throw $exception;
         }
@@ -95,7 +98,7 @@ class VehiclePhotoService
         });
 
         $thumbnailPath = $this->thumbnailPath($path);
-        DB::afterCommit(fn () => Storage::disk($disk)->delete([$path, $thumbnailPath]));
+        DB::afterCommit(fn () => Storage::disk($disk)->delete([$path, $thumbnailPath, $this->telegram->path($path)]));
     }
 
     public function url(VehiclePhoto $photo): string
@@ -106,6 +109,14 @@ class VehiclePhotoService
     public function thumbnailUrl(VehiclePhoto $photo): string
     {
         return Storage::disk((string) $photo->disk)->url($this->thumbnailPath((string) $photo->file_path));
+    }
+
+    public function telegramUrl(VehiclePhoto $photo): ?string
+    {
+        $storage = Storage::disk((string) $photo->disk);
+        $path = $this->telegram->path((string) $photo->file_path);
+
+        return $storage->exists($path) ? $storage->url($path) : null;
     }
 
     public function thumbnailPath(string $originalPath): string
@@ -119,7 +130,7 @@ class VehiclePhotoService
     public function discardFiles(VehiclePhoto $photo): void
     {
         $path = (string) $photo->file_path;
-        Storage::disk((string) $photo->disk)->delete([$path, $this->thumbnailPath($path)]);
+        Storage::disk((string) $photo->disk)->delete([$path, $this->thumbnailPath($path), $this->telegram->path($path)]);
     }
 
     private function thumbnail(UploadedFile $file): string

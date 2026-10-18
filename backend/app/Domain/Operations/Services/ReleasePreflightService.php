@@ -5,14 +5,17 @@ namespace App\Domain\Operations\Services;
 use App\Domain\Notifications\Services\AdminTelegramRecipientResolver;
 use App\Domain\Operations\Data\ReleaseCheck;
 use App\Domain\Pricing\Services\PricingCatalogAuditor;
+use App\Domain\Vehicles\Services\TelegramPhotoOptimizer;
 use App\Models\NotificationOutbox;
 use App\Models\ServiceApiClient;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\VehiclePhoto;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class ReleasePreflightService
@@ -20,6 +23,7 @@ class ReleasePreflightService
     public function __construct(
         private readonly PricingCatalogAuditor $pricing,
         private readonly AdminTelegramRecipientResolver $adminTelegramRecipients,
+        private readonly TelegramPhotoOptimizer $telegramPhotos,
     ) {}
 
     /** @return list<ReleaseCheck> */
@@ -243,6 +247,7 @@ class ReleasePreflightService
         $checks[] = $this->serviceClient($strict);
         $checks[] = $this->catalog($strict);
         $checks[] = $this->vehiclePhotos($strict);
+        $checks[] = $this->telegramVehiclePhotos($strict);
         $checks[] = $this->pricingCatalog();
         $checks[] = $this->failedJobs();
         $checks[] = $this->failedNotifications();
@@ -345,6 +350,32 @@ class ReleasePreflightService
             $strict,
             'Every visible vehicle has a primary photo.',
             "Visible vehicles without a primary photo: {$missing}.",
+        );
+    }
+
+    private function telegramVehiclePhotos(bool $strict): ReleaseCheck
+    {
+        $publishedPhotos = VehiclePhoto::query()
+            ->whereHas('vehicle', fn ($query) => $query
+                ->where('is_active', true)
+                ->where('is_visible_for_booking', true))
+            ->get(['id', 'disk', 'file_path']);
+        $missing = $publishedPhotos->filter(function (VehiclePhoto $photo): bool {
+            try {
+                return ! Storage::disk((string) $photo->disk)->exists(
+                    $this->telegramPhotos->path((string) $photo->file_path),
+                );
+            } catch (Throwable) {
+                return true;
+            }
+        })->count();
+
+        return $this->requirement(
+            'catalog.telegram_photos',
+            $missing === 0,
+            $strict,
+            'Every published vehicle photo has a Telegram delivery copy.',
+            "Published vehicle photos without a Telegram delivery copy: {$missing}. Run vehicles:optimize-telegram-photos.",
         );
     }
 

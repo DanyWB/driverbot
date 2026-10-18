@@ -28,7 +28,7 @@ function normalizeVehicle(vehicle) {
     category_id: vehicle.category?.id || null,
     category_code: vehicle.category?.code || null,
     category_name: vehicle.category?.name || null,
-    image_url: vehicle.primary_photo?.thumbnail_url || vehicle.primary_photo?.url || null,
+    image_url: vehicle.primary_photo?.url || (vehicle.primary_photo?.original_url ? null : vehicle.primary_photo?.thumbnail_url) || null,
   };
 }
 
@@ -44,6 +44,7 @@ function profileAsLegacyUser(profile) {
     passport_photo_file_id: profile.passport?.has_document ? "stored-in-laravel" : null,
     meta: {passport_number: profile.passport?.number || null},
     profile_complete: profile.profile_complete,
+    terms: profile.terms,
     is_admin: false,
   };
 }
@@ -124,6 +125,14 @@ async function revokeExposedAdminTelegramBindingCode(ctx, code) {
 async function getProfile(telegramId) {
   const payload = await api().get("/customers/me", {telegramId});
   return profileAsLegacyUser(payload.data);
+}
+
+async function acceptTerms(telegramId, version) {
+  const body = {terms_version: version, accepted: true};
+  const response = await api().post('/customers/me/terms', {
+    telegramId, body, idempotencyKey: stableKey('terms-accept', telegramId, body),
+  });
+  return profileAsLegacyUser(response.data);
 }
 
 async function updateProfile(telegramId, changes) {
@@ -293,6 +302,7 @@ module.exports = {
   normalizeVehicle,
   bookingPagination,
   profileAsLegacyUser,
+  acceptTerms,
   syncTelegramUser,
   unavailableDates,
   updateProfile,

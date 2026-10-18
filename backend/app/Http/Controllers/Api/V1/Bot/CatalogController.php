@@ -24,9 +24,11 @@ class CatalogController extends Controller
         $categories = Category::query()
             ->where('is_active', true)
             ->whereHas('vehicles', fn (Builder $query) => $query
+                ->whereNull('archived_at')
                 ->where('is_active', true)
                 ->where('is_visible_for_booking', true))
             ->withCount(['vehicles as vehicles_count' => fn (Builder $query) => $query
+                ->whereNull('archived_at')
                 ->where('is_active', true)
                 ->where('is_visible_for_booking', true)])
             ->orderBy('sort_order')
@@ -121,6 +123,7 @@ class CatalogController extends Controller
     private function vehicleQuery(): Builder
     {
         return Vehicle::query()
+            ->whereNull('archived_at')
             ->where('is_active', true)
             ->where('is_visible_for_booking', true)
             ->with([

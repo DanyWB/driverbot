@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Vehicles;
 
 use App\Domain\Pricing\Exceptions\PricingException;
+use App\Domain\Pricing\Presenters\PricingPresetPresenter;
 use App\Domain\Pricing\Services\PricingService;
 use App\Domain\Pricing\Services\PricingTemplateService;
 use App\Domain\Pricing\Services\VehiclePricingService;
@@ -23,19 +24,38 @@ class VehiclePricingController extends Controller
 {
     use HandlesAdminContext;
 
+    public function show(Vehicle $vehicle, VehiclePricingService $pricing, PricingPresetPresenter $presets): JsonResponse
+    {
+        $vehicle->load('pricingPreset');
+
+        return response()->json(['data' => [
+            'vehicle_id' => (int) $vehicle->id,
+            'revision' => (int) $vehicle->pricing_version,
+            'matrix' => $pricing->matrix($vehicle),
+            'preset' => $vehicle->pricingPreset === null ? null : $presets->present($vehicle->pricingPreset),
+        ]]);
+    }
+
     public function update(
         UpdateVehiclePricingRequest $request,
         Vehicle $vehicle,
         VehiclePricingService $pricing,
         AdminAuditService $audit,
-    ): RedirectResponse {
+    ): RedirectResponse|JsonResponse {
         $oldMatrix = $pricing->matrix($vehicle);
         $oldTemplate = $vehicle->getRawOriginal('pricing_profile');
         $wasVisible = (bool) $vehicle->is_visible_for_booking;
         $data = $request->validated();
 
         DB::transaction(function () use ($request, $vehicle, $pricing, $audit, $data, $oldMatrix, $oldTemplate, $wasVisible): void {
-            $updated = $pricing->replaceMatrix($vehicle, $data['prices'], $data['enabled']);
+            $updated = $pricing->replaceMatrix(
+                $vehicle,
+                $data['prices'],
+                $data['enabled'],
+                isset($data['expected_vehicle_pricing_revision'])
+                    ? (int) $data['expected_vehicle_pricing_revision']
+                    : null,
+            );
 
             if (is_string($data['template'] ?? null)) {
                 $updated->forceFill(['pricing_profile' => $data['template']])->save();
@@ -57,9 +77,12 @@ class VehiclePricingController extends Controller
         $message = $wasVisible && ! $vehicle->refresh()->is_visible_for_booking
             ? 'Prices saved. Vehicle was hidden because the active matrix is incomplete.'
             : 'Prices saved.';
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message]);
+        }
         Inertia::flash('toast', ['type' => 'success', 'message' => $message]);
 
-        return to_route('vehicles.edit', $vehicle);
+        return to_route('vehicles.edit', $this->fleetEditParameters($request, $vehicle));
     }
 
     public function quote(

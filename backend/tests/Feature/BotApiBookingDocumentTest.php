@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Bookings\Data\BookingActor;
 use App\Domain\Bookings\Data\CreateBookingData;
 use App\Domain\Bookings\Enums\BookingSource;
+use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Bookings\Services\BookingService;
 use App\Domain\Integrations\Bot\Services\ServiceAuditService;
 use App\Models\Booking;
@@ -101,6 +102,7 @@ class BotApiBookingDocumentTest extends BotApiTestCase
                 startsOn: '2026-08-10',
                 endsOn: '2026-08-16',
                 source: BookingSource::AdminManual,
+                initialStatus: BookingStatus::Approved,
             ),
             BookingActor::admin(User::factory()->create()->id),
         );
@@ -131,7 +133,7 @@ class BotApiBookingDocumentTest extends BotApiTestCase
             ->assertJsonValidationErrors(['items.0.starts_on'], 'error.fields');
 
         $long = $this->bookingPayload($vehicle);
-        $long['items'][0]['ends_on'] = '2027-08-11';
+        $long['items'][0]['ends_on'] = '2027-08-12';
 
         $this->withHeaders($this->apiHeaders('200008', 'long-booking'))
             ->postJson('/api/v1/bot/bookings', $long)

@@ -66,7 +66,7 @@ test("does not duplicate the same vehicle in one cart", () => {
   assert.equal(cart.getCart(ctx).length, 1);
 });
 
-test("binds consent to a terms version and clears it with the cart", () => {
+test("binds consent to a terms version and preserves it when clearing the cart", () => {
   const ctx = context();
   cart.add(ctx, booking(), {id: 7, name: "Honda Click"}, {final_total: 700, currency: "THB"});
   cart.markTermsAccepted(ctx, "2026-07-22");
@@ -76,8 +76,8 @@ test("binds consent to a terms version and clears it with the cart", () => {
   assert.equal(cart.getCart(ctx)[0].accept_terms, true);
 
   cart.clear(ctx);
-  assert.equal(ctx.session.acceptTerms, null);
-  assert.equal(ctx.session.acceptedTermsVersion, null);
+  assert.equal(ctx.session.acceptTerms, true);
+  assert.equal(ctx.session.acceptedTermsVersion, "2026-07-22");
   assert.deepEqual(cart.getCart(ctx), []);
 });
 

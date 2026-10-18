@@ -33,6 +33,7 @@ Route::prefix('v1/bot')->group(function (): void {
 
         Route::middleware('telegram.customer')->group(function (): void {
             Route::patch('customers/me', [CustomerController::class, 'update']);
+            Route::post('customers/me/terms', [CustomerController::class, 'acceptTerms']);
             Route::post('bookings', [BookingController::class, 'store']);
             Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel'])->whereUuid('booking');
         });

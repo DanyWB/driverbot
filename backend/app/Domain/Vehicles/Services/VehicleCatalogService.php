@@ -28,6 +28,7 @@ class VehicleCatalogService
     public function updateVehicle(Vehicle $vehicle, array $attributes): Vehicle
     {
         return DB::transaction(function () use ($vehicle, $attributes): Vehicle {
+            $vehicle = Vehicle::query()->lockForUpdate()->findOrFail($vehicle->id);
             $vehicle->fill($this->normalizeVehicleAttributes($attributes, $vehicle));
             $this->enforceVehicleInvariants($vehicle);
             $vehicle->save();
@@ -97,6 +98,8 @@ class VehicleCatalogService
             'inventory_code' => $this->nullableString($attributes['inventory_code'] ?? null),
             'year' => $attributes['year'] ?? null,
             'description' => $this->nullableString($attributes['description'] ?? null),
+            'description_ru' => $this->nullableString(array_key_exists('description_ru', $attributes) ? $attributes['description_ru'] : $vehicle?->description_ru),
+            'description_ua' => $this->nullableString(array_key_exists('description_ua', $attributes) ? $attributes['description_ua'] : $vehicle?->description_ua),
             'characteristics_text' => $this->nullableString($attributes['characteristics_text'] ?? null),
             'emoji' => $this->nullableString($attributes['emoji'] ?? null),
             'is_active' => (bool) ($attributes['is_active'] ?? false),
@@ -135,9 +138,27 @@ class VehicleCatalogService
 
     private function enforceVehicleInvariants(Vehicle $vehicle): void
     {
+        if ($vehicle->archived_at !== null) {
+            $vehicle->is_active = false;
+            $vehicle->is_visible_for_booking = false;
+        }
+        if (! $vehicle->is_active && $vehicle->unfinishedBookings()->exists()) {
+            throw new VehicleCatalogException('vehicle_has_bookings', __('fleet.unfinished', [], request()->cookie('admin_locale') === 'ru' ? 'ru' : 'en'));
+        }
         $type = $vehicle->getAttribute('type');
         $typeValue = $type instanceof VehicleType ? $type->value : (string) $type;
         $categoryId = $vehicle->getAttribute('category_id');
+
+        if ($vehicle->pricing_preset_id !== null) {
+            $presetType = $vehicle->pricingPreset()->value('vehicle_type');
+
+            if ($presetType !== null && $presetType !== $typeValue) {
+                throw new VehicleCatalogException(
+                    'pricing_preset_type_mismatch',
+                    __('pricing_presets.vehicle_type_conflict', [], request()->cookie('admin_locale') === 'ru' ? 'ru' : 'en'),
+                );
+            }
+        }
 
         if ($categoryId !== null) {
             $category = Category::query()->find($categoryId);

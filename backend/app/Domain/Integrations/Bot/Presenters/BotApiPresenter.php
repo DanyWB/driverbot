@@ -47,6 +47,11 @@ class BotApiPresenter
             'name' => (string) $vehicle->name,
             'year' => is_numeric($vehicle->year) ? (int) $vehicle->year : null,
             'description' => $vehicle->description,
+            'descriptions' => [
+                'en' => $vehicle->description,
+                'ru' => $vehicle->description_ru,
+                'ua' => $vehicle->description_ua,
+            ],
             'characteristics' => $vehicle->characteristics_text,
             'emoji' => $vehicle->emoji,
             'category' => $vehicle->category instanceof Category ? $this->category($vehicle->category) : null,
@@ -70,6 +75,11 @@ class BotApiPresenter
             'name' => $nameCompleted ? (string) $customer->name : null,
             'locale' => $languageCompleted ? (string) $customer->locale : null,
             'phone' => $this->contact($customer, ContactType::Phone),
+            'terms' => [
+                'version' => $customer->terms_version,
+                'accepted_at' => $this->dateTime($customer->terms_accepted_at),
+                'current' => $customer->terms_accepted_at !== null && $customer->terms_version === (string) config('business.terms_version'),
+            ],
             'telegram' => [
                 'id' => $identity?->external_id,
                 'username' => $this->contact($customer, ContactType::TelegramUsername),
@@ -132,6 +142,7 @@ class BotApiPresenter
             'can_cancel' => $cancellation['can_cancel'],
             'cancellation' => $cancellation,
             'pending_expires_at' => $this->dateTime($booking->getAttribute('pending_expires_at')),
+            'payments' => $booking->paymentsSummary(),
             'created_at' => $this->dateTime($booking->created_at),
             'updated_at' => $this->dateTime($booking->updated_at),
         ];
@@ -156,7 +167,8 @@ class BotApiPresenter
     {
         return [
             'id' => (int) $photo->id,
-            'url' => $this->photos->url($photo),
+            'url' => $this->photos->telegramUrl($photo),
+            'original_url' => $this->photos->url($photo),
             'thumbnail_url' => $this->photos->thumbnailUrl($photo),
             'alt_text' => $photo->alt_text,
             'is_primary' => (bool) $photo->is_primary,

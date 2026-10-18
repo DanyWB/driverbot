@@ -12,6 +12,7 @@ import {
     X,
 } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { rentalDayCount } from '@/lib/rentalPeriod';
 import AdminDateInput from '@/components/AdminDateInput.vue';
 import AdminSelect from '@/components/AdminSelect.vue';
 import InputError from '@/components/InputError.vue';
@@ -77,18 +78,9 @@ let quoteRequest: AbortController | undefined;
 let customerTimer: ReturnType<typeof setTimeout> | undefined;
 let customerRequest: AbortController | undefined;
 
-const selectedDays = computed(() => {
-    if (!form.starts_on || !form.ends_on) {
-        return 0;
-    }
-
-    const start = Date.parse(`${form.starts_on}T00:00:00Z`);
-    const end = Date.parse(`${form.ends_on}T00:00:00Z`);
-
-    return Number.isFinite(start) && Number.isFinite(end) && end >= start
-        ? Math.floor((end - start) / 86_400_000) + 1
-        : 0;
-});
+const selectedDays = computed(() =>
+    rentalDayCount(form.starts_on, form.ends_on),
+);
 
 watch(
     () => [props.open, props.selection] as const,

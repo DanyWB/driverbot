@@ -96,6 +96,7 @@ class BookingEventRecorder
         } else {
             $this->outbox->discardPickupReminders($booking, 'Booking dates changed outside the approved status.');
         }
+        $this->outbox->schedulePendingReminders($booking);
     }
 
     public function recordPriceChanged(Booking $booking, BookingPriceSnapshot $snapshot): void
@@ -152,6 +153,7 @@ class BookingEventRecorder
             BookingStatus::Pending,
             BookingStatus::Approved,
             BookingStatus::Cancelled,
+            BookingStatus::CancelledUnavailable,
             BookingStatus::Expired,
         ];
 
@@ -185,6 +187,11 @@ class BookingEventRecorder
             $this->outbox->schedulePickupReminders($booking);
         } elseif ($status !== BookingStatus::Pending) {
             $this->outbox->discardPickupReminders($booking, "Booking status changed to {$status->value}.");
+        }
+        if ($status === BookingStatus::Pending) {
+            $this->outbox->schedulePendingReminders($booking);
+        } else {
+            $this->outbox->discardPendingReminders($booking, "Booking status changed to {$status->value}.");
         }
     }
 }

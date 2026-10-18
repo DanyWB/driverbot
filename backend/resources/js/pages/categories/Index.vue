@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Pencil, Plus, Tags } from '@lucide/vue';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import AdminSelect from '@/components/AdminSelect.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,38 @@ import { Label } from '@/components/ui/label';
 import { useLocale } from '@/composables/useLocale';
 import type { CategoryItem } from '@/types';
 
-defineProps<{ categories: CategoryItem[]; types: string[] }>();
+const props = defineProps<{
+    categories: CategoryItem[];
+    types: string[];
+    rentalPolicy: {
+        minimum_days: number;
+        category_minimum_days: Record<string, number> | null;
+    };
+}>();
+
+const policyForm = useForm({
+    minimum_days: props.rentalPolicy.minimum_days,
+    categories: props.categories.map((category) => ({
+        id: category.id,
+        minimum_days:
+            props.rentalPolicy.category_minimum_days?.[category.id] ??
+            ('' as number | string),
+    })),
+});
+
+watch(
+    () => props.categories,
+    (categories) => {
+        policyForm.categories = categories.map((category) => ({
+            id: category.id,
+            minimum_days:
+                policyForm.categories.find((item) => item.id === category.id)
+                    ?.minimum_days ??
+                props.rentalPolicy.category_minimum_days?.[category.id] ??
+                '',
+        }));
+    },
+);
 
 defineOptions({
     layout: {
@@ -114,6 +145,73 @@ function submit(): void {
                 ><Plus />{{ t('Add category') }}</Button
             >
         </header>
+
+        <form
+            class="space-y-4 border-b p-6"
+            @submit.prevent="
+                policyForm.put('/categories/rental-policy', {
+                    preserveScroll: true,
+                })
+            "
+        >
+            <h2 class="font-semibold">{{ t('Minimum rental duration') }}</h2>
+            <p class="text-sm text-muted-foreground">
+                {{
+                    t(
+                        'Category values override the general minimum. Leave blank to inherit. Existing bookings do not change.',
+                    )
+                }}
+            </p>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="space-y-2">
+                    <Label for="general-minimum">{{
+                        t('General minimum in days')
+                    }}</Label>
+                    <Input
+                        id="general-minimum"
+                        v-model.number="policyForm.minimum_days"
+                        type="number"
+                        min="1"
+                        max="366"
+                        required
+                    />
+                    <InputError :message="policyForm.errors.minimum_days" />
+                </div>
+                <div
+                    v-for="(category, index) in policyForm.categories"
+                    :key="category.id"
+                    class="space-y-2"
+                >
+                    <Label :for="`minimum-${category.id}`">{{
+                        categories.find((item) => item.id === category.id)?.name
+                    }}</Label>
+                    <Input
+                        :id="`minimum-${category.id}`"
+                        v-model.number="category.minimum_days"
+                        type="number"
+                        min="1"
+                        max="366"
+                        :placeholder="String(policyForm.minimum_days)"
+                    />
+                    <InputError
+                        :message="
+                            policyForm.errors[
+                                `categories.${index}.minimum_days`
+                            ]
+                        "
+                    />
+                </div>
+            </div>
+            <Button type="submit" :disabled="policyForm.processing">{{
+                t('Save minimum duration')
+            }}</Button>
+            <span
+                v-if="policyForm.recentlySuccessful"
+                role="status"
+                class="ml-3 text-sm"
+                >{{ t('Saved') }}</span
+            >
+        </form>
 
         <section class="min-w-0 flex-1">
             <div

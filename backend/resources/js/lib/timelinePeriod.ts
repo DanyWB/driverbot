@@ -1,4 +1,4 @@
-export const timelineQuickRangeDays = [30, 45, 60, 90] as const;
+export const timelineQuickRangeDays = [30, 45, 60, 90, 180] as const;
 
 export type TimelineQuickRangeDays = (typeof timelineQuickRangeDays)[number];
 

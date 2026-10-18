@@ -8,6 +8,7 @@ use App\Domain\Bookings\Enums\BookingSource;
 use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Bookings\Exceptions\BookingException;
 use App\Domain\Bookings\Services\BookingService;
+use App\Domain\Customers\Services\CustomerTermsService;
 use App\Models\Booking;
 use App\Models\Customer;
 use App\Models\ServiceApiClient;
@@ -53,7 +54,8 @@ class BotBookingService
 
         return DB::transaction(function () use ($customer, $client, $indexed, $termsVersion, $requestId): array {
             $created = [];
-            $acceptedAt = CarbonImmutable::now();
+            $acceptedCustomer = app(CustomerTermsService::class)->accept($customer, $termsVersion);
+            $acceptedAt = $acceptedCustomer->termsAcceptedAt() ?? CarbonImmutable::now();
 
             foreach ($indexed as $entry) {
                 $item = $entry['item'];

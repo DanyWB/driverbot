@@ -93,6 +93,11 @@ module.exports = async (ctx) => {
   }
 
   if (step === "waiting_for_passport") {
+    if (ctx.session.scenario === 'registration') {
+      ctx.session.step = null;
+      ctx.session.scenario = null;
+      return require('../commands/start')(ctx);
+    }
     return handlePassportStep(ctx);
   }
 

@@ -9,7 +9,7 @@ import {
 } from '../../resources/js/lib/timelinePeriod.ts';
 
 test('fullscreen quick ranges expose the approved day options', () => {
-    assert.deepEqual(timelineQuickRangeDays, [30, 45, 60, 90]);
+    assert.deepEqual(timelineQuickRangeDays, [30, 45, 60, 90, 180]);
 });
 
 test('quick ranges include today as the first displayed day', () => {

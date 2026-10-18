@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const {spawnSync} = require("child_process");
+const {composerCommand} = require("./composer-command");
 
 const root = path.resolve(__dirname, "..");
 const phpTemp = path.join(root, "backend", "storage", "framework", "testing");
@@ -18,7 +19,7 @@ if (process.platform === "win32") {
 }
 
 const CHECKS = [
-  ["repository security tests", "node", ["--test", "scripts/check-secrets.test.js"]],
+  ["repository security tests", "node", ["--test", "scripts/check-secrets.test.js", "scripts/composer-command.test.js"]],
   ["tracked secrets", "npm", ["run", "check:secrets"]],
   ["Composer production dependency audit", "composer", ["--working-dir", "backend", "audit", "--locked", "--no-dev"]],
   ["backend production dependency audit", "npm", ["--prefix", "backend", "audit", "--omit=dev"]],
@@ -32,11 +33,14 @@ const CHECKS = [
 for (const [name, command, args] of CHECKS) {
   console.log(`\n== ${name} ==`);
 
-  const result = spawnSync(command, args, {
+  const invocation = command === "composer"
+    ? composerCommand(args, {env: childEnv})
+    : {command, args, shell: process.platform === "win32" && command === "npm"};
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: root,
     env: childEnv,
     stdio: "inherit",
-    shell: process.platform === "win32",
+    shell: invocation.shell,
   });
 
   if (result.status !== 0) {

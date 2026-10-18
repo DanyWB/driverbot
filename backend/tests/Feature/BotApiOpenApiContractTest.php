@@ -40,7 +40,7 @@ class BotApiOpenApiContractTest extends TestCase
             }
         }
 
-        $this->assertCount(18, array_unique($covered));
+        $this->assertCount(19, array_unique($covered));
     }
 
     public function test_contract_does_not_expose_internal_fields_or_storage_paths(): void

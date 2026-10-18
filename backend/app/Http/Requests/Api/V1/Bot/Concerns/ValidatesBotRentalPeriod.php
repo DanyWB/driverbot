@@ -33,7 +33,7 @@ trait ValidatesBotRentalPeriod
 
         $maxDays = max(1, (int) config('bot_api.max_rental_days', 366));
 
-        if ($end->gte($start) && ((int) $start->diffInDays($end)) + 1 > $maxDays) {
+        if ($end->gte($start) && max(1, (int) $start->diffInDays($end)) > $maxDays) {
             $validator->errors()->add($endsOnField, "The rental period cannot exceed {$maxDays} days.");
         }
     }

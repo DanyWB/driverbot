@@ -47,6 +47,7 @@ class BookingServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->travelTo(CarbonImmutable::parse('2026-08-01 10:00:00', 'Asia/Bangkok'));
 
         $this->seed();
         $this->bookings = app(BookingService::class);
@@ -70,11 +71,11 @@ class BookingServiceTest extends TestCase
 
         $this->assertSame(BookingStatus::Pending, $booking->bookingStatus());
         $this->assertNotNull($booking->pendingExpiresAt());
-        $this->assertSame(900, $booking->priceSnapshots()->firstOrFail()->final_total);
+        $this->assertSame(600, $booking->priceSnapshots()->firstOrFail()->final_total);
         $occupancy = VehicleOccupancy::query()->where('booking_id', $booking->id)->firstOrFail();
         $this->assertSame('2026-08-10', $occupancy->starts_on->format('Y-m-d'));
         $this->assertSame('2026-08-12', $occupancy->ends_on->format('Y-m-d'));
-        $this->assertTrue($occupancy->blocks_availability);
+        $this->assertFalse($occupancy->blocks_availability);
         $this->assertSame(1, BookingStatusHistory::query()->where('booking_id', $booking->id)->count());
         $this->assertSame(2, AuditLog::query()->where('subject_id', $booking->public_id)->count());
         $this->assertDatabaseHas('notification_outbox', ['event_type' => 'booking.pending', 'channel' => 'telegram']);
@@ -185,6 +186,7 @@ class BookingServiceTest extends TestCase
     public function test_conflict_returns_409_and_admin_cancellation_releases_dates(): void
     {
         $first = $this->createPending();
+        $first = $this->bookings->approve($first, BookingActor::admin($this->admin->id));
         $otherCustomer = Customer::factory()->create();
 
         try {
@@ -218,7 +220,7 @@ class BookingServiceTest extends TestCase
 
         $this->assertSame('2026-08-15', $changed->starts_on->format('Y-m-d'));
         $this->assertSame(2, BookingPriceSnapshot::query()->where('booking_id', $booking->id)->count());
-        $this->assertSame(1200, $changed->priceSnapshots()->firstOrFail()->final_total);
+        $this->assertSame(900, $changed->priceSnapshots()->firstOrFail()->final_total);
         $occupancy = VehicleOccupancy::query()->where('booking_id', $booking->id)->firstOrFail();
         $this->assertSame('2026-08-15', $occupancy->starts_on->format('Y-m-d'));
         $this->assertSame('2026-08-18', $occupancy->ends_on->format('Y-m-d'));
@@ -356,7 +358,7 @@ class BookingServiceTest extends TestCase
         }
     }
 
-    public function test_process_submission_calculates_price_and_starts_blocking(): void
+    public function test_process_submission_calculates_price_without_blocking(): void
     {
         $process = Booking::factory()->create([
             'customer_id' => $this->customer->id,

@@ -25,6 +25,7 @@ import {
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import AdminSelect from '@/components/AdminSelect.vue';
 import BookingStatusBadge from '@/components/bookings/BookingStatusBadge.vue';
+import BookingDetailsEditor from '@/components/bookings/BookingDetailsEditor.vue';
 import PriceBreakdown from '@/components/bookings/PriceBreakdown.vue';
 import AdminDateInput from '@/components/AdminDateInput.vue';
 import InputError from '@/components/InputError.vue';
@@ -398,6 +399,20 @@ function deleteDocument(id: number): void {
 
         <div class="grid min-w-0 xl:grid-cols-[minmax(0,1fr)_340px]">
             <main class="min-w-0 divide-y">
+                <BookingDetailsEditor
+                    :booking="booking"
+                    :return-to="return_to"
+                />
+                <figure
+                    v-if="booking.vehicle_photo_url"
+                    class="px-4 pt-6 sm:px-6 lg:px-8"
+                >
+                    <img
+                        :src="booking.vehicle_photo_url"
+                        :alt="booking.vehicle.name"
+                        class="max-h-64 w-full rounded-lg bg-muted object-contain"
+                    />
+                </figure>
                 <section
                     class="px-4 py-6 sm:px-6 lg:px-8"
                     aria-labelledby="rental-details-heading"

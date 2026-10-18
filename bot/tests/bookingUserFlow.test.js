@@ -32,10 +32,10 @@ function vehicle(overrides = {}) {
   };
 }
 
-test("vehicle summary replaces the active UI with one photo and preserves list back", async () => {
+test("vehicle summary renders originals with full description and preserves list back", async () => {
   let rendered;
   const renderer = {
-    async renderPhoto(_ctx, payload) {
+    async renderGallery(_ctx, payload) {
       rendered = payload;
       return {mode: "replaced"};
     },
@@ -45,7 +45,8 @@ test("vehicle summary replaces the active UI with one photo and preserves list b
   await showBikeSummary(ctx, vehicle(), booking(), {renderer});
 
   assert.equal(rendered.screen, "booking_bike_summary");
-  assert.equal(rendered.photo, "https://example.test/click.jpg");
+  assert.deepEqual(rendered.photos, ["https://example.test/click.jpg"]);
+  assert.equal(rendered.description, "Comfort scooter");
   assert.equal(
     rendered.replyMarkup.inline_keyboard.at(-1)[0].callback_data,
     "book:back_to_bikes"
@@ -69,7 +70,7 @@ test("bike-first summary returns to the end-date calendar without clearing the b
 
   await showBikeSummary(
     ctx,
-    vehicle({image_url: null}),
+    vehicle({image_url: null, description: null}),
     booking({scenario: "bike_first"}),
     {renderer}
   );

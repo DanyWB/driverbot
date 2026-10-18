@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3';
-import { Calculator, Save, TriangleAlert } from '@lucide/vue';
-import { computed, nextTick, ref, watch } from 'vue';
+import { Link, useForm } from '@inertiajs/vue3';
+import { Calculator, Link2Off, Save, TriangleAlert } from '@lucide/vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import PriceBreakdown from '@/components/bookings/PriceBreakdown.vue';
 import AdminDateInput from '@/components/AdminDateInput.vue';
 import AdminSelect from '@/components/AdminSelect.vue';
@@ -9,6 +9,14 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { useLocale } from '@/composables/useLocale';
 import { formatMoney } from '@/lib/bookings';
 import {
@@ -20,6 +28,8 @@ import {
 } from '@/lib/catalogPricing';
 import type {
     PriceQuote,
+    PricingPreset,
+    PricingPresetSummary,
     PricingTemplateOption,
     VehiclePriceCell,
 } from '@/types';
@@ -29,6 +39,11 @@ const props = defineProps<{
     pricing: Record<string, Record<string, VehiclePriceCell>>;
     pricingProfile: string | null;
     templates: PricingTemplateOption[];
+    pricingPreset: PricingPresetSummary | null;
+    pricingPresets: PricingPreset[];
+    pricingRevision: number;
+    vehicleType: string;
+    vehicleName: string;
 }>();
 const { t } = useLocale();
 
@@ -47,18 +62,30 @@ const tiers = [
 
 type Prices = Record<string, Record<string, number | string>>;
 type Enabled = Record<string, Record<string, boolean>>;
+type SubmittedPricingDraft = {
+    prices: Prices;
+    enabled: Enabled;
+    basePrices: Record<string, number | string>;
+    template: string | null;
+    templateKey: string;
+};
 
 const prices: Prices = {};
 const enabled: Enabled = {};
+const persistedPrices = reactive<Record<string, Record<string, number | null>>>(
+    {},
+);
 
 for (const season of seasons) {
     prices[season.key] = {};
     enabled[season.key] = {};
+    persistedPrices[season.key] = {};
 
     for (const tier of tiers) {
         const cell = props.pricing[season.key]?.[tier.key];
         prices[season.key][tier.key] = cell?.package_total ?? '';
         enabled[season.key][tier.key] = cell?.is_active ?? false;
+        persistedPrices[season.key][tier.key] = cell?.package_total ?? null;
     }
 }
 
@@ -66,7 +93,13 @@ const form = useForm<{
     prices: Prices;
     enabled: Enabled;
     template: string | null;
-}>({ prices, enabled, template: null });
+    expected_vehicle_pricing_revision: number;
+}>({
+    prices,
+    enabled,
+    template: null,
+    expected_vehicle_pricing_revision: props.pricingRevision,
+});
 const templateKey = ref(
     props.templates.some((template) => template.key === props.pricingProfile)
         ? (props.pricingProfile ?? '')
@@ -86,6 +119,32 @@ const priceTouched = ref<Record<string, boolean>>({});
 const pricingValidationAttempted = ref(false);
 const generatorPanel = ref<HTMLElement | null>(null);
 const pricingForm = ref<HTMLFormElement | null>(null);
+const selectedPresetId = ref<number | null>(props.pricingPreset?.id ?? null);
+const detachDialogOpen = ref(false);
+const assignmentDialogOpen = ref(false);
+const selectedPreset = computed(() =>
+    props.pricingPresets.find((preset) => preset.id === selectedPresetId.value),
+);
+const compatiblePresets = computed(() =>
+    props.pricingPresets.filter(
+        (preset) =>
+            preset.id === props.pricingPreset?.id ||
+            preset.vehicle_type === null ||
+            preset.vehicle_type === props.vehicleType,
+    ),
+);
+const assignmentForm = useForm({
+    preset_id: props.pricingPreset?.id ?? (null as number | null),
+    preset_version: props.pricingPreset?.version ?? 0,
+    expected_pricing_preset_id:
+        props.pricingPreset?.id ?? (null as number | null),
+    expected_vehicle_pricing_revision: props.pricingRevision,
+});
+const detachForm = useForm({
+    preset_version: props.pricingPreset?.version ?? 0,
+    expected_pricing_preset_id: props.pricingPreset?.id ?? 0,
+    expected_vehicle_pricing_revision: props.pricingRevision,
+});
 const completeCount = computed(() => {
     let count = 0;
 
@@ -113,6 +172,7 @@ const pricingError = computed(() => {
 
     return (
         errors.template ??
+        errors.expected_vehicle_pricing_revision ??
         errors.prices ??
         errors.enabled ??
         Object.entries(errors).find(([key]) => key.startsWith('enabled.'))?.[1]
@@ -127,13 +187,17 @@ const hasGeneratorValidationErrors = computed(() =>
 );
 const hasPricingValidationErrors = computed(() =>
     seasons.some((season) =>
-        tiers.some(
-            (tier) =>
-                validateCatalogPrice(
-                    form.prices[season.key]?.[tier.key] ?? '',
+        tiers.some((tier) => {
+            const value = form.prices[season.key]?.[tier.key] ?? '';
+
+            return Boolean(
+                catalogPriceValidationMessage(
+                    value,
                     form.enabled[season.key]?.[tier.key] ?? false,
-                ) !== null,
-        ),
+                    true,
+                ),
+            );
+        }),
     ),
 );
 
@@ -154,7 +218,12 @@ async function focusFirstInvalid(container: HTMLElement | null): Promise<void> {
     );
 
     input?.focus();
-    input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    input?.scrollIntoView({
+        block: 'center',
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 'auto'
+            : 'smooth',
+    });
 }
 
 function submit(): void {
@@ -166,15 +235,13 @@ function submit(): void {
         return;
     }
 
+    const submittedDraft = captureSubmittedDraft();
+
+    // Keep the revision captured with this draft. A failed stale request may
+    // refresh page props while preserving these edited prices.
     form.patch(`/vehicles/${props.vehicleId}/pricing`, {
         preserveScroll: true,
-        onSuccess: () => {
-            form.template = null;
-            form.defaults();
-            quote.value = null;
-            pricingValidationAttempted.value = false;
-            priceTouched.value = {};
-        },
+        onSuccess: () => syncSavedPricing(submittedDraft),
         onError: () => focusFirstInvalid(pricingForm.value),
     });
 }
@@ -258,6 +325,7 @@ async function generatePrices(): Promise<void> {
 function catalogPriceValidationMessage(
     value: number | string,
     required: boolean,
+    allowPersistedExactValue = false,
 ): string | undefined {
     const error = validateCatalogPrice(value, required);
 
@@ -270,6 +338,10 @@ function catalogPriceValidationMessage(
     }
 
     if (error === 'multiple_of_step') {
+        if (allowPersistedExactValue) {
+            return undefined;
+        }
+
         return t('Price must be a multiple of 50 THB.');
     }
 
@@ -279,9 +351,7 @@ function catalogPriceValidationMessage(
 function basePriceError(season: string): string | undefined {
     const value = basePrices.value[season] ?? '';
     const shouldShowClientError =
-        generatorValidationAttempted.value ||
-        basePriceTouched.value[season] ||
-        !isEmptyCatalogPrice(value);
+        generatorValidationAttempted.value || basePriceTouched.value[season];
 
     return (
         (shouldShowClientError
@@ -319,9 +389,179 @@ function priceError(season: string, tier: string): string | undefined {
 
     return (
         (shouldShowClientError
-            ? catalogPriceValidationMessage(value, required)
+            ? catalogPriceValidationMessage(value, required, true)
             : undefined) ?? (backendError ? t(backendError) : undefined)
     );
+}
+
+function assignPreset(): void {
+    const preset = selectedPreset.value;
+
+    if (!preset || preset.id === props.pricingPreset?.id) {
+        return;
+    }
+
+    assignmentForm.preset_id = preset.id;
+    assignmentForm.preset_version = preset.version;
+    assignmentForm.expected_pricing_preset_id = props.pricingPreset?.id ?? null;
+    assignmentForm.expected_vehicle_pricing_revision = props.pricingRevision;
+    assignmentForm.put(`/vehicles/${props.vehicleId}/pricing-preset`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            assignmentDialogOpen.value = false;
+
+            return syncSavedPricing();
+        },
+        onError: () => {
+            assignmentDialogOpen.value = false;
+        },
+    });
+}
+
+function requestPresetAssignment(): void {
+    if (
+        !selectedPreset.value ||
+        selectedPreset.value.id === props.pricingPreset?.id
+    ) {
+        return;
+    }
+
+    assignmentDialogOpen.value = true;
+}
+
+function detachPreset(): void {
+    if (!props.pricingPreset) {
+        return;
+    }
+
+    detachForm.preset_version = props.pricingPreset.version;
+    detachForm.expected_pricing_preset_id = props.pricingPreset.id;
+    detachForm.expected_vehicle_pricing_revision = props.pricingRevision;
+    detachForm.delete(`/vehicles/${props.vehicleId}/pricing-preset`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            detachDialogOpen.value = false;
+
+            return syncSavedPricing();
+        },
+    });
+}
+
+function captureSubmittedDraft(): SubmittedPricingDraft {
+    const capturedPrices: Prices = {};
+    const capturedEnabled: Enabled = {};
+
+    for (const season of seasons) {
+        capturedPrices[season.key] = {};
+        capturedEnabled[season.key] = {};
+
+        for (const tier of tiers) {
+            capturedPrices[season.key][tier.key] =
+                form.prices[season.key][tier.key];
+            capturedEnabled[season.key][tier.key] =
+                form.enabled[season.key][tier.key];
+        }
+    }
+
+    return {
+        prices: capturedPrices,
+        enabled: capturedEnabled,
+        basePrices: { ...basePrices.value },
+        template: form.template,
+        templateKey: templateKey.value,
+    };
+}
+
+async function syncSavedPricing(
+    submittedDraft?: SubmittedPricingDraft,
+): Promise<void> {
+    // Inertia has accepted the mutation; wait until this component sees the
+    // returned vehicle props before replacing the saved draft baseline.
+    await nextTick();
+
+    const savedPrices: Prices = {};
+    const savedEnabled: Enabled = {};
+
+    for (const season of seasons) {
+        savedPrices[season.key] = {};
+        savedEnabled[season.key] = {};
+
+        for (const tier of tiers) {
+            const cell = props.pricing[season.key]?.[tier.key];
+            const savedPrice = cell?.package_total ?? '';
+            const isSavedEnabled = cell?.is_active ?? false;
+            const changedAfterSubmit =
+                submittedDraft !== undefined &&
+                (form.prices[season.key][tier.key] !==
+                    submittedDraft.prices[season.key][tier.key] ||
+                    form.enabled[season.key][tier.key] !==
+                        submittedDraft.enabled[season.key][tier.key]);
+
+            savedPrices[season.key][tier.key] = savedPrice;
+            savedEnabled[season.key][tier.key] = isSavedEnabled;
+            persistedPrices[season.key][tier.key] = cell?.package_total ?? null;
+
+            if (!changedAfterSubmit) {
+                form.prices[season.key][tier.key] = savedPrice;
+                form.enabled[season.key][tier.key] = isSavedEnabled;
+            }
+        }
+    }
+
+    const savedBasePrices: Record<string, number | string> = {
+        high: props.pricing.high?.['1d']?.package_total ?? '',
+        middle: props.pricing.middle?.['1d']?.package_total ?? '',
+        low: props.pricing.low?.['1d']?.package_total ?? '',
+    };
+    const savedTemplateKey = props.templates.some(
+        (template) => template.key === props.pricingProfile,
+    )
+        ? (props.pricingProfile ?? '')
+        : (props.templates[0]?.key ?? '');
+
+    for (const season of seasons) {
+        if (
+            submittedDraft === undefined ||
+            basePrices.value[season.key] ===
+                submittedDraft.basePrices[season.key]
+        ) {
+            basePrices.value[season.key] = savedBasePrices[season.key];
+        }
+    }
+
+    if (
+        submittedDraft === undefined ||
+        templateKey.value === submittedDraft.templateKey
+    ) {
+        templateKey.value = savedTemplateKey;
+    }
+
+    if (
+        submittedDraft === undefined ||
+        form.template === submittedDraft.template
+    ) {
+        form.template = null;
+    }
+
+    selectedPresetId.value = props.pricingPreset?.id ?? null;
+    form.expected_vehicle_pricing_revision = props.pricingRevision;
+    form.clearErrors();
+    form.defaults({
+        prices: savedPrices,
+        enabled: savedEnabled,
+        template: null,
+        expected_vehicle_pricing_revision: props.pricingRevision,
+    });
+    assignmentForm.clearErrors();
+    detachForm.clearErrors();
+    quote.value = null;
+    quoteError.value = '';
+    generatorError.value = '';
+    generatorFieldErrors.value = {};
+    basePriceTouched.value = {};
+    priceTouched.value = {};
+    generatorValidationAttempted.value = false;
+    pricingValidationAttempted.value = false;
 }
 
 function touchPrice(season: string, tier: string): void {
@@ -391,7 +631,110 @@ async function preview(): Promise<void> {
             </div>
         </div>
 
+        <div class="mt-5 rounded-lg border bg-muted/20 p-4">
+            <div class="flex flex-col gap-1">
+                <h3 class="font-semibold">{{ t('Shared pricing preset') }}</h3>
+                <p class="text-sm text-muted-foreground">
+                    {{
+                        t(
+                            'Assigning a preset replaces this vehicle price matrix for future quotes. Existing bookings are not recalculated.',
+                        )
+                    }}
+                </p>
+            </div>
+            <div
+                v-if="compatiblePresets.length"
+                class="mt-4 grid gap-3 sm:grid-cols-[minmax(220px,1fr)_auto] sm:items-end"
+            >
+                <div>
+                    <Label for="vehicle_pricing_preset">{{
+                        t('Pricing preset')
+                    }}</Label>
+                    <AdminSelect
+                        id="vehicle_pricing_preset"
+                        v-model="selectedPresetId"
+                        class="mt-2"
+                        :options="[
+                            {
+                                value: null,
+                                label: t('Select a pricing preset'),
+                                disabled: true,
+                            },
+                            ...compatiblePresets.map((preset) => ({
+                                value: preset.id,
+                                label: `${preset.name} · ${t('Version :version', { version: preset.version })}`,
+                            })),
+                        ]"
+                        :placeholder="t('Select a pricing preset')"
+                        :disabled="assignmentForm.processing"
+                    />
+                </div>
+                <Button
+                    type="button"
+                    :disabled="
+                        assignmentForm.processing ||
+                        !selectedPreset ||
+                        selectedPreset.id === pricingPreset?.id
+                    "
+                    @click="requestPresetAssignment"
+                >
+                    {{ t(pricingPreset ? 'Replace preset' : 'Assign preset') }}
+                </Button>
+            </div>
+            <div v-else class="mt-4">
+                <Button as-child variant="outline">
+                    <Link href="/pricing-presets"
+                        ><Link2Off />{{ t('Create a compatible preset') }}</Link
+                    >
+                </Button>
+            </div>
+            <InputError
+                class="mt-2"
+                :message="
+                    assignmentForm.errors.preset_id ||
+                    assignmentForm.errors.preset_version ||
+                    assignmentForm.errors.expected_pricing_preset_id ||
+                    assignmentForm.errors.expected_vehicle_pricing_revision
+                "
+                role="alert"
+            />
+            <div
+                v-if="pricingPreset"
+                class="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+                <p class="text-sm">
+                    <span class="font-medium">{{ pricingPreset.name }}</span>
+                    <span class="text-muted-foreground">
+                        ·
+                        {{
+                            t('Version :version', {
+                                version: pricingPreset.version,
+                            })
+                        }}
+                    </span>
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <Button as-child type="button" variant="outline" size="sm">
+                        <Link
+                            :href="`/pricing-presets?preset=${pricingPreset.id}`"
+                        >
+                            {{ t('Edit preset') }}
+                        </Link>
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        @click="detachDialogOpen = true"
+                    >
+                        <Link2Off />{{ t('Detach to individual pricing') }}
+                    </Button>
+                </div>
+            </div>
+        </div>
+
         <div
+            v-if="!pricingPreset"
             ref="generatorPanel"
             class="mt-5 rounded-md border bg-muted/20 p-4"
         >
@@ -437,7 +780,7 @@ async function preview(): Promise<void> {
                         class="mt-2 tabular-nums"
                         type="number"
                         :min="CATALOG_PRICE_STEP"
-                        :step="CATALOG_PRICE_STEP"
+                        :step="1"
                         :placeholder="t('THB per day')"
                         :aria-invalid="Boolean(basePriceError(season.key))"
                         :aria-describedby="
@@ -446,7 +789,7 @@ async function preview(): Promise<void> {
                                 : undefined
                         "
                         data-catalog-price-input
-                        @input="touchBasePrice(season.key)"
+                        @update:model-value="touchBasePrice(season.key)"
                     />
                     <InputError
                         :id="`base_price_${season.key}_error`"
@@ -481,13 +824,14 @@ async function preview(): Promise<void> {
         </div>
 
         <form
+            v-if="!pricingPreset"
             ref="pricingForm"
             class="mt-6"
             novalidate
             @submit.prevent="submit"
         >
             <p class="mb-3 text-xs text-muted-foreground">
-                {{ t('Price must be a multiple of 50 THB.') }}
+                {{ t('Package totals in THB. No automatic rounding.') }}
             </p>
             <div class="overflow-x-auto rounded-md border">
                 <table class="w-full min-w-[850px] table-fixed text-sm">
@@ -523,7 +867,7 @@ async function preview(): Promise<void> {
                                     "
                                     type="number"
                                     :min="CATALOG_PRICE_STEP"
-                                    :step="CATALOG_PRICE_STEP"
+                                    :step="1"
                                     class="tabular-nums"
                                     :aria-label="`${t(season.label)}, ${t(tier.label)}`"
                                     :aria-invalid="
@@ -537,7 +881,9 @@ async function preview(): Promise<void> {
                                             : undefined
                                     "
                                     data-catalog-price-input
-                                    @input="touchPrice(season.key, tier.key)"
+                                    @update:model-value="
+                                        touchPrice(season.key, tier.key)
+                                    "
                                 />
                                 <InputError
                                     :id="`price_${season.key}_${tier.key}_error`"
@@ -575,8 +921,73 @@ async function preview(): Promise<void> {
             </div>
         </form>
 
+        <div v-else class="mt-6">
+            <div class="mb-3 flex flex-col gap-1 text-sm">
+                <p class="font-medium">{{ t('Linked preset matrix') }}</p>
+                <p class="text-muted-foreground">
+                    {{
+                        t(
+                            'This matrix is read-only here. Edit the shared preset to update all linked vehicles.',
+                        )
+                    }}
+                </p>
+            </div>
+            <div class="overflow-x-auto rounded-md border">
+                <table class="w-full min-w-[760px] text-sm">
+                    <thead
+                        class="border-b bg-muted/35 text-xs text-muted-foreground"
+                    >
+                        <tr>
+                            <th class="px-3 py-3 text-left font-medium">
+                                {{ t('Season') }}
+                            </th>
+                            <th
+                                v-for="tier in tiers"
+                                :key="tier.key"
+                                class="px-3 py-3 text-right font-medium"
+                            >
+                                {{ t(tier.label) }}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        <tr v-for="season in seasons" :key="season.key">
+                            <th class="px-3 py-3 text-left font-medium">
+                                {{ t(season.label) }}
+                            </th>
+                            <td
+                                v-for="tier in tiers"
+                                :key="tier.key"
+                                class="px-3 py-3 text-right whitespace-nowrap tabular-nums"
+                            >
+                                {{
+                                    pricing[season.key]?.[tier.key]
+                                        ?.package_total ?? '—'
+                                }}
+                                <span
+                                    v-if="
+                                        pricing[season.key]?.[tier.key]
+                                            ?.package_total !== null
+                                    "
+                                    class="text-muted-foreground"
+                                    >THB</span
+                                >
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="mt-8 border-t pt-6">
             <h3 class="font-semibold">{{ t('Saved price preview') }}</h3>
+            <p class="mt-1 text-xs text-muted-foreground">
+                {{
+                    t(
+                        'The final booking quote still follows the existing 100 THB rounding rule.',
+                    )
+                }}
+            </p>
             <form
                 class="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
                 @submit.prevent="preview"
@@ -632,4 +1043,107 @@ async function preview(): Promise<void> {
             </div>
         </div>
     </section>
+
+    <Dialog v-model:open="assignmentDialogOpen">
+        <DialogContent
+            class="duration-[350ms] ease-out motion-reduce:animate-none"
+        >
+            <DialogHeader>
+                <DialogTitle>{{
+                    t('Apply shared pricing preset?')
+                }}</DialogTitle>
+                <DialogDescription>
+                    {{
+                        t('Apply :preset to :vehicle?', {
+                            preset: selectedPreset?.name ?? '',
+                            vehicle: vehicleName,
+                        })
+                    }}
+                </DialogDescription>
+            </DialogHeader>
+            <div
+                class="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+                <p>
+                    {{
+                        t(
+                            'The selected preset will replace the current vehicle matrix for future quotes. Existing bookings are not recalculated.',
+                        )
+                    }}
+                </p>
+                <p v-if="form.isDirty" class="font-semibold">
+                    {{
+                        t(
+                            'Unsaved individual price changes will be discarded when the preset is applied.',
+                        )
+                    }}
+                </p>
+            </div>
+            <DialogFooter>
+                <Button
+                    type="button"
+                    variant="outline"
+                    :disabled="assignmentForm.processing"
+                    @click="assignmentDialogOpen = false"
+                >
+                    {{ t('Cancel') }}
+                </Button>
+                <Button
+                    type="button"
+                    :disabled="assignmentForm.processing"
+                    @click="assignPreset"
+                >
+                    {{ t('Apply preset') }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="detachDialogOpen">
+        <DialogContent
+            class="duration-[350ms] ease-out motion-reduce:animate-none"
+        >
+            <DialogHeader>
+                <DialogTitle>{{ t('Detach shared preset?') }}</DialogTitle>
+                <DialogDescription>
+                    {{
+                        t(
+                            'The current exact matrix will be preserved on this vehicle and become individually editable.',
+                        )
+                    }}
+                </DialogDescription>
+            </DialogHeader>
+            <p class="rounded-lg border bg-muted/30 p-3 text-sm">
+                {{
+                    t(
+                        'Future preset changes will no longer affect this vehicle. Existing bookings are not recalculated.',
+                    )
+                }}
+            </p>
+            <InputError
+                :message="
+                    detachForm.errors.preset_version ||
+                    detachForm.errors.expected_pricing_preset_id ||
+                    detachForm.errors.expected_vehicle_pricing_revision
+                "
+                role="alert"
+            />
+            <DialogFooter>
+                <Button
+                    type="button"
+                    variant="outline"
+                    @click="detachDialogOpen = false"
+                >
+                    {{ t('Cancel') }}
+                </Button>
+                <Button
+                    type="button"
+                    :disabled="detachForm.processing"
+                    @click="detachPreset"
+                >
+                    <Link2Off />{{ t('Detach and keep current prices') }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

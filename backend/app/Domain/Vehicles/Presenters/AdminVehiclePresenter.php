@@ -33,6 +33,11 @@ class AdminVehiclePresenter
                 'is_active' => (bool) $vehicle->category->is_active,
             ],
             'is_active' => (bool) $vehicle->is_active,
+            'archived_at' => $vehicle->archived_at?->toIso8601String(),
+            'unfinished_bookings_count' => (int) ($vehicle->getAttribute('unfinished_bookings_count') ?? 0),
+            'can_delete' => $vehicle->archived_at !== null
+                && (int) ($vehicle->getAttribute('bookings_count') ?? 0) === 0
+                && (int) ($vehicle->getAttribute('occupancies_count') ?? 0) === 0,
             'is_visible_for_booking' => (bool) $vehicle->is_visible_for_booking,
             'sort_order' => (int) $vehicle->sort_order,
             'active_price_tiers_count' => $activePriceCount,
@@ -50,9 +55,18 @@ class AdminVehiclePresenter
         return [
             ...$this->listItem($vehicle),
             'description' => $this->nullableString($vehicle->description),
+            'description_ru' => $this->nullableString($vehicle->description_ru),
+            'description_ua' => $this->nullableString($vehicle->description_ua),
             'characteristics_text' => $this->nullableString($vehicle->characteristics_text),
             'emoji' => $this->nullableString($vehicle->emoji),
             'pricing_profile' => $this->nullableString($vehicle->pricing_profile),
+            'pricing_revision' => (int) $vehicle->pricing_version,
+            'pricing_preset' => $vehicle->pricingPreset === null ? null : [
+                'id' => (int) $vehicle->pricingPreset->id,
+                'name' => (string) $vehicle->pricingPreset->name,
+                'vehicle_type' => $vehicle->pricingPreset->getRawOriginal('vehicle_type'),
+                'version' => (int) $vehicle->pricingPreset->version,
+            ],
             'photos' => $vehicle->photos->map(fn (VehiclePhoto $photo): array => $this->photo($photo))->values()->all(),
             'pricing' => $this->pricing->matrix($vehicle),
         ];

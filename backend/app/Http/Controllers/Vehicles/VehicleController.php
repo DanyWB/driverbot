@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Vehicles;
 
+use App\Domain\Pricing\Presenters\PricingPresetPresenter;
 use App\Domain\Pricing\Services\PricingTemplateService;
 use App\Domain\Shared\Services\AdminAuditService;
 use App\Domain\Vehicles\Enums\VehicleType;
@@ -13,9 +14,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Vehicles\ListVehiclesRequest;
 use App\Http\Requests\Vehicles\SaveVehicleRequest;
 use App\Models\Category;
+use App\Models\PricingPreset;
 use App\Models\Vehicle;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -35,6 +38,8 @@ class VehicleController extends Controller
             ->withCount([
                 'photos',
                 'bookings',
+                'unfinishedBookings',
+                'occupancies',
                 'priceTiers as active_price_tiers_count' => fn (Builder $query) => $query->where('is_active', true),
             ]);
 
@@ -52,6 +57,7 @@ class VehicleController extends Controller
             'filters' => $filters,
             'summary' => [
                 'total' => Vehicle::query()->count(),
+                'archived' => Vehicle::query()->whereNotNull('archived_at')->count(),
                 'active' => Vehicle::query()->where('is_active', true)->count(),
                 'visible' => Vehicle::query()->where('is_visible_for_booking', true)->count(),
                 'incomplete_pricing' => Vehicle::query()
@@ -104,21 +110,36 @@ class VehicleController extends Controller
     }
 
     public function edit(
+        Request $request,
         Vehicle $vehicle,
         AdminVehiclePresenter $presenter,
         PricingTemplateService $pricingTemplates,
+        PricingPresetPresenter $pricingPresetPresenter,
     ): Response {
-        $vehicle->load(['category', 'photos', 'priceTiers.season'])->loadCount([
+        $vehicle->load(['category', 'photos', 'priceTiers.season', 'pricingPreset'])->loadCount([
             'photos',
             'bookings',
+            'unfinishedBookings',
+            'occupancies',
             'priceTiers as active_price_tiers_count' => fn (Builder $query) => $query->where('is_active', true),
         ]);
 
         return Inertia::render('vehicles/Edit', [
+            'return_to' => $this->fleetReturnTo($request),
             'vehicle' => $presenter->detail($vehicle),
             'types' => array_column(VehicleType::cases(), 'value'),
             'categories' => $this->categoryOptions(),
             'pricing_templates' => $pricingTemplates->options($vehicle->type),
+            'pricing_presets' => PricingPreset::query()
+                ->with(['prices.season', 'vehicles:id,pricing_preset_id'])
+                ->where(fn (Builder $query) => $query
+                    ->whereNull('vehicle_type')
+                    ->orWhere('vehicle_type', $vehicle->getRawOriginal('type')))
+                ->orderBy('name')
+                ->get()
+                ->map(fn (PricingPreset $preset): array => $pricingPresetPresenter->present($preset))
+                ->values()
+                ->all(),
         ]);
     }
 
@@ -150,7 +171,7 @@ class VehicleController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Vehicle saved.']);
 
-        return to_route('vehicles.edit', $vehicle);
+        return to_route('vehicles.edit', $this->fleetEditParameters($request, $vehicle));
     }
 
     /**
@@ -159,6 +180,11 @@ class VehicleController extends Controller
      */
     private function applyFilters(Builder $query, array $filters): void
     {
+        if ($filters['tab'] === 'archive') {
+            $query->whereNotNull('archived_at');
+        } else {
+            $query->whereNull('archived_at');
+        }
         $search = trim((string) $filters['search']);
 
         if ($search !== '') {
@@ -227,6 +253,8 @@ class VehicleController extends Controller
             'inventory_code',
             'year',
             'description',
+            'description_ru',
+            'description_ua',
             'characteristics_text',
             'emoji',
             'is_active',
@@ -238,7 +266,11 @@ class VehicleController extends Controller
 
     private function throwCatalogValidation(VehicleCatalogException $exception): never
     {
-        $field = str_starts_with($exception->errorCode, 'category_') ? 'category_id' : 'is_visible_for_booking';
+        $field = match (true) {
+            $exception->errorCode === 'pricing_preset_type_mismatch' => 'type',
+            str_starts_with($exception->errorCode, 'category_') => 'category_id',
+            default => 'is_visible_for_booking',
+        };
 
         throw ValidationException::withMessages([$field => $exception->getMessage()]);
     }

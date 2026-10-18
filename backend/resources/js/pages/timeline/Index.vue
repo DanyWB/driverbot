@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, useRemember } from '@inertiajs/vue3';
+import { useMediaQuery } from '@vueuse/core';
 import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     Expand,
     FilterX,
     Minimize,
@@ -17,11 +19,13 @@ import {
     onMounted,
     reactive,
     ref,
+    unref,
     watch,
 } from 'vue';
 import AdminDateInput from '@/components/AdminDateInput.vue';
 import AdminSelect from '@/components/AdminSelect.vue';
 import TimelineBookingSheet from '@/components/timeline/TimelineBookingSheet.vue';
+import TimelineVehicleName from '@/components/timeline/TimelineVehicleName.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -33,6 +37,12 @@ import { getActiveLocale, useLocale } from '@/composables/useLocale';
 import { lockBodyScroll } from '@/lib/bodyScrollLock';
 import { timelineEscapeAction } from '@/lib/timelineInteraction';
 import { timelineStatusClasses, timelineStatusLabels } from '@/lib/timeline';
+import {
+    occupancyLanes,
+    timelineMonthBands,
+    vehicleNameParts,
+    vehicleRowColor,
+} from '@/lib/timelinePresentation';
 import {
     shiftTimelineRange,
     timelineQuickRangeDays,
@@ -61,8 +71,37 @@ defineOptions({
     },
 });
 
-const vehicleColumnWidth = 240;
-const dayWidth = 44;
+const smallScreen = useMediaQuery('(max-width: 640px)');
+const vehicleColumnWidth = computed(() => (smallScreen.value ? 160 : 255));
+const dayWidth = 48;
+const display = useRemember(
+    { filtersOpen: true, compact: false, customRange: false },
+    'Timeline:display',
+);
+const localizedDates = computed(() =>
+    props.timeline.dates.map((day) => ({
+        ...day,
+        month: new Intl.DateTimeFormat(getActiveLocale(), {
+            month: 'long',
+            timeZone: 'UTC',
+        }).format(new Date(day.date)),
+        weekday: new Intl.DateTimeFormat(getActiveLocale(), {
+            weekday: 'short',
+            timeZone: 'UTC',
+        }).format(new Date(day.date)),
+    })),
+);
+const monthBands = computed(() => timelineMonthBands(localizedDates.value));
+const timelineHead = ref<HTMLElement | null>(null);
+const timelineBody = ref<HTMLElement | null>(null);
+function syncHorizontal(event: Event, target: HTMLElement | null): void {
+    const source = event.currentTarget as HTMLElement;
+
+    if (target && target.scrollLeft !== source.scrollLeft) {
+        target.scrollLeft = source.scrollLeft;
+    }
+}
+const hoverDateIndex = ref<number | null>(null);
 const loading = ref(false);
 const isFullscreen = ref(false);
 const timelineContainer = ref<HTMLElement | null>(null);
@@ -96,7 +135,7 @@ watch(isFullscreen, (fullscreen) => {
 });
 
 const gridWidth = computed(
-    () => vehicleColumnWidth + props.timeline.dates.length * dayWidth,
+    () => vehicleColumnWidth.value + props.timeline.dates.length * dayWidth,
 );
 const rangeLabel = computed(() =>
     formatRange(props.timeline.range.starts_on, props.timeline.range.ends_on),
@@ -398,6 +437,7 @@ function selectTimelineDate(
 }
 
 function previewTimelineDate(row: TimelineVehicle, index: number): void {
+    hoverDateIndex.value = index;
     const selection = rangeSelection.value;
 
     if (selection?.vehicleId === row.id && index >= selection.startIndex) {
@@ -406,6 +446,8 @@ function previewTimelineDate(row: TimelineVehicle, index: number): void {
 }
 
 function clearHoveredCell(vehicleId: number): void {
+    hoverDateIndex.value = null;
+
     if (hoveredCell.value?.vehicleId === vehicleId) {
         hoveredCell.value = null;
     }
@@ -521,9 +563,12 @@ function bookingHref(publicId: string): string {
     return `/bookings/${publicId}?${params}`;
 }
 
-function occupancyStyle(occupancy: TimelineOccupancy): Record<string, string> {
+function occupancyStyle(
+    occupancy: TimelineOccupancy & { lane: number },
+): Record<string, string> {
     return {
-        left: `${vehicleColumnWidth + occupancy.start_index * dayWidth + 2}px`,
+        top: `${(unref(display).compact ? 5 : 10) + occupancy.lane * 30}px`,
+        left: `${vehicleColumnWidth.value + occupancy.start_index * dayWidth + 2}px`,
         width: `${Math.max(dayWidth - 4, occupancy.span_days * dayWidth - 4)}px`,
     };
 }
@@ -551,10 +596,14 @@ function vehicleDetails(row: TimelineVehicle): string {
         .join(' · ');
 }
 
-function monthLabel(index: number): string {
-    const date = props.timeline.dates[index];
-
-    return index === 0 || date.day === 1 ? date.month : '';
+function rowStyle(row: TimelineVehicle): Record<string, string> {
+    return {
+        height: `${Math.max(unref(display).compact ? 38 : 48, ...occupancyLanes(row.occupancies).map((item) => item.lane * 30 + (unref(display).compact ? 38 : 48)))}px`,
+        width: `${gridWidth.value}px`,
+        '--bike-color': vehicleRowColor(row.id),
+        '--paint-color':
+            vehicleNameParts(row.name).ink ?? vehicleRowColor(row.id),
+    };
 }
 
 function timelineHref(filters: TimelineFilters): string {
@@ -606,8 +655,8 @@ function validateRange(startsOn: string, endsOn: string): string {
         return t('End date must be on or after the start date.');
     }
 
-    if (inclusiveDays(start, end) > 93) {
-        return t('The timeline range cannot exceed 93 days.');
+    if (inclusiveDays(start, end) > 186) {
+        return t('The timeline range cannot exceed 186 days.');
     }
 
     return '';
@@ -659,7 +708,7 @@ function formatRange(startsOn: string, endsOn: string): string {
 
     <div
         ref="timelineContainer"
-        class="flex min-w-0 flex-1 flex-col bg-background transition-colors duration-150 motion-reduce:transition-none"
+        class="timeline-page flex min-w-0 flex-1 flex-col bg-background transition-colors duration-[350ms] motion-reduce:transition-none"
         :class="
             isFullscreen
                 ? 'fixed inset-0 z-40 h-dvh min-h-0 w-screen overflow-hidden'
@@ -735,185 +784,269 @@ function formatRange(startsOn: string, endsOn: string): string {
             v-if="!isFullscreen"
             class="border-b px-4 py-4 sm:px-6 lg:px-8"
         >
-            <div class="flex flex-col gap-3 xl:flex-row xl:items-end">
-                <div class="flex items-center gap-1">
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        :title="t('Previous period')"
-                        :disabled="loading"
-                        @click="shiftPeriod(-1)"
-                    >
-                        <ChevronLeft />
-                        <span class="sr-only">{{ t('Previous period') }}</span>
-                    </Button>
-                    <Button
-                        variant="outline"
-                        :disabled="loading"
-                        @click="goToToday"
-                    >
-                        <CalendarDays />{{ t('Today') }}
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        :title="t('Next period')"
-                        :disabled="loading"
-                        @click="shiftPeriod(1)"
-                    >
-                        <ChevronRight />
-                        <span class="sr-only">{{ t('Next period') }}</span>
-                    </Button>
-                </div>
-
-                <form
-                    class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end"
-                    @submit.prevent="applyFilters"
+            <div class="mb-3 flex items-center justify-between gap-3">
+                <h2 class="text-sm font-semibold">
+                    {{ t('Schedule settings') }}
+                </h2>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    :aria-expanded="display.filtersOpen"
+                    aria-controls="timeline-filter-panel"
+                    @click="display.filtersOpen = !display.filtersOpen"
                 >
-                    <div class="w-full sm:max-w-44">
-                        <Label for="timeline_starts_on">{{ t('From') }}</Label>
-                        <AdminDateInput
-                            id="timeline_starts_on"
-                            v-model="filterState.starts_on"
-                            class="mt-1.5"
-                        />
-                    </div>
-                    <div class="w-full sm:max-w-44">
-                        <Label for="timeline_ends_on">{{ t('To') }}</Label>
-                        <AdminDateInput
-                            id="timeline_ends_on"
-                            v-model="filterState.ends_on"
-                            class="mt-1.5"
-                        />
-                    </div>
-                    <Button type="submit" :disabled="loading">{{
-                        t('Apply')
-                    }}</Button>
-                    <p
-                        v-if="rangeError"
-                        class="pb-2 text-sm text-destructive"
-                        role="alert"
-                    >
-                        {{ rangeError }}
-                    </p>
-                </form>
+                    {{
+                        t(
+                            display.filtersOpen
+                                ? 'Collapse filters'
+                                : 'Expand filters',
+                        )
+                    }}
+                    <ChevronDown
+                        class="transition-transform duration-[350ms] motion-reduce:transition-none"
+                        :class="display.filtersOpen ? 'rotate-180' : ''"
+                    />
+                </Button>
             </div>
-
-            <form
-                class="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-[repeat(5,minmax(0,1fr))_auto_auto]"
-                @submit.prevent="applyFilters"
+            <div
+                class="timeline-collapse"
+                :class="{ 'is-collapsed': !display.filtersOpen }"
+                :inert="!display.filtersOpen"
             >
-                <div>
-                    <Label for="timeline_type">{{ t('Type') }}</Label>
-                    <AdminSelect
-                        id="timeline_type"
-                        v-model="filterState.vehicle_type"
-                        class="mt-1.5"
-                        :options="[
-                            { value: '', label: t('All types') },
-                            ...options.vehicle_types.map((type) => ({
-                                value: type,
-                                label: t(type),
-                            })),
-                        ]"
-                        @change="onVehicleTypeChange"
-                    />
-                </div>
-                <div>
-                    <Label for="timeline_category">{{ t('Category') }}</Label>
-                    <AdminSelect
-                        id="timeline_category"
-                        v-model="filterState.category_id"
-                        class="mt-1.5"
-                        :options="[
-                            { value: null, label: t('All categories') },
-                            ...filteredCategories.map((category) => ({
-                                value: category.id,
-                                label: category.name,
-                            })),
-                        ]"
-                        @change="onCategoryChange"
-                    />
-                </div>
-                <div>
-                    <Label for="timeline_vehicle">{{ t('Vehicle') }}</Label>
-                    <AdminSelect
-                        id="timeline_vehicle"
-                        v-model="filterState.vehicle_id"
-                        class="mt-1.5"
-                        :options="[
-                            { value: null, label: t('All vehicles') },
-                            ...filteredVehicles.map((vehicle) => ({
-                                value: vehicle.id,
-                                label: vehicle.name,
-                            })),
-                        ]"
-                    />
-                </div>
-                <div>
-                    <Label for="timeline_visibility">{{
-                        t('Visibility')
-                    }}</Label>
-                    <AdminSelect
-                        id="timeline_visibility"
-                        v-model="filterState.visibility"
-                        class="mt-1.5"
-                        :options="[
-                            { value: 'active', label: t('All active') },
-                            { value: 'visible', label: t('Client-visible') },
-                            { value: 'hidden', label: t('Internal only') },
-                            { value: 'inactive', label: t('Inactive') },
-                            { value: 'all', label: t('All records') },
-                        ]"
-                    />
-                </div>
-                <div>
-                    <Label for="timeline_status">{{ t('Occupancy') }}</Label>
-                    <AdminSelect
-                        id="timeline_status"
-                        v-model="filterState.status"
-                        class="mt-1.5"
-                        :options="[
-                            { value: '', label: t('All blocking') },
-                            ...options.statuses.map((status) => ({
-                                value: status,
-                                label: t(timelineStatusLabels[status]),
-                            })),
-                        ]"
-                        @change="onStatusChange"
-                    />
-                </div>
-                <label
-                    class="flex h-9 cursor-pointer items-center gap-2 self-end rounded-md border px-3 text-sm whitespace-nowrap"
-                >
-                    <input
-                        v-model="filterState.available_only"
-                        type="checkbox"
-                        class="size-4 accent-foreground"
-                        @change="onAvailabilityChange"
-                    />
-                    {{ t('Available only') }}
-                </label>
-                <div class="flex items-end gap-1">
-                    <Button
-                        type="submit"
-                        variant="secondary"
-                        :disabled="loading"
-                        >{{ t('Filter') }}</Button
+                <div id="timeline-filter-panel" class="min-h-0 overflow-hidden">
+                    <div class="flex flex-col gap-3 xl:flex-row xl:items-end">
+                        <div class="flex items-center gap-1">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                :title="t('Previous period')"
+                                :disabled="loading"
+                                @click="shiftPeriod(-1)"
+                            >
+                                <ChevronLeft />
+                                <span class="sr-only">{{
+                                    t('Previous period')
+                                }}</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                :disabled="loading"
+                                @click="goToToday"
+                            >
+                                <CalendarDays />{{ t('Today') }}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                :title="t('Next period')"
+                                :disabled="loading"
+                                @click="shiftPeriod(1)"
+                            >
+                                <ChevronRight />
+                                <span class="sr-only">{{
+                                    t('Next period')
+                                }}</span>
+                            </Button>
+                        </div>
+
+                        <div
+                            class="flex flex-wrap items-center gap-1.5"
+                            role="group"
+                            :aria-label="t('Calendar range')"
+                        >
+                            <Button
+                                v-for="days in timelineQuickRangeDays"
+                                :key="days"
+                                variant="outline"
+                                :class="
+                                    activeQuickRangeDays === days
+                                        ? 'timeline-range-active'
+                                        : ''
+                                "
+                                :aria-pressed="activeQuickRangeDays === days"
+                                :disabled="loading"
+                                @click="applyQuickRange(days)"
+                                >{{ t(':count days', { count: days }) }}</Button
+                            >
+                            <Button
+                                variant="ghost"
+                                :aria-expanded="display.customRange"
+                                @click="
+                                    display.customRange = !display.customRange
+                                "
+                                >{{ t('Other period') }}</Button
+                            >
+                        </div>
+                    </div>
+                    <form
+                        v-if="display.customRange"
+                        class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end"
+                        @submit.prevent="applyFilters"
                     >
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        :title="t('Reset filters')"
-                        :disabled="loading"
-                        @click="resetFilters"
+                        <div class="w-full sm:max-w-44">
+                            <Label for="timeline_starts_on">{{
+                                t('From')
+                            }}</Label>
+                            <AdminDateInput
+                                id="timeline_starts_on"
+                                v-model="filterState.starts_on"
+                                class="mt-1.5"
+                            />
+                        </div>
+                        <div class="w-full sm:max-w-44">
+                            <Label for="timeline_ends_on">{{ t('To') }}</Label>
+                            <AdminDateInput
+                                id="timeline_ends_on"
+                                v-model="filterState.ends_on"
+                                class="mt-1.5"
+                            />
+                        </div>
+                        <Button type="submit" :disabled="loading">{{
+                            t('Apply')
+                        }}</Button>
+                        <p
+                            v-if="rangeError"
+                            class="pb-2 text-sm text-destructive"
+                            role="alert"
+                        >
+                            {{ rangeError }}
+                        </p>
+                    </form>
+
+                    <form
+                        class="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-[repeat(5,minmax(0,1fr))_auto_auto]"
+                        @submit.prevent="applyFilters"
                     >
-                        <FilterX />
-                        <span class="sr-only">{{ t('Reset filters') }}</span>
-                    </Button>
+                        <div>
+                            <Label for="timeline_type">{{ t('Type') }}</Label>
+                            <AdminSelect
+                                id="timeline_type"
+                                v-model="filterState.vehicle_type"
+                                class="mt-1.5"
+                                :options="[
+                                    { value: '', label: t('All types') },
+                                    ...options.vehicle_types.map((type) => ({
+                                        value: type,
+                                        label: t(type),
+                                    })),
+                                ]"
+                                @change="onVehicleTypeChange"
+                            />
+                        </div>
+                        <div>
+                            <Label for="timeline_category">{{
+                                t('Category')
+                            }}</Label>
+                            <AdminSelect
+                                id="timeline_category"
+                                v-model="filterState.category_id"
+                                class="mt-1.5"
+                                :options="[
+                                    { value: null, label: t('All categories') },
+                                    ...filteredCategories.map((category) => ({
+                                        value: category.id,
+                                        label: category.name,
+                                    })),
+                                ]"
+                                @change="onCategoryChange"
+                            />
+                        </div>
+                        <div>
+                            <Label for="timeline_vehicle">{{
+                                t('Vehicle')
+                            }}</Label>
+                            <AdminSelect
+                                id="timeline_vehicle"
+                                v-model="filterState.vehicle_id"
+                                class="mt-1.5"
+                                :options="[
+                                    { value: null, label: t('All vehicles') },
+                                    ...filteredVehicles.map((vehicle) => ({
+                                        value: vehicle.id,
+                                        label: vehicle.name,
+                                    })),
+                                ]"
+                            />
+                        </div>
+                        <div>
+                            <Label for="timeline_visibility">{{
+                                t('Visibility')
+                            }}</Label>
+                            <AdminSelect
+                                id="timeline_visibility"
+                                v-model="filterState.visibility"
+                                class="mt-1.5"
+                                :options="[
+                                    { value: 'active', label: t('All active') },
+                                    {
+                                        value: 'visible',
+                                        label: t('Client-visible'),
+                                    },
+                                    {
+                                        value: 'hidden',
+                                        label: t('Internal only'),
+                                    },
+                                    { value: 'inactive', label: t('Inactive') },
+                                    { value: 'all', label: t('All records') },
+                                ]"
+                            />
+                        </div>
+                        <div>
+                            <Label for="timeline_status">{{
+                                t('Occupancy')
+                            }}</Label>
+                            <AdminSelect
+                                id="timeline_status"
+                                v-model="filterState.status"
+                                class="mt-1.5"
+                                :options="[
+                                    {
+                                        value: '',
+                                        label: t('All requests and blocks'),
+                                    },
+                                    ...options.statuses.map((status) => ({
+                                        value: status,
+                                        label: t(timelineStatusLabels[status]),
+                                    })),
+                                ]"
+                                @change="onStatusChange"
+                            />
+                        </div>
+                        <label
+                            class="flex h-9 cursor-pointer items-center gap-2 self-end rounded-md border px-3 text-sm whitespace-nowrap"
+                        >
+                            <input
+                                v-model="filterState.available_only"
+                                type="checkbox"
+                                class="size-4 accent-foreground"
+                                @change="onAvailabilityChange"
+                            />
+                            {{ t('Available only') }}
+                        </label>
+                        <div class="flex items-end gap-1">
+                            <Button
+                                type="submit"
+                                variant="secondary"
+                                :disabled="loading"
+                                >{{ t('Filter') }}</Button
+                            >
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                :title="t('Reset filters')"
+                                :disabled="loading"
+                                @click="resetFilters"
+                            >
+                                <FilterX />
+                                <span class="sr-only">{{
+                                    t('Reset filters')
+                                }}</span>
+                            </Button>
+                        </div>
+                    </form>
                 </div>
-            </form>
+            </div>
         </section>
 
         <section
@@ -993,6 +1126,11 @@ function formatRange(startsOn: string, endsOn: string): string {
 
         <section
             class="relative min-h-0 min-w-0 flex-1"
+            :style="
+                isFullscreen
+                    ? { display: 'flex', flexDirection: 'column' }
+                    : undefined
+            "
             :class="isFullscreen ? 'h-dvh' : ''"
             :aria-label="t('Vehicle availability')"
         >
@@ -1063,33 +1201,63 @@ function formatRange(startsOn: string, endsOn: string): string {
             </div>
 
             <div
-                v-else
-                class="timeline-scroll-area max-w-full overflow-auto overscroll-x-contain overscroll-y-auto [contain:paint]"
-                :class="[
-                    isFullscreen
-                        ? 'h-full max-h-none min-h-0'
-                        : 'max-h-[70vh] min-h-[360px]',
-                    loading ? 'opacity-60' : '',
-                ]"
-                :aria-busy="loading"
+                v-if="timeline.rows.length > 0"
+                ref="timelineHead"
+                class="sticky top-0 z-30 shrink-0 overflow-x-auto bg-background"
+                :class="isFullscreen ? 'pt-12' : ''"
+                @scroll="syncHorizontal($event, timelineBody)"
             >
-                <div class="relative" :style="{ width: `${gridWidth}px` }">
+                <div
+                    class="timeline-grid-head flex h-24 border-b bg-background shadow-xs"
+                    :style="{ width: `${gridWidth}px` }"
+                >
                     <div
-                        class="sticky top-0 z-30 flex h-14 border-b bg-background shadow-xs"
-                        :style="{ width: `${gridWidth}px` }"
+                        class="timeline-vehicle-head sticky left-0 z-40 flex shrink-0 items-center justify-between gap-2 border-r bg-background px-3 text-xs font-semibold text-muted-foreground"
+                        :style="{ width: `${vehicleColumnWidth}px` }"
                     >
-                        <div
-                            class="sticky left-0 z-40 flex shrink-0 items-center border-r bg-background px-4 text-xs font-semibold text-muted-foreground"
-                            :style="{ width: `${vehicleColumnWidth}px` }"
-                        >
-                            {{ t('Vehicle') }}
+                        {{ t('Vehicle') }}
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            class="size-7"
+                            :aria-expanded="!display.compact"
+                            :aria-label="
+                                t(
+                                    display.compact
+                                        ? 'Show vehicle details'
+                                        : 'Hide vehicle details',
+                                )
+                            "
+                            @click="display.compact = !display.compact"
+                            ><Plus
+                                v-if="display.compact"
+                                class="size-3" /><Minimize
+                                v-else
+                                class="size-3"
+                        /></Button>
+                    </div>
+                    <div class="relative flex pt-12">
+                        <div class="absolute inset-x-0 top-0 flex h-12">
+                            <div
+                                v-for="band in monthBands"
+                                :key="band.start"
+                                class="timeline-month flex shrink-0 items-center justify-center border-r text-xs font-extrabold tracking-widest uppercase"
+                                :style="{
+                                    width: `${band.span * dayWidth}px`,
+                                }"
+                            >
+                                {{ band.label }}
+                            </div>
                         </div>
                         <div
-                            v-for="(date, index) in timeline.dates"
+                            v-for="(date, index) in localizedDates"
                             :key="date.date"
-                            class="flex shrink-0 flex-col items-center justify-center border-r text-xs tabular-nums"
+                            class="timeline-date-head flex shrink-0 flex-col items-center justify-center border-r text-xs tabular-nums"
                             :class="[
                                 date.is_weekend ? 'bg-muted/45' : '',
+                                hoverDateIndex === index
+                                    ? 'timeline-date-hover'
+                                    : '',
                                 date.is_today
                                     ? 'bg-cyan-50 text-cyan-900 dark:bg-cyan-950 dark:text-cyan-100'
                                     : '',
@@ -1097,11 +1265,6 @@ function formatRange(startsOn: string, endsOn: string): string {
                             :style="{ width: `${dayWidth}px` }"
                             :title="date.date"
                         >
-                            <span
-                                class="h-4 text-[10px] font-medium text-muted-foreground uppercase"
-                            >
-                                {{ monthLabel(index) }}
-                            </span>
                             <strong>{{ date.day }}</strong>
                             <span
                                 class="text-[10px] text-muted-foreground uppercase"
@@ -1109,27 +1272,62 @@ function formatRange(startsOn: string, endsOn: string): string {
                             >
                         </div>
                     </div>
-
+                </div>
+            </div>
+            <div
+                v-if="timeline.rows.length > 0"
+                ref="timelineBody"
+                @scroll="syncHorizontal($event, timelineHead)"
+                class="timeline-scroll-area max-w-full overflow-auto overscroll-x-contain overscroll-y-auto [contain:paint]"
+                :class="[
+                    isFullscreen
+                        ? 'max-h-none min-h-0 flex-1'
+                        : 'min-h-[360px]',
+                    loading ? 'opacity-60' : '',
+                ]"
+                :aria-busy="loading"
+            >
+                <div class="relative" :style="{ width: `${gridWidth}px` }">
                     <div
                         v-for="row in timeline.rows"
                         :key="row.id"
-                        class="group relative flex h-10 border-b"
-                        :style="{ width: `${gridWidth}px` }"
+                        class="timeline-vehicle-row group relative flex border-b"
+                        :style="rowStyle(row)"
                         @mouseleave="clearHoveredCell(row.id)"
                     >
                         <div
-                            class="sticky left-0 z-20 flex shrink-0 items-center border-r bg-background px-4 group-hover:bg-muted/30"
+                            class="timeline-vehicle-label sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r px-3"
                             :style="{ width: `${vehicleColumnWidth}px` }"
                         >
+                            <span
+                                class="h-7 w-1 shrink-0 rounded-full"
+                                :style="{
+                                    backgroundColor: vehicleRowColor(row.id),
+                                }"
+                            />
                             <div class="flex min-w-0 flex-1 items-center gap-2">
                                 <div class="min-w-0 flex-1">
-                                    <p
-                                        class="truncate text-sm font-medium"
-                                        :title="row.name"
+                                    <Tooltip :delay-duration="1000"
+                                        ><TooltipTrigger as-child
+                                            ><Link
+                                                :href="`/vehicles/${row.id}/edit`"
+                                                class="timeline-name block w-fit max-w-full truncate text-xs font-semibold"
+                                                :aria-label="row.name"
+                                                ><TimelineVehicleName
+                                                    :name="
+                                                        row.name
+                                                    " /></Link></TooltipTrigger
+                                        ><TooltipContent
+                                            ><TimelineVehicleName
+                                                :name="row.name"
+                                            />
+                                            <p class="mt-1 text-xs">
+                                                {{ vehicleDetails(row) }}
+                                            </p></TooltipContent
+                                        ></Tooltip
                                     >
-                                        {{ row.name }}
-                                    </p>
                                     <p
+                                        v-if="!display.compact"
                                         class="truncate text-[11px] text-muted-foreground"
                                         :title="vehicleDetails(row)"
                                     >
@@ -1165,7 +1363,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             <button
                                 v-if="row.is_active && isCellFree(row, index)"
                                 type="button"
-                                class="group/cell relative h-full shrink-0 border-r p-0 hover:bg-emerald-50 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-600 dark:hover:bg-emerald-950/40"
+                                class="timeline-day group/cell relative h-full shrink-0 border-r p-0 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-600"
                                 :class="[
                                     date.is_weekend ? 'bg-muted/25' : '',
                                     date.is_today
@@ -1182,6 +1380,8 @@ function formatRange(startsOn: string, endsOn: string): string {
                                 "
                                 :aria-pressed="isCellSelected(row, index)"
                                 @mouseenter="previewTimelineDate(row, index)"
+                                @focus="previewTimelineDate(row, index)"
+                                @blur="clearHoveredCell(row.id)"
                                 @click="
                                     selectTimelineDate(row, date.date, index)
                                 "
@@ -1192,7 +1392,8 @@ function formatRange(startsOn: string, endsOn: string): string {
                             </button>
                             <div
                                 v-else
-                                class="h-full shrink-0 border-r"
+                                class="timeline-day h-full shrink-0 border-r"
+                                @mouseenter="hoverDateIndex = index"
                                 :class="[
                                     date.is_weekend ? 'bg-muted/25' : '',
                                     date.is_today
@@ -1211,13 +1412,13 @@ function formatRange(startsOn: string, endsOn: string): string {
                         </template>
 
                         <template
-                            v-for="occupancy in row.occupancies"
+                            v-for="occupancy in occupancyLanes(row.occupancies)"
                             :key="occupancy.id"
                         >
                             <Link
                                 v-if="occupancy.booking_public_id"
                                 :href="bookingHref(occupancy.booking_public_id)"
-                                class="absolute top-1 z-10 flex h-8 items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                                class="absolute z-10 flex h-[26px] items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
                                 :class="occupancyClass(occupancy)"
                                 :style="occupancyStyle(occupancy)"
                                 :title="occupancyTitle(occupancy)"
@@ -1229,7 +1430,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             </Link>
                             <div
                                 v-else
-                                class="absolute top-1 z-10 flex h-8 items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs"
+                                class="absolute z-10 flex h-[26px] items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs"
                                 :class="occupancyClass(occupancy)"
                                 :style="occupancyStyle(occupancy)"
                                 :title="occupancyTitle(occupancy)"
@@ -1252,3 +1453,138 @@ function formatRange(startsOn: string, endsOn: string): string {
         @update:open="handleBookingSheetOpen"
     />
 </template>
+
+<style>
+/* A non-scrolling overflow:hidden layout ancestor traps position:sticky.
+   Clip horizontal overflow without creating a second vertical scroll container. */
+main:has(> .timeline-page) {
+    min-width: 0;
+    overflow-x: clip;
+    overflow-y: visible;
+}
+.timeline-page {
+    --timeline-base: var(--background);
+}
+.dark .timeline-page {
+    --timeline-base: #111313;
+}
+.timeline-collapse {
+    display: grid;
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transition:
+        grid-template-rows 350ms ease,
+        opacity 350ms ease;
+}
+.timeline-collapse.is-collapsed {
+    grid-template-rows: 0fr;
+    opacity: 0;
+}
+.timeline-range-active {
+    background: #173d79 !important;
+    border-color: #3988ff !important;
+    color: white !important;
+    box-shadow: 0 0 0 1px #3988ff44;
+}
+.timeline-month {
+    background: color-mix(in srgb, #55c5a8 10%, var(--background));
+}
+.dark .timeline-month {
+    background: #222626;
+    color: #d9e6e2;
+    border-color: #414b48;
+}
+.dark .timeline-date-head,
+.dark .timeline-vehicle-head {
+    background: #171919;
+}
+.timeline-vehicle-row {
+    background: color-mix(in srgb, var(--bike-color) 19%, var(--timeline-base));
+}
+.timeline-vehicle-label {
+    background: color-mix(in srgb, var(--bike-color) 24%, var(--background));
+}
+.dark .timeline-vehicle-label {
+    background: color-mix(in srgb, var(--bike-color) 24%, #151717);
+}
+.timeline-vehicle-row,
+.timeline-vehicle-label,
+.timeline-day,
+.timeline-date-head,
+.timeline-name {
+    transition:
+        background-color 350ms ease,
+        box-shadow 350ms ease,
+        border-color 350ms ease,
+        color 350ms ease;
+}
+.timeline-vehicle-row:hover,
+.timeline-vehicle-row:focus-within {
+    background: color-mix(in srgb, var(--bike-color) 48%, var(--timeline-base));
+}
+.timeline-vehicle-row:hover .timeline-vehicle-label,
+.timeline-vehicle-row:focus-within .timeline-vehicle-label {
+    background: color-mix(in srgb, var(--bike-color) 54%, var(--background));
+}
+.dark .timeline-vehicle-row:hover .timeline-vehicle-label,
+.dark .timeline-vehicle-row:focus-within .timeline-vehicle-label {
+    background: color-mix(in srgb, var(--bike-color) 54%, #151717);
+}
+.timeline-day:hover,
+.timeline-day:focus-visible {
+    background: color-mix(in srgb, var(--bike-color) 92%, white);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--bike-color) 45%, white),
+        0 0 10px #3988ff88;
+}
+.timeline-date-hover,
+.timeline-date-head:hover {
+    outline: 2px solid #69b7ff;
+    outline-offset: -2px;
+    box-shadow:
+        inset 0 0 6px #4da3ff55,
+        0 0 7px 2px #3988ff,
+        0 0 15px 4px #3988ff88;
+    color: #2878ff;
+    text-shadow:
+        0 0 2px #b9faff,
+        0 0 6px #3988ff;
+}
+.timeline-name {
+    padding: 3px 7px;
+    border: 1px solid color-mix(in srgb, var(--paint-color) 48%, #777e7b);
+    border-radius: 6px;
+    background: var(--background);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--paint-color) 22%, #303534);
+}
+.dark .timeline-name {
+    background: #131515;
+}
+.timeline-vehicle-row:hover .timeline-name,
+.timeline-name:focus-visible {
+    border-color: var(--paint-color);
+    box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--paint-color) 72%, #e7eeeb),
+        0 0 16px color-mix(in srgb, var(--paint-color) 85%, transparent),
+        0 0 34px color-mix(in srgb, var(--paint-color) 58%, transparent);
+}
+.timeline-paint-word {
+    color: var(--paint-ink);
+    font-weight: 800;
+    -webkit-text-stroke: 0.35px #6b7471;
+    paint-order: stroke fill;
+}
+.dark .timeline-paint-word {
+    -webkit-text-stroke: 0.35px #eef2f0;
+}
+.dark .timeline-paint-black {
+    -webkit-text-stroke: 0.45px #f4f6f5;
+    text-shadow: 0 0 1px #f4f6f5;
+}
+@media (prefers-reduced-motion: reduce) {
+    .timeline-page *,
+    .timeline-collapse {
+        transition: none !important;
+    }
+}
+</style>

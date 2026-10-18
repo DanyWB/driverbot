@@ -6,6 +6,7 @@ export type BookingStatus =
     | 'completed'
     | 'cancelled'
     | 'cancelled_by_client'
+    | 'cancelled_unavailable'
     | 'expired'
     | 'no_show';
 
@@ -107,6 +108,17 @@ export type BookingPriceSnapshot = BookingPrice & {
 };
 
 export type BookingDetail = BookingListItem & {
+    vehicle_photo_url: string | null;
+    details_version: number;
+    payments: Record<
+        'prepayment' | 'deposit',
+        {
+            amount: string | null;
+            currency: string | null;
+            received: boolean;
+            received_at: string | null;
+        }
+    >;
     cancellation_reason: string | null;
     no_show_reason: string | null;
     options: {

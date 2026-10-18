@@ -7,6 +7,11 @@ const {
   sendConditions,
 } = require("../handlers/conditions");
 
+const acceptedGateway = {
+  async getProfile() { return {terms: {current: true, version: "v2"}}; },
+  async getConfiguration() { return {terms_version: "v2"}; },
+};
+
 async function inLaravelMode(callback) {
   const original = process.env.BOT_DATA_MODE;
   process.env.BOT_DATA_MODE = "laravel";
@@ -27,6 +32,7 @@ test("conditions screen records a supported origin and has accept/back controls"
     };
     await sendConditions(ctx, "en", {
       origin: "booking_confirmation",
+      gateway: acceptedGateway,
       renderer: {async renderText(_ctx, payload) { rendered = payload; }},
     });
 
@@ -34,7 +40,7 @@ test("conditions screen records a supported origin and has accept/back controls"
     assert.deepEqual(rendered.returnContext, {termsOrigin: "booking_confirmation"});
     assert.deepEqual(
       conditionsKeyboard("en", false).inline_keyboard.flat().map((button) => button.callback_data),
-      ["conditions:accept", "conditions:back"]
+      ["conditions:accept", "conditions:contract", "conditions:back"]
     );
     assert.equal(normalizeTermsOrigin("untrusted"), "main_menu");
   });
@@ -66,6 +72,7 @@ test("accepting terms returns to the same booking draft without clearing it", as
 
     try {
       await handleConditionsActionWithDeps(ctx, {
+        gateway: acceptedGateway,
         renderer: {async renderText() {}},
       });
     } finally {
@@ -76,6 +83,26 @@ test("accepting terms returns to the same booking draft without clearing it", as
     assert.equal(ctx.session.booking, draft);
     assert.equal(ctx.session.bookingCart, cart);
     assert.equal(ctx.session.termsOrigin, null);
+  });
+});
+
+test("stale terms buttons display the current version without accepting unseen terms", async () => {
+  await inLaravelMode(async () => {
+    const ctx = {from: {id: 1}, callbackQuery: {data: "conditions:accept"},
+      session: {lang: "en", viewedTermsVersion: "v1", termsOrigin: "booking_confirmation"}};
+    let accepted = 0;
+    let rendered;
+    await handleConditionsActionWithDeps(ctx, {
+      gateway: {
+        async getProfile() { return {terms: {current: false, version: "v1"}}; },
+        async getConfiguration() { return {terms_version: "v2"}; },
+        async acceptTerms() { accepted += 1; },
+      },
+      renderer: {async renderText(_ctx, payload) { rendered = payload; }},
+    });
+    assert.equal(accepted, 0);
+    assert.equal(ctx.session.viewedTermsVersion, "v2");
+    assert.equal(rendered.screen, "conditions");
   });
 });
 

@@ -50,6 +50,7 @@ function add(ctx, booking, vehicle, quote) {
     start_time: booking.startTime || null,
     end_time: booking.endTime || null,
     total_price: quote.final_total,
+    total_days: quote.total_days,
     currency: quote.currency,
     helmets_qty: booking.helmets || 0,
     delivery_required: Boolean(booking.deliveryRequired),
@@ -75,7 +76,12 @@ function clear(ctx) {
   ctx.session.bookingCart = [];
   ctx.session.bookingCartConfirmationNonce = null;
   clearConfirmationAttempt(ctx);
-  clearTermsAcceptance(ctx);
+}
+
+function restoreTermsAcceptance(ctx, user) {
+  if (!user?.terms) return;
+  if (user.terms.current && user.terms.version) markTermsAccepted(ctx, user.terms.version);
+  else clearTermsAcceptance(ctx);
 }
 
 function markTermsAccepted(ctx, termsVersion) {
@@ -169,6 +175,7 @@ function applyAuthoritativeQuotes(ctx, quotes) {
   for (const {item, quote, changed: itemChanged} of updates) {
     if (!itemChanged) continue;
     item.total_price = quote.final_total;
+    item.total_days = quote.total_days;
     item.currency = String(quote.currency).trim();
   }
 
@@ -203,6 +210,7 @@ module.exports = {
   hasConfirmationAttempt,
   loadOptionsIntoBooking,
   markTermsAccepted,
+  restoreTermsAcceptance,
   markConfirmationAttempt,
   remove,
   toApiItems,

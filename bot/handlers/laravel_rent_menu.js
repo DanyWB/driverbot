@@ -161,24 +161,43 @@ async function handleLaravelRentMenuActionWithDeps(ctx, dependencies = {}) {
   if (action === "rent:support") {
     return require("./support").sendSupportMenu(ctx, lang, {renderer, origin: "rent_menu"});
   }
-  if (action === "rent:contract") {
-    return renderer.renderText(ctx, {
+  if (action === "rent:contract" || action === "conditions:contract") {
+    const path = require("node:path");
+    return renderer.renderDocuments(ctx, {
       screen: "rent_contract",
-      text: t(lang, "conditions_info"),
+      documents: [{path: path.join(__dirname, "../assets/contracts", `agreement-${lang}.png`), filename: `Drive-Phangan-agreement-${lang}.png`}],
+      text: t(lang, "rent_contract_copy"),
       parseMode: "HTML",
       replyMarkup: {inline_keyboard: [[
-        {text: t(lang, "btn_back"), callback_data: "rent:menu"},
+        {text: t(lang, "btn_back"), callback_data: action === "conditions:contract" ? "conditions:open" : "rent:menu"},
       ]]},
       returnContext: {origin: "rent_menu"},
     });
   }
-  if (action === "rent:payment") {
+  if (action === "rent:payment" || /^rent:payment:\d+$/.test(action)) {
+    const page = pageFromAction(action, "payment");
+    const pageResult = normalizeBookingPage(await loadBookingPage(ctx, "current", page, dependencies), page);
+    const lines = [t(lang, "rent_btn_payment")];
+    for (const booking of pageResult.items) {
+      lines.push("", escapeHtml(historyButtonText(booking)));
+      for (const key of ["prepayment", "deposit"]) {
+        const payment = booking.payments?.[key];
+        lines.push(escapeHtml(t(lang, "rent_payment_line", {
+          label: t(lang, `rent_payment_${key}`),
+          amount: payment?.amount == null ? t(lang, "booking_price_tbd") : `${payment.amount} ${payment.currency || ""}`,
+          status: payment?.amount == null ? "—" : t(lang, payment.received ? "rent_payment_received" : "rent_payment_due"),
+        })));
+      }
+    }
+    if (!pageResult.items.length) lines.push(t(lang, "rent_deposit_empty"));
+    const keyboard = bookingRows(pageResult.items, "payment", lang);
+    if (pageResult.items.length || page > 0) appendPaginationRow(keyboard, "payment", page, pageResult, lang);
+    keyboard.push([{text: t(lang, "btn_back"), callback_data: "rent:menu"}]);
     return renderer.renderText(ctx, {
       screen: "rent_payment",
-      text: t(lang, "rent_deposit_empty"),
-      replyMarkup: {inline_keyboard: [[
-        {text: t(lang, "btn_back"), callback_data: "rent:menu"},
-      ]]},
+      text: lines.join("\n"),
+      parseMode: "HTML",
+      replyMarkup: {inline_keyboard: keyboard},
       returnContext: {origin: "rent_menu"},
     });
   }

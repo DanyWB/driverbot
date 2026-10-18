@@ -4,6 +4,7 @@ import {
     Bike,
     CalendarRange,
     ClipboardList,
+    Coins,
     LayoutDashboard,
     Users,
 } from '@lucide/vue';
@@ -42,6 +43,11 @@ const mainNavItems: NavItem[] = [
         title: 'Fleet',
         href: '/vehicles',
         icon: Bike,
+    },
+    {
+        title: 'Pricing presets',
+        href: '/pricing-presets',
+        icon: Coins,
     },
     {
         title: 'Customers',

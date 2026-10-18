@@ -6,6 +6,92 @@ const STORAGE_KEY = 'admin_locale';
 const COOKIE_KEY = 'admin_locale';
 
 const russianMessages: Record<string, string> = {
+    high: 'Высокий',
+    middle: 'Средний',
+    low: 'Низкий',
+    'Prices saved.': 'Цены сохранены.',
+    Currency: 'Валюта',
+    'Active for operations': 'Активен для работы',
+    'Publish vehicle': 'Опубликовать байк',
+    'Hidden from clients.': 'Скрыт от клиентов.',
+    'Activate the vehicle before publishing.':
+        'Перед публикацией активируйте байк.',
+    'Select an active category before publishing.':
+        'Перед публикацией выберите активную категорию.',
+    'Complete all 15 prices before publishing.':
+        'Перед публикацией заполните все 15 тарифов.',
+    'Unsaved changes. Save to apply publication and details.':
+        'Есть несохранённые изменения. Сохраните данные, чтобы применить публикацию.',
+    'Operational state is separate from publication and availability on selected dates.':
+        'Рабочее состояние не зависит от публикации и доступности на выбранные даты.',
+    'Publication changes apply when you save details.':
+        'Изменение публикации применяется после сохранения данных.',
+    'All requests and blocks': 'Все заявки и блокировки',
+    'Booking contacts and payments': 'Контакты и платежи бронирования',
+    'These contacts apply only to this booking. The customer profile and Telegram delivery address do not change.':
+        'Контакты относятся только к этой брони. Профиль клиента и получатель сообщений Telegram не изменятся.',
+    Prepayment: 'Предоплата',
+    'Security deposit': 'Залог',
+    'Required amount': 'Сумма к внесению',
+    Received: 'Получено',
+    'Save booking details': 'Сохранить контакты и платежи',
+    'Booking details saved.': 'Контакты и платежи сохранены.',
+    'Booking details changed. Reload before saving; your draft has not been applied.':
+        'Другой администратор изменил данные. Обновите страницу перед сохранением; ваш черновик не применён.',
+    'Changing an amount or currency clears its previous receipt mark. Save, then mark the corrected amount as received if appropriate. No automatic payment or booking confirmation.':
+        'При изменении суммы или валюты прежняя отметка получения снимается. Сохраните, затем при необходимости отметьте исправленную сумму как полученную. Оплата и подтверждение брони автоматически не выполняются.',
+    'Shared preset': 'Общий пресет',
+    'Individual vehicle prices': 'Индивидуальные цены байка',
+    'Individual prices for this vehicle': 'Индивидуальные цены этого байка',
+    'Saving will update :count linked vehicles.':
+        'Сохранение изменит цены у связанных байков: :count.',
+    'Package totals in THB. No automatic rounding.':
+        'Итоговые цены за период в THB. Без автоматического округления.',
+    'New individual prices must be multiples of 50 THB; existing exact prices are preserved.':
+        'Новые индивидуальные цены кратны 50 THB; ранее введённые точные значения сохраняются.',
+    'Save or close the price editor before leaving this page.':
+        'Перед переходом сохраните цены или закройте редактор, отменив изменения.',
+    'Unable to load prices.': 'Не удалось загрузить цены.',
+    'Unable to save prices.':
+        'Не удалось сохранить цены. Черновик сохранён на экране.',
+    'Enter positive whole prices for all enabled tariffs.':
+        'Укажите положительные целые цены для всех включённых тарифов.',
+    'Only this vehicle will be changed.':
+        'Будут изменены цены только этого байка.',
+    'Existing booking price snapshots will not change.':
+        'Стоимость уже созданных бронирований не изменится.',
+    'Discard unsaved prices?': 'Отменить несохранённые цены?',
+    'Your unsaved price changes will be lost.':
+        'Несохранённые изменения цен будут потеряны.',
+    'Continue editing': 'Продолжить редактирование',
+    'Discard changes': 'Отменить изменения',
+    'Unavailable on requested dates': 'Недоступен на выбранные даты',
+    Archive: 'Архив',
+    'Fleet sections': 'Разделы техники',
+    'Move to archive': 'В архив',
+    'Restore vehicle': 'Восстановить',
+    'Delete permanently': 'Удалить окончательно',
+    'Unpublish vehicle': 'Снять с публикации',
+    'This vehicle is archived': 'Техника в архиве',
+    'Enter the exact vehicle name': 'Введите точное название техники',
+    'The vehicle will leave the working fleet and disappear from booking. Photos, prices and history are preserved.':
+        'Техника будет убрана из рабочего списка и бронирования. Фотографии, цены и история сохранятся.',
+    'The vehicle will return to the fleet but remain unpublished. Check its prices and publish it when ready.':
+        'Техника вернётся в рабочий список, но останется снятой с публикации. Проверьте цены и опубликуйте её, когда будете готовы.',
+    'This permanently removes the vehicle, its prices and photos. This cannot be undone.':
+        'Техника, её цены и фотографии будут удалены окончательно. Это действие нельзя отменить.',
+    'Customers will no longer see this vehicle for new bookings. Existing bookings remain unchanged.':
+        'Клиенты больше не увидят эту технику для новых бронирований. Существующие брони останутся без изменений.',
+    'Archive is unavailable while bookings are unfinished. Unpublish the vehicle and complete or cancel those bookings first.':
+        'Пока есть незавершённые бронирования, архив недоступен. Снимите технику с публикации и сначала завершите или отмените эти бронирования.',
+    'Rental history or occupancy records are preserved. Permanent deletion is unavailable.':
+        'История аренд и записи занятости сохраняются. Окончательное удаление недоступно.',
+    Saved: 'Сохранено',
+    'Minimum rental duration': 'Минимальный срок аренды',
+    'General minimum in days': 'Общий минимум в днях',
+    'Save minimum duration': 'Сохранить минимальный срок',
+    'Category values override the general minimum. Leave blank to inherit. Existing bookings do not change.':
+        'Значение категории заменяет общий минимум. Оставьте поле пустым, чтобы использовать общий. Существующие бронирования не изменятся.',
     Dashboard: 'Обзор',
     Timeline: 'Календарь',
     Bookings: 'Бронирования',
@@ -85,6 +171,11 @@ const russianMessages: Record<string, string> = {
     Type: 'Тип',
     Name: 'Название',
     Description: 'Описание',
+    'Description — English': 'Описание — английский',
+    'Description — Russian': 'Описание — русский',
+    'Description — Ukrainian': 'Описание — украинский',
+    'The bot uses the customer language. Empty translations fall back to English. Translations are entered manually.':
+        'Бот показывает описание на языке клиента. Если перевод не заполнен, используется английское описание. Переводы вводятся вручную.',
     Photo: 'Фото',
     Other: 'Другое',
     Passport: 'Паспорт',
@@ -129,6 +220,16 @@ const russianMessages: Record<string, string> = {
     scooter: 'Скутер',
     car: 'Автомобиль',
     'Photos count': ':count фото',
+    ':count photos': ':count фото',
+    'The timeline range cannot exceed 186 days.':
+        'Период календаря не может превышать 186 дней.',
+    'Schedule settings': 'Параметры расписания',
+    'Collapse filters': 'Свернуть',
+    'Expand filters': 'Развернуть',
+    'Other period': 'Другой период',
+    'Hide vehicle details': 'Скрыть категории и инвентарные коды',
+    'Show vehicle details': 'Показать категории и инвентарные коды',
+    ':count days': ':count дней',
     bookings: 'бронирований',
     'Edit vehicle': 'Редактировать технику',
     'Fleet pages': 'Страницы каталога',
@@ -229,6 +330,93 @@ const russianMessages: Record<string, string> = {
     'Days count': ':count дн.',
     'Price preview failed.': 'Не удалось рассчитать цену.',
     'Price preview is unavailable.': 'Расчёт цены временно недоступен.',
+    'Pricing presets': 'Шаблоны цен',
+    'Create preset': 'Создать шаблон',
+    'Create pricing preset': 'Создание шаблона цен',
+    'Edit pricing preset': 'Редактирование шаблона цен',
+    'Copy pricing preset': 'Копирование шаблона цен',
+    'Create a separate preset with the same exact prices.':
+        'Создайте отдельный шаблон с теми же точными ценами.',
+    'Enter exact package totals for all seasons and rental periods.':
+        'Укажите точные пакетные суммы для всех сезонов и сроков аренды.',
+    'Reuse one exact 3 × 5 price matrix across multiple vehicles. Preset totals are stored as whole THB without rounding or a 50 THB step.':
+        'Используйте одну точную матрицу цен 3 × 5 для нескольких единиц техники. Суммы шаблона хранятся в целых батах без округления и шага 50 бат.',
+    'Booking rounding is unchanged': 'Округление бронирования не изменилось',
+    'Preset package totals stay exact. The final booking quote still follows the existing 100 THB rounding rule.':
+        'Пакетные суммы шаблона остаются точными. Итог бронирования по-прежнему округляется по действующему правилу до 100 бат.',
+    'Changing a preset updates linked vehicles for future quotes. Existing bookings are never recalculated.':
+        'Изменение шаблона обновляет связанную технику для будущих расчётов. Существующие бронирования никогда не пересчитываются.',
+    'Version :version': 'Версия :version',
+    ':count linked vehicles': 'Связано техники: :count',
+    Copy: 'Копировать',
+    'Linked vehicles': 'Связанная техника',
+    'No pricing presets yet': 'Шаблонов цен пока нет',
+    'Create a preset manually, then assign it from a vehicle price section.':
+        'Создайте шаблон вручную, затем назначьте его в разделе цен техники.',
+    ':name copy': ':name — копия',
+    'Enter a preset name.': 'Введите название шаблона.',
+    'Enter a positive whole THB amount.':
+        'Введите положительную целую сумму в батах.',
+    'Price must not exceed 100,000,000 THB.':
+        'Цена не должна превышать 100 000 000 бат.',
+    'The pricing preset could not be saved.':
+        'Не удалось сохранить шаблон цен.',
+    'This preset changed after you opened it. Your edits are still here. Refresh the preset state, review, and try again.':
+        'Шаблон изменился после открытия. Ваши правки сохранены в форме. Обновите состояние шаблона, проверьте данные и повторите попытку.',
+    'The pricing preset service is unavailable. Try again.':
+        'Сервис шаблонов цен недоступен. Повторите попытку.',
+    'Pricing preset saved.': 'Шаблон цен сохранён.',
+    'Preset state refreshed. Your edited fields were not replaced.':
+        'Состояние шаблона обновлено. Ваши правки в форме не заменены.',
+    'Latest preset state is ready. Your edited fields are still here. Load the latest version only if you want to discard this draft.':
+        'Актуальное состояние шаблона загружено. Ваши правки всё ещё в форме. Загрузите последнюю версию, только если хотите удалить этот черновик.',
+    'Load latest and discard my draft':
+        'Загрузить последнюю версию и удалить мой черновик',
+    'Could not refresh the preset state.':
+        'Не удалось обновить состояние шаблона.',
+    'Preset name': 'Название шаблона',
+    'Enter exact positive whole THB totals. Presets do not round and do not require multiples of 50.':
+        'Укажите точные положительные целые суммы в батах. В шаблонах нет округления и требования кратности 50.',
+    'Refresh preset state': 'Обновить состояние шаблона',
+    'Create copy': 'Создать копию',
+    'Save preset': 'Сохранить шаблон',
+    'Update linked vehicles?': 'Обновить связанную технику?',
+    'This preset is linked to :count vehicles. Saving will replace their current matrices for future quotes.':
+        'Этот шаблон связан с :count ед. техники. Сохранение заменит их текущие матрицы для будущих расчётов.',
+    'Existing bookings are not recalculated. Final booking rounding remains unchanged.':
+        'Существующие бронирования не пересчитываются. Округление итоговой суммы бронирования не меняется.',
+    Review: 'Вернуться к проверке',
+    'Update :count vehicles': 'Обновить технику: :count',
+    'Shared pricing preset': 'Общий шаблон цен',
+    'Assigning a preset replaces this vehicle price matrix for future quotes. Existing bookings are not recalculated.':
+        'Назначение шаблона заменяет матрицу цен этой техники для будущих расчётов. Существующие бронирования не пересчитываются.',
+    'Pricing preset': 'Шаблон цен',
+    'Select a pricing preset': 'Выберите шаблон цен',
+    'Assign preset': 'Назначить шаблон',
+    'Replace preset': 'Заменить шаблон',
+    'Create a compatible preset': 'Создать подходящий шаблон',
+    'Edit preset': 'Редактировать шаблон',
+    'Detach to individual pricing': 'Перейти на индивидуальные цены',
+    'Linked preset matrix': 'Матрица связанного шаблона',
+    'This matrix is read-only here. Edit the shared preset to update all linked vehicles.':
+        'Здесь матрица доступна только для чтения. Измените общий шаблон, чтобы обновить всю связанную технику.',
+    'The final booking quote still follows the existing 100 THB rounding rule.':
+        'Итог бронирования по-прежнему округляется по действующему правилу до 100 бат.',
+    'Detach shared preset?': 'Отвязать общий шаблон?',
+    'The current exact matrix will be preserved on this vehicle and become individually editable.':
+        'Текущая точная матрица сохранится у этой техники и станет доступна для индивидуального редактирования.',
+    'Future preset changes will no longer affect this vehicle. Existing bookings are not recalculated.':
+        'Будущие изменения шаблона больше не затронут эту технику. Существующие бронирования не пересчитываются.',
+    'Detach and keep current prices': 'Отвязать и сохранить текущие цены',
+    'Apply shared pricing preset?': 'Применить общий шаблон цен?',
+    'Apply :preset to :vehicle?': 'Применить «:preset» к «:vehicle»?',
+    'The selected preset will replace the current vehicle matrix for future quotes. Existing bookings are not recalculated.':
+        'Выбранный шаблон заменит текущую матрицу техники для будущих расчётов. Существующие бронирования не пересчитываются.',
+    'Unsaved individual price changes will be discarded when the preset is applied.':
+        'Несохранённые изменения индивидуальных цен будут удалены при применении шаблона.',
+    'Apply preset': 'Применить шаблон',
+    'Exact prices preserved from a detached preset may stay unchanged. Any individual price you change must be a multiple of 50 THB.':
+        'Точные цены, сохранённые после отвязки шаблона, можно оставить без изменений. Любая изменённая индивидуальная цена должна быть кратна 50 бат.',
     '1d': '1 день',
     '7d': '7 дней',
     '14d': '14 дней',
@@ -588,6 +776,13 @@ export function useLocale() {
         message: string,
         replacements: Record<string, string | number> = {},
     ): string {
+        const minimumDuration =
+            /^Minimum rental duration is (\d+) days\.$/.exec(message);
+
+        if (locale.value === 'ru' && minimumDuration) {
+            return `Минимальный срок аренды: ${minimumDuration[1]} дн.`;
+        }
+
         const translated =
             locale.value === 'ru'
                 ? (russianMessages[message] ?? message)

@@ -72,8 +72,6 @@ module.exports = async (ctx) => {
 
   const isNameOk = !!user.name;
   const isPhoneOk = !!user.phone;
-  const passportNumber = user.meta?.passport_number;
-  const isPassportOk = !!(user.passport_photo_file_id || passportNumber);
 
   if (!isNameOk) {
     ctx.session.step = "waiting_for_name";
@@ -97,15 +95,9 @@ module.exports = async (ctx) => {
     });
   }
 
-  if (!isPassportOk) {
-    ctx.session.step = "waiting_for_passport";
-    ctx.session.scenario = "registration";
-    return botScreenRenderer.renderText(ctx, {
-      screen: "registration_passport",
-      text: t(lang, "enter_passport"),
-      navigationMode: "reset",
-      forceNewMessage: true,
-    });
+  if (ctx.session.scenario === 'registration') {
+    ctx.session.step = null;
+    ctx.session.scenario = null;
   }
 
   return showMainMenu(ctx, lang, {

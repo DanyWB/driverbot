@@ -25,6 +25,15 @@ require_file() {
     fi
 }
 
+assert_release_rollback_compatible() {
+    local guard_backend="$1"
+    local target_backend="$2"
+
+    require_file "${guard_backend}/artisan"
+    require_file "${target_backend}/artisan"
+    php "${guard_backend}/artisan" operations:rollback-guard "$target_backend"
+}
+
 read_env_value() {
     local key="$1"
     local file="$2"

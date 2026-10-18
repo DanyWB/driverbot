@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Link, useForm } from '@inertiajs/vue3';
-import { Save } from '@lucide/vue';
+import { Eye, EyeOff, Save } from '@lucide/vue';
 import { computed, watch } from 'vue';
 import AdminSelect from '@/components/AdminSelect.vue';
 import InputError from '@/components/InputError.vue';
+import VehicleLifecycleActions from '@/components/vehicles/VehicleLifecycleActions.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +15,7 @@ const props = defineProps<{
     vehicle?: VehicleDetail;
     types: string[];
     categories: CategoryOption[];
+    returnTo?: string | null;
 }>();
 
 const editing = computed(() => props.vehicle !== undefined);
@@ -26,6 +28,8 @@ const form = useForm({
     inventory_code: props.vehicle?.inventory_code ?? '',
     year: props.vehicle?.year ?? ('' as number | string),
     description: props.vehicle?.description ?? '',
+    description_ru: props.vehicle?.description_ru ?? '',
+    description_ua: props.vehicle?.description_ua ?? '',
     characteristics_text: props.vehicle?.characteristics_text ?? '',
     emoji: props.vehicle?.emoji ?? '',
     is_active: props.vehicle?.is_active ?? true,
@@ -38,6 +42,29 @@ const availableCategories = computed(() =>
         (category) => !category.type || category.type === form.type,
     ),
 );
+const publishProblem = computed(() => {
+    if (props.vehicle?.archived_at) {
+        return 'This vehicle is archived';
+    }
+
+    if (!form.is_active) {
+        return 'Activate the vehicle before publishing.';
+    }
+
+    if (
+        !props.categories.find(
+            (category) => category.id === Number(form.category_id),
+        )?.is_active
+    ) {
+        return 'Select an active category before publishing.';
+    }
+
+    if (!props.vehicle?.has_complete_pricing) {
+        return 'Complete all 15 prices before publishing.';
+    }
+
+    return '';
+});
 
 watch(
     () => form.type,
@@ -77,6 +104,124 @@ function submit(): void {
 
 <template>
     <form class="divide-y" @submit.prevent="submit">
+        <section
+            class="space-y-4 bg-muted/20 px-4 py-5 sm:px-6 lg:px-8"
+            aria-labelledby="vehicle-availability-title"
+        >
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h2 id="vehicle-availability-title" class="font-semibold">
+                        {{ t('Availability controls') }}
+                    </h2>
+                    <p
+                        class="mt-1 text-sm"
+                        :class="
+                            form.is_visible_for_booking
+                                ? 'text-emerald-700 dark:text-emerald-400'
+                                : 'text-muted-foreground'
+                        "
+                    >
+                        {{
+                            t(
+                                form.is_visible_for_booking
+                                    ? 'Published to client channels.'
+                                    : 'Hidden from clients.',
+                            )
+                        }}
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        :variant="
+                            form.is_visible_for_booking ? 'outline' : 'default'
+                        "
+                        :disabled="
+                            form.processing ||
+                            (!form.is_visible_for_booking && !!publishProblem)
+                        "
+                        :aria-pressed="form.is_visible_for_booking"
+                        @click="
+                            form.is_visible_for_booking =
+                                !form.is_visible_for_booking
+                        "
+                    >
+                        <EyeOff v-if="form.is_visible_for_booking" /><Eye
+                            v-else
+                        />{{
+                            t(
+                                form.is_visible_for_booking
+                                    ? 'Unpublish vehicle'
+                                    : 'Publish vehicle',
+                            )
+                        }}
+                    </Button>
+                    <Button type="submit" :disabled="form.processing"
+                        ><Save />{{
+                            t(editing ? 'Save details' : 'Create vehicle')
+                        }}</Button
+                    >
+                </div>
+            </div>
+            <p
+                v-if="publishProblem && !form.is_visible_for_booking"
+                class="text-sm text-muted-foreground"
+            >
+                {{ t(publishProblem) }}
+            </p>
+            <label
+                class="flex items-start gap-3 rounded-lg border bg-background p-3"
+            >
+                <input
+                    v-model="form.is_active"
+                    type="checkbox"
+                    class="mt-1 size-4 accent-current"
+                    :disabled="
+                        !!vehicle?.archived_at ||
+                        (!!vehicle?.is_active &&
+                            vehicle.unfinished_bookings_count > 0)
+                    "
+                />
+                <span
+                    ><span class="block text-sm font-medium">{{
+                        t('Active for operations')
+                    }}</span
+                    ><span class="text-xs text-muted-foreground">{{
+                        t(
+                            'Operational state is separate from publication and availability on selected dates.',
+                        )
+                    }}</span></span
+                >
+            </label>
+            <p
+                class="text-sm"
+                :class="
+                    form.isDirty
+                        ? 'text-amber-700 dark:text-amber-400'
+                        : 'text-muted-foreground'
+                "
+                aria-live="polite"
+            >
+                {{
+                    t(
+                        form.isDirty
+                            ? 'Unsaved changes. Save to apply publication and details.'
+                            : 'Publication changes apply when you save details.',
+                    )
+                }}
+            </p>
+            <InputError
+                :message="
+                    form.errors.is_active || form.errors.is_visible_for_booking
+                "
+            />
+            <VehicleLifecycleActions
+                v-if="vehicle"
+                :vehicle="vehicle"
+                :disabled="form.isDirty || form.processing"
+                hide-publication
+            />
+        </section>
         <section class="grid gap-5 px-4 py-6 sm:px-6 lg:grid-cols-2 lg:px-8">
             <div class="lg:col-span-2">
                 <h2 class="font-semibold">{{ t('Catalog details') }}</h2>
@@ -245,7 +390,9 @@ function submit(): void {
                 </h2>
             </div>
             <div>
-                <Label for="vehicle_description">{{ t('Description') }}</Label>
+                <Label for="vehicle_description">{{
+                    t('Description — English')
+                }}</Label>
                 <textarea
                     id="vehicle_description"
                     v-model="form.description"
@@ -257,6 +404,41 @@ function submit(): void {
                     "
                 />
                 <InputError class="mt-1" :message="form.errors.description" />
+                <p class="mt-2 text-sm text-muted-foreground">
+                    {{
+                        t(
+                            'The bot uses the customer language. Empty translations fall back to English. Translations are entered manually.',
+                        )
+                    }}
+                </p>
+            </div>
+            <div>
+                <Label for="vehicle_description_ru">{{
+                    t('Description — Russian')
+                }}</Label>
+                <textarea
+                    id="vehicle_description_ru"
+                    v-model="form.description_ru"
+                    class="admin-textarea mt-2 min-h-32"
+                />
+                <InputError
+                    class="mt-1"
+                    :message="form.errors.description_ru"
+                />
+            </div>
+            <div>
+                <Label for="vehicle_description_ua">{{
+                    t('Description — Ukrainian')
+                }}</Label>
+                <textarea
+                    id="vehicle_description_ua"
+                    v-model="form.description_ua"
+                    class="admin-textarea mt-2 min-h-32"
+                />
+                <InputError
+                    class="mt-1"
+                    :message="form.errors.description_ua"
+                />
             </div>
             <div>
                 <Label for="vehicle_characteristics">{{
@@ -281,59 +463,11 @@ function submit(): void {
             </div>
         </section>
 
-        <section class="px-4 py-6 sm:px-6 lg:px-8">
-            <h2 class="font-semibold">{{ t('Availability controls') }}</h2>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                <label
-                    class="flex min-h-16 items-start gap-3 rounded-md border px-4 py-3"
-                >
-                    <input
-                        v-model="form.is_active"
-                        type="checkbox"
-                        class="mt-0.5 size-4 accent-current"
-                    />
-                    <span>
-                        <span class="block text-sm font-medium">{{
-                            t('Active')
-                        }}</span>
-                        <span class="block text-xs text-muted-foreground">{{
-                            t('Available to operations.')
-                        }}</span>
-                    </span>
-                </label>
-                <label
-                    class="flex min-h-16 items-start gap-3 rounded-md border px-4 py-3"
-                    :class="!form.is_active ? 'opacity-60' : ''"
-                >
-                    <input
-                        v-model="form.is_visible_for_booking"
-                        type="checkbox"
-                        class="mt-0.5 size-4 accent-current"
-                        :disabled="!form.is_active"
-                    />
-                    <span>
-                        <span class="block text-sm font-medium">{{
-                            t('Visible for booking')
-                        }}</span>
-                        <span class="block text-xs text-muted-foreground">{{
-                            t('Published to client channels.')
-                        }}</span>
-                    </span>
-                </label>
-            </div>
-            <InputError
-                class="mt-2"
-                :message="
-                    form.errors.is_active || form.errors.is_visible_for_booking
-                "
-            />
-        </section>
-
         <footer
             class="flex flex-col-reverse gap-3 px-4 py-4 sm:flex-row sm:justify-end sm:px-6 lg:px-8"
         >
             <Button as-child type="button" variant="outline">
-                <Link href="/vehicles">{{ t('Cancel') }}</Link>
+                <Link :href="returnTo || '/vehicles'">{{ t('Cancel') }}</Link>
             </Button>
             <Button type="submit" :disabled="form.processing">
                 <Save />{{ t(editing ? 'Save details' : 'Create vehicle') }}

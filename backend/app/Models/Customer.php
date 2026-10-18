@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Database\Factories\CustomerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -14,6 +15,19 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Hidden(['internal_note', 'private_data'])]
 class Customer extends Model
 {
+    public function termsAcceptedAt(): ?CarbonImmutable
+    {
+        $value = $this->getAttribute('terms_accepted_at');
+        if ($value === null) {
+            return null;
+        }
+        if (! $value instanceof \DateTimeInterface) {
+            throw new \LogicException('Customer terms acceptance is not a date-time value.');
+        }
+
+        return CarbonImmutable::instance($value);
+    }
+
     /** @use HasFactory<CustomerFactory> */
     use HasFactory;
 
@@ -65,6 +79,7 @@ class Customer extends Model
     protected function casts(): array
     {
         return [
+            'terms_accepted_at' => 'immutable_datetime',
             'private_data' => 'encrypted:array',
         ];
     }

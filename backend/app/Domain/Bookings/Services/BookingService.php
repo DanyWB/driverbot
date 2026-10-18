@@ -13,6 +13,7 @@ use App\Domain\Pricing\Services\BookingPriceSnapshotService;
 use App\Domain\Pricing\Services\PricingService;
 use App\Domain\Pricing\ValueObjects\RentalPeriod;
 use App\Domain\Shared\Enums\ActorType;
+use App\Jobs\ExpireBookingRequest;
 use App\Models\Booking;
 use App\Models\Customer;
 use Carbon\CarbonImmutable;
@@ -30,6 +31,7 @@ class BookingService
         private readonly PricingService $pricing,
         private readonly BookingPriceSnapshotService $snapshots,
         private readonly BookingEventRecorder $events,
+        private readonly PendingRequestPolicy $pendingPolicy,
     ) {}
 
     public function create(CreateBookingData $data, BookingActor $actor, ?string $requestId = null): Booking
@@ -76,7 +78,12 @@ class BookingService
                 $vehicle = $this->availability->lockVehicle($data->vehicleId);
                 $this->availability->assertAvailable($vehicle, $data->startsOn, $data->endsOn);
                 $quote = $this->pricing->quote($vehicle, $period, $actor->type !== ActorType::Admin);
-                $now = now();
+                $now = CarbonImmutable::now();
+                $deadline = $data->initialStatus === BookingStatus::Pending
+                    ? $this->pendingPolicy->deadline($now, $data->startsOn, $pickupTime) : null;
+                if ($deadline !== null) {
+                    $this->pendingPolicy->assertOpen($deadline);
+                }
 
                 $booking = $this->statusGuard->run(fn (): Booking => Booking::query()->create([
                     'customer_id' => $data->customerId,
@@ -96,9 +103,11 @@ class BookingService
                     'terms_accepted_at' => $data->termsAcceptedAt,
                     'terms_version' => $data->termsVersion,
                     'created_by_admin_id' => $actor->adminId,
-                    'pending_expires_at' => $data->initialStatus === BookingStatus::Pending
-                        ? $now->addHours($this->pendingTtlHours())
-                        : null,
+                    'request_policy_version' => PendingRequestPolicy::VERSION,
+                    'submitted_at' => $now,
+                    'pending_expires_at' => $deadline,
+                    'prepayment_amount' => 1500,
+                    'prepayment_currency' => 'THB',
                     'reminder_version' => $data->initialStatus === BookingStatus::Approved ? 1 : 0,
                     'approved_at' => $data->initialStatus === BookingStatus::Approved ? $now : null,
                 ]));
@@ -106,6 +115,11 @@ class BookingService
                 $this->snapshots->createAutomatic($booking, $quote, $requestId);
                 $this->availability->syncBookingOccupancy($booking);
                 $this->events->recordInitialStatus($booking, $actor, ['source' => $data->source->value], $requestId);
+                if ($deadline !== null) {
+                    $this->scheduleExpiry($booking);
+                } else {
+                    $this->closeCompetingRequests($booking, $requestId);
+                }
 
                 return $booking->fresh(['priceSnapshots', 'occupancy']) ?? $booking;
             }, 3);
@@ -130,12 +144,20 @@ class BookingService
                 $this->availability->assertAvailable($vehicle, $startsOn, $endsOn, $locked->id);
                 $quote = $this->pricing->quote($vehicle, $this->period($startsOn, $endsOn), $actor->type !== ActorType::Admin);
 
+                $submittedAt = CarbonImmutable::now();
+                $deadline = $this->pendingPolicy->deadline($submittedAt, $startsOn, $locked->pickup_time);
+                $this->pendingPolicy->assertOpen($deadline);
                 $this->saveStatus($locked, BookingStatus::Pending, [
-                    'pending_expires_at' => now()->addHours($this->pendingTtlHours()),
+                    'request_policy_version' => PendingRequestPolicy::VERSION,
+                    'submitted_at' => $submittedAt,
+                    'pending_expires_at' => $deadline,
+                    'prepayment_amount' => $locked->prepayment_amount ?? 1500,
+                    'prepayment_currency' => $locked->prepayment_currency ?? 'THB',
                 ]);
                 $this->snapshots->createAutomatic($locked, $quote, $requestId);
                 $this->availability->syncBookingOccupancy($locked);
                 $this->events->recordStatus($locked, $from, BookingStatus::Pending, $actor, requestId: $requestId);
+                $this->scheduleExpiry($locked);
 
                 return $locked->fresh(['priceSnapshots', 'occupancy']) ?? $locked;
             }, 3);
@@ -289,12 +311,27 @@ class BookingService
                 if ($locked->bookingStatus() === BookingStatus::Approved) {
                     $dateAttributes['reminder_version'] = (int) $locked->reminder_version + 1;
                 }
+                if ($locked->bookingStatus() === BookingStatus::Pending && (int) $locked->request_policy_version >= PendingRequestPolicy::VERSION) {
+                    $this->pendingPolicy->assertOpen($locked->pendingExpiresAt() ?? CarbonImmutable::now());
+                    $submittedAt = $locked->submittedAt();
+                    if ($submittedAt === null) {
+                        throw new BookingException('invalid_request_timestamp', 'Request submission timestamp is missing.', 500);
+                    }
+                    $deadline = $this->pendingPolicy->deadline($submittedAt, $data->startsOn, $pickupTime);
+                    $this->pendingPolicy->assertOpen($deadline);
+                    $dateAttributes['pending_expires_at'] = $deadline;
+                }
 
                 $locked->forceFill($dateAttributes)->save();
 
                 $this->availability->syncBookingOccupancy($locked);
                 $this->snapshots->createAutomatic($locked, $quote, $requestId);
                 $this->events->recordDatesChanged($locked, $actor, $oldValues, $this->bookingDateValues($locked), $requestId);
+                if ($locked->bookingStatus() === BookingStatus::Pending) {
+                    $this->scheduleExpiry($locked);
+                } else {
+                    $this->closeCompetingRequests($locked, $requestId);
+                }
 
                 return $locked->fresh(['priceSnapshots', 'occupancy']) ?? $locked;
             }, 3);
@@ -375,12 +412,20 @@ class BookingService
         $this->stateMachine->assertCanTransition($from, $to);
 
         if ($to === BookingStatus::Approved) {
+            if ($booking->pendingExpiresAt() !== null) {
+                $this->pendingPolicy->assertOpen($booking->pendingExpiresAt());
+            }
+            $vehicle = $this->availability->lockVehicle((int) $booking->vehicle_id);
+            $this->availability->assertAvailable($vehicle, $this->dateValue($booking, 'starts_on'), $this->dateValue($booking, 'ends_on'), $booking->id);
             $attributes['reminder_version'] = (int) $booking->reminder_version + 1;
         }
 
         $this->saveStatus($booking, $to, $attributes);
         $this->availability->syncBookingOccupancy($booking);
         $this->events->recordStatus($booking, $from, $to, $actor, $reason, $context, $requestId);
+        if ($to === BookingStatus::Approved) {
+            $this->closeCompetingRequests($booking, $requestId);
+        }
 
         return $booking->fresh(['occupancy']) ?? $booking;
     }
@@ -395,6 +440,8 @@ class BookingService
 
     private function lockBooking(Booking $booking): Booking
     {
+        // Every booking mutation uses the same vehicle -> booking lock order.
+        $this->availability->lockVehicle((int) $booking->vehicle_id);
         $locked = Booking::query()->lockForUpdate()->find($booking->id);
 
         if (! $locked instanceof Booking) {
@@ -576,9 +623,28 @@ class BookingService
         return is_string($value) && $value !== '' ? $value : null;
     }
 
-    private function pendingTtlHours(): int
+    private function scheduleExpiry(Booking $booking): void
     {
-        return max(1, (int) config('business.pending_ttl_hours', 24));
+        if ($booking->pendingExpiresAt() !== null) {
+            ExpireBookingRequest::dispatch((int) $booking->id)->delay($booking->pendingExpiresAt())->afterCommit();
+        }
+    }
+
+    private function closeCompetingRequests(Booking $confirmed, ?string $requestId): void
+    {
+        $competitors = Booking::query()->where('vehicle_id', $confirmed->vehicle_id)
+            ->where('id', '!=', $confirmed->id)->where('status', BookingStatus::Pending->value)
+            ->where('request_policy_version', '>=', PendingRequestPolicy::VERSION)
+            ->where('starts_on', '<=', $this->dateValue($confirmed, 'ends_on'))
+            ->where('ends_on', '>=', $this->dateValue($confirmed, 'starts_on'))
+            ->orderBy('id')->lockForUpdate()->get();
+        foreach ($competitors as $competitor) {
+            $expired = $competitor->pendingExpiresAt()?->lessThanOrEqualTo(now()) ?? false;
+            $this->transitionLocked($competitor, $expired ? BookingStatus::Expired : BookingStatus::CancelledUnavailable,
+                BookingActor::system(), $expired ? ['expired_at' => now()] : [
+                    'cancelled_at' => now(), 'cancellation_reason' => 'vehicle_unavailable',
+                ], context: ['confirmed_booking_public_id' => $confirmed->public_id], requestId: $requestId);
+        }
     }
 
     private function businessTimezone(): string

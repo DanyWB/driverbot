@@ -4,6 +4,7 @@ use App\Http\Controllers\Bookings\BookingAdminNoteController;
 use App\Http\Controllers\Bookings\BookingController;
 use App\Http\Controllers\Bookings\BookingCsvExportController;
 use App\Http\Controllers\Bookings\BookingDatesController;
+use App\Http\Controllers\Bookings\BookingDetailsController;
 use App\Http\Controllers\Bookings\BookingPriceOverrideController;
 use App\Http\Controllers\Bookings\BookingPriceRecalculationController;
 use App\Http\Controllers\Bookings\BookingQuoteController;
@@ -12,11 +13,15 @@ use App\Http\Controllers\Bookings\CustomerLookupController;
 use App\Http\Controllers\Customers\CustomerController;
 use App\Http\Controllers\Customers\CustomerDocumentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PricingPresets\PricingPresetController;
 use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\Vehicles\CategoryController;
+use App\Http\Controllers\Vehicles\RentalPolicyController;
 use App\Http\Controllers\Vehicles\VehicleController;
+use App\Http\Controllers\Vehicles\VehicleLifecycleController;
 use App\Http\Controllers\Vehicles\VehiclePhotoController;
 use App\Http\Controllers\Vehicles\VehiclePricingController;
+use App\Http\Controllers\Vehicles\VehiclePricingPresetController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard')->name('home');
@@ -25,19 +30,33 @@ Route::middleware(['auth', 'admin.active', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('timeline', TimelineController::class)->name('timeline.index');
 
+    Route::get('pricing-presets', [PricingPresetController::class, 'index'])->name('pricing-presets.index');
+    Route::post('pricing-presets', [PricingPresetController::class, 'store'])->name('pricing-presets.store');
+    Route::post('pricing-presets/{pricingPreset}/copy', [PricingPresetController::class, 'copy'])->name('pricing-presets.copy');
+    Route::patch('pricing-presets/{pricingPreset}', [PricingPresetController::class, 'update'])->name('pricing-presets.update');
+
     Route::get('vehicles', [VehicleController::class, 'index'])->name('vehicles.index');
+    Route::patch('bookings/{booking}/details', [BookingDetailsController::class, 'update'])->name('bookings.details.update');
     Route::get('vehicles/create', [VehicleController::class, 'create'])->name('vehicles.create');
     Route::post('vehicles', [VehicleController::class, 'store'])->name('vehicles.store');
     Route::get('vehicles/{vehicle}/edit', [VehicleController::class, 'edit'])->name('vehicles.edit');
     Route::patch('vehicles/{vehicle}', [VehicleController::class, 'update'])->name('vehicles.update');
+    Route::post('vehicles/{vehicle}/archive', [VehicleLifecycleController::class, 'archive'])->name('vehicles.archive');
+    Route::post('vehicles/{vehicle}/restore', [VehicleLifecycleController::class, 'restore'])->name('vehicles.restore');
+    Route::post('vehicles/{vehicle}/unpublish', [VehicleLifecycleController::class, 'unpublish'])->name('vehicles.unpublish');
+    Route::delete('vehicles/{vehicle}', [VehicleLifecycleController::class, 'destroy'])->name('vehicles.destroy');
     Route::post('vehicles/{vehicle}/photos', [VehiclePhotoController::class, 'store'])->name('vehicles.photos.store');
     Route::patch('vehicles/{vehicle}/photos', [VehiclePhotoController::class, 'arrange'])->name('vehicles.photos.arrange');
     Route::delete('vehicles/{vehicle}/photos/{photo}', [VehiclePhotoController::class, 'destroy'])->name('vehicles.photos.destroy');
     Route::patch('vehicles/{vehicle}/pricing', [VehiclePricingController::class, 'update'])->name('vehicles.pricing.update');
+    Route::get('vehicles/{vehicle}/pricing', [VehiclePricingController::class, 'show'])->name('vehicles.pricing.show');
     Route::get('vehicles/{vehicle}/pricing/generate', [VehiclePricingController::class, 'generate'])->name('vehicles.pricing.generate');
     Route::get('vehicles/{vehicle}/pricing/quote', [VehiclePricingController::class, 'quote'])->name('vehicles.pricing.quote');
+    Route::put('vehicles/{vehicle}/pricing-preset', [VehiclePricingPresetController::class, 'attach'])->name('vehicles.pricing-preset.attach');
+    Route::delete('vehicles/{vehicle}/pricing-preset', [VehiclePricingPresetController::class, 'detach'])->name('vehicles.pricing-preset.detach');
 
     Route::get('categories', [CategoryController::class, 'index'])->name('categories.index');
+    Route::put('categories/rental-policy', RentalPolicyController::class)->name('categories.rental-policy');
     Route::post('categories', [CategoryController::class, 'store'])->name('categories.store');
     Route::patch('categories/{category}', [CategoryController::class, 'update'])->name('categories.update');
 

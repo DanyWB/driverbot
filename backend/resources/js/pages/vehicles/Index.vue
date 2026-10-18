@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     Bike,
     CircleOff,
@@ -14,8 +14,11 @@ import {
     TriangleAlert,
 } from '@lucide/vue';
 import { reactive } from 'vue';
+import { useMediaQuery } from '@vueuse/core';
 import AdminPagination from '@/components/AdminPagination.vue';
 import AdminSelect from '@/components/AdminSelect.vue';
+import VehicleLifecycleActions from '@/components/vehicles/VehicleLifecycleActions.vue';
+import FleetPrices from '@/components/vehicles/FleetPrices.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLocale } from '@/composables/useLocale';
@@ -23,6 +26,7 @@ import { formatDateTime } from '@/lib/bookings';
 import type { CategoryOption, PaginatedVehicles } from '@/types';
 
 type Filters = {
+    tab: 'fleet' | 'archive';
     search: string;
     type: string;
     category_id: number | null;
@@ -36,6 +40,7 @@ const props = defineProps<{
     vehicles: PaginatedVehicles;
     filters: Filters;
     summary: {
+        archived: number;
         total: number;
         active: number;
         visible: number;
@@ -55,6 +60,15 @@ defineOptions({
 
 const filters = reactive<Filters>({ ...props.filters });
 const { t } = useLocale();
+const page = usePage();
+const desktop = useMediaQuery('(min-width: 768px)');
+function vehicleHref(id: number): string {
+    return `/vehicles/${id}/edit?${new URLSearchParams({ return_to: page.url })}`;
+}
+
+function vehiclePricingHref(id: number): string {
+    return `${vehicleHref(id)}#pricing`;
+}
 
 function query(): Record<string, string | number> {
     return Object.fromEntries(
@@ -80,7 +94,7 @@ function resetFilters(): void {
         state: 'all',
         visibility: 'all',
         pricing: 'all',
-        per_page: 25,
+        per_page: 50,
     });
     applyFilters();
 }
@@ -112,7 +126,38 @@ function resetFilters(): void {
             </div>
         </header>
 
-        <section class="grid border-b sm:grid-cols-2 xl:grid-cols-4">
+        <nav
+            class="flex gap-2 border-b px-4 py-3 sm:px-6 lg:px-8"
+            :aria-label="t('Fleet sections')"
+        >
+            <Link
+                href="/vehicles"
+                :aria-current="filters.tab === 'fleet' ? 'page' : undefined"
+                class="rounded-md px-4 py-2 text-sm font-medium transition-colors duration-[350ms] ease-in-out motion-reduce:transition-none"
+                :class="
+                    filters.tab === 'fleet'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'hover:bg-muted'
+                "
+                >{{ t('Fleet') }}</Link
+            >
+            <Link
+                href="/vehicles?tab=archive"
+                :aria-current="filters.tab === 'archive' ? 'page' : undefined"
+                class="rounded-md px-4 py-2 text-sm font-medium transition-colors duration-[350ms] ease-in-out motion-reduce:transition-none"
+                :class="
+                    filters.tab === 'archive'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'hover:bg-muted'
+                "
+                >{{ t('Archive') }} ({{ summary.archived }})</Link
+            >
+        </nav>
+
+        <section
+            v-if="filters.tab === 'fleet'"
+            class="grid border-b sm:grid-cols-2 xl:grid-cols-4"
+        >
             <div
                 class="flex items-center gap-3 border-b px-4 py-4 sm:border-r lg:px-6 xl:border-b-0"
             >
@@ -204,6 +249,7 @@ function resetFilters(): void {
                 ]"
             />
             <AdminSelect
+                v-if="filters.tab === 'fleet'"
                 v-model="filters.state"
                 :aria-label="t('Active state')"
                 :options="[
@@ -213,6 +259,7 @@ function resetFilters(): void {
                 ]"
             />
             <AdminSelect
+                v-if="filters.tab === 'fleet'"
                 v-model="filters.visibility"
                 :aria-label="t('Visibility')"
                 :options="[
@@ -222,6 +269,7 @@ function resetFilters(): void {
                 ]"
             />
             <AdminSelect
+                v-if="filters.tab === 'fleet'"
                 v-model="filters.pricing"
                 :aria-label="t('Pricing completeness')"
                 :options="[
@@ -263,6 +311,31 @@ function resetFilters(): void {
                     ></Button
                 >
             </div>
+            <template v-else-if="filters.tab === 'archive'">
+                <div class="grid gap-4 p-4 sm:p-6 lg:grid-cols-2">
+                    <article
+                        v-for="vehicle in vehicles.data"
+                        :key="vehicle.id"
+                        class="space-y-4 rounded-lg border p-4"
+                    >
+                        <Link
+                            :href="vehicleHref(vehicle.id)"
+                            class="block font-semibold break-words underline-offset-4 hover:underline"
+                            >{{ vehicle.name }}</Link
+                        >
+                        <p class="text-sm text-muted-foreground">
+                            {{
+                                vehicle.inventory_code || vehicle.external_code
+                            }}
+                        </p>
+                        <VehicleLifecycleActions :vehicle="vehicle" />
+                    </article>
+                </div>
+                <AdminPagination
+                    :paginator="vehicles"
+                    :label="t('Fleet pages')"
+                />
+            </template>
             <template v-else>
                 <div class="hidden overflow-x-auto md:block">
                     <table class="w-full min-w-[980px] text-sm">
@@ -296,150 +369,169 @@ function resetFilters(): void {
                             </tr>
                         </thead>
                         <tbody class="divide-y">
-                            <tr
+                            <template
                                 v-for="vehicle in vehicles.data"
                                 :key="vehicle.id"
-                                class="hover:bg-muted/25"
-                            >
-                                <td class="px-4 py-3 lg:px-6">
-                                    <div class="flex items-center gap-3">
-                                        <div
-                                            class="grid h-12 w-16 shrink-0 place-items-center overflow-hidden rounded-md border bg-muted"
-                                        >
-                                            <img
-                                                v-if="vehicle.primary_photo"
-                                                :src="
-                                                    vehicle.primary_photo
-                                                        .thumbnail_url
-                                                "
-                                                :alt="
-                                                    vehicle.primary_photo
-                                                        .alt_text ??
-                                                    vehicle.name
-                                                "
-                                                class="h-full w-full object-cover"
-                                            />
-                                            <Image
-                                                v-else
-                                                class="size-5 text-muted-foreground"
-                                            />
-                                        </div>
-                                        <div class="min-w-0">
-                                            <Link
-                                                :href="`/vehicles/${vehicle.id}/edit`"
-                                                class="font-medium hover:underline"
-                                                >{{ vehicle.name }}</Link
+                                ><tr class="hover:bg-muted/25">
+                                    <td class="px-4 py-3 lg:px-6">
+                                        <div class="flex items-center gap-3">
+                                            <div
+                                                class="grid h-12 w-16 shrink-0 place-items-center overflow-hidden rounded-md border bg-muted"
                                             >
-                                            <p
-                                                class="truncate text-xs text-muted-foreground"
-                                            >
-                                                {{
-                                                    vehicle.inventory_code ||
-                                                    vehicle.external_code
-                                                }}<span v-if="vehicle.year">
-                                                    · {{ vehicle.year }}</span
+                                                <img
+                                                    v-if="vehicle.primary_photo"
+                                                    :src="
+                                                        vehicle.primary_photo
+                                                            .thumbnail_url
+                                                    "
+                                                    :alt="
+                                                        vehicle.primary_photo
+                                                            .alt_text ??
+                                                        vehicle.name
+                                                    "
+                                                    class="h-full w-full object-cover"
+                                                />
+                                                <Image
+                                                    v-else
+                                                    class="size-5 text-muted-foreground"
+                                                />
+                                            </div>
+                                            <div class="min-w-0">
+                                                <Link
+                                                    :href="
+                                                        vehicleHref(vehicle.id)
+                                                    "
+                                                    class="font-medium hover:underline"
+                                                    >{{ vehicle.name }}</Link
                                                 >
-                                            </p>
+                                                <p
+                                                    class="truncate text-xs text-muted-foreground"
+                                                >
+                                                    {{
+                                                        vehicle.inventory_code ||
+                                                        vehicle.external_code
+                                                    }}<span v-if="vehicle.year">
+                                                        ·
+                                                        {{ vehicle.year }}</span
+                                                    >
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <p>
-                                        {{
-                                            vehicle.category?.name ??
-                                            t('Uncategorized')
-                                        }}
-                                    </p>
-                                    <p
-                                        class="text-xs text-muted-foreground capitalize"
-                                    >
-                                        {{ t(vehicle.type) }}
-                                    </p>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <div class="flex flex-wrap gap-1.5">
-                                        <span
-                                            v-if="vehicle.is_active"
-                                            class="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800"
-                                            >{{ t('Active') }}</span
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <p>
+                                            {{
+                                                vehicle.category?.name ??
+                                                t('Uncategorized')
+                                            }}
+                                        </p>
+                                        <p
+                                            class="text-xs text-muted-foreground capitalize"
                                         >
+                                            {{ t(vehicle.type) }}
+                                        </p>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="flex flex-wrap gap-1.5">
+                                            <span
+                                                v-if="vehicle.is_active"
+                                                class="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800"
+                                                >{{ t('Active') }}</span
+                                            >
+                                            <span
+                                                v-else
+                                                class="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs text-muted-foreground"
+                                                ><CircleOff class="size-3" />{{
+                                                    t('Inactive')
+                                                }}</span
+                                            >
+                                            <span
+                                                v-if="
+                                                    vehicle.is_visible_for_booking
+                                                "
+                                                class="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-800"
+                                                >{{ t('Published') }}</span
+                                            >
+                                            <span
+                                                v-else
+                                                class="rounded border px-2 py-0.5 text-xs text-muted-foreground"
+                                                >{{ t('Hidden') }}</span
+                                            >
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
                                         <span
-                                            v-else
-                                            class="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs text-muted-foreground"
-                                            ><CircleOff class="size-3" />{{
-                                                t('Inactive')
-                                            }}</span
-                                        >
-                                        <span
-                                            v-if="
-                                                vehicle.is_visible_for_booking
+                                            :class="
+                                                vehicle.has_complete_pricing
+                                                    ? 'text-emerald-700'
+                                                    : 'text-amber-700'
                                             "
-                                            class="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-800"
-                                            >{{ t('Published') }}</span
+                                            class="font-medium tabular-nums"
+                                            >{{
+                                                vehicle.active_price_tiers_count
+                                            }}/15</span
                                         >
-                                        <span
-                                            v-else
-                                            class="rounded border px-2 py-0.5 text-xs text-muted-foreground"
-                                            >{{ t('Hidden') }}</span
+                                        <p
+                                            class="text-xs text-muted-foreground"
                                         >
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <span
-                                        :class="
-                                            vehicle.has_complete_pricing
-                                                ? 'text-emerald-700'
-                                                : 'text-amber-700'
-                                        "
-                                        class="font-medium tabular-nums"
-                                        >{{
-                                            vehicle.active_price_tiers_count
-                                        }}/15</span
+                                            {{
+                                                t(':count photos', {
+                                                    count: vehicle.photos_count,
+                                                })
+                                            }}
+                                        </p>
+                                        <div
+                                            :id="`fleet-price-trigger-${vehicle.id}`"
+                                        ></div>
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-right tabular-nums"
                                     >
-                                    <p class="text-xs text-muted-foreground">
-                                        {{
-                                            t('Photos count', {
-                                                count: vehicle.photos_count,
-                                            })
-                                        }}
-                                    </p>
-                                </td>
-                                <td class="px-4 py-3 text-right tabular-nums">
-                                    {{ vehicle.bookings_count }}
-                                    <p class="text-xs text-muted-foreground">
-                                        {{ t('bookings') }}
-                                    </p>
-                                </td>
-                                <td
-                                    class="px-4 py-3 text-xs text-muted-foreground"
-                                >
-                                    {{ formatDateTime(vehicle.updated_at) }}
-                                </td>
-                                <td class="px-4 py-3">
-                                    <Button
-                                        as-child
-                                        variant="ghost"
-                                        size="icon"
-                                        :title="t('Edit vehicle')"
-                                        ><Link
-                                            :href="`/vehicles/${vehicle.id}/edit`"
-                                            ><Pencil /><span class="sr-only">{{
-                                                t('Edit')
-                                            }}</span></Link
-                                        ></Button
+                                        {{ vehicle.bookings_count }}
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            {{ t('bookings') }}
+                                        </p>
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 text-xs text-muted-foreground"
                                     >
-                                </td>
-                            </tr>
+                                        {{ formatDateTime(vehicle.updated_at) }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <Button
+                                            as-child
+                                            variant="ghost"
+                                            size="icon"
+                                            :title="t('Edit vehicle')"
+                                            ><Link
+                                                :href="vehicleHref(vehicle.id)"
+                                                ><Pencil /><span
+                                                    class="sr-only"
+                                                    >{{ t('Edit') }}</span
+                                                ></Link
+                                            ></Button
+                                        >
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td
+                                        :id="`fleet-price-row-${vehicle.id}`"
+                                        colspan="7"
+                                        class="p-0"
+                                    ></td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
                 </div>
 
                 <div class="divide-y md:hidden">
-                    <Link
+                    <article
                         v-for="vehicle in vehicles.data"
                         :key="vehicle.id"
-                        :href="`/vehicles/${vehicle.id}/edit`"
-                        class="flex gap-3 px-4 py-4 hover:bg-muted/30"
+                        class="flex flex-wrap gap-3 px-4 py-4 hover:bg-muted/30"
                     >
                         <div
                             class="grid h-14 w-20 shrink-0 place-items-center overflow-hidden rounded-md border bg-muted"
@@ -459,9 +551,12 @@ function resetFilters(): void {
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-start justify-between gap-2">
-                                <p class="truncate font-medium">
+                                <Link
+                                    :href="vehicleHref(vehicle.id)"
+                                    class="truncate font-medium"
+                                >
                                     {{ vehicle.name }}
-                                </p>
+                                </Link>
                                 <span
                                     :class="
                                         vehicle.has_complete_pricing
@@ -491,8 +586,36 @@ function resetFilters(): void {
                                 }}</span>
                             </div>
                         </div>
-                    </Link>
+                        <div
+                            :id="`fleet-price-mobile-${vehicle.id}`"
+                            class="w-full"
+                        ></div>
+                    </article>
                 </div>
+                <Teleport
+                    v-for="vehicle in vehicles.data"
+                    :key="vehicle.id"
+                    :to="
+                        desktop
+                            ? `#fleet-price-trigger-${vehicle.id}`
+                            : `#fleet-price-mobile-${vehicle.id}`
+                    "
+                    defer
+                >
+                    <FleetPrices
+                        :vehicle-id="vehicle.id"
+                        :vehicle-name="vehicle.name"
+                        :vehicle-edit-href="vehiclePricingHref(vehicle.id)"
+                        :panel-target="
+                            desktop
+                                ? `#fleet-price-row-${vehicle.id}`
+                                : undefined
+                        "
+                        @saved="
+                            router.reload({ only: ['vehicles', 'summary'] })
+                        "
+                    />
+                </Teleport>
                 <AdminPagination
                     :paginator="vehicles"
                     :label="t('Fleet pages')"

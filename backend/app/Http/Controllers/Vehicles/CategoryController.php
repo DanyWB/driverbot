@@ -10,6 +10,7 @@ use App\Http\Controllers\Concerns\HandlesAdminContext;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Vehicles\SaveCategoryRequest;
 use App\Models\Category;
+use App\Models\RentalPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -30,6 +31,8 @@ class CategoryController extends Controller
                 ->get()
                 ->map(fn (Category $category): array => $this->present($category)),
             'types' => array_column(VehicleType::cases(), 'value'),
+            'rentalPolicy' => RentalPolicy::query()->find(1)?->only(['minimum_days', 'category_minimum_days'])
+                ?? ['minimum_days' => 1, 'category_minimum_days' => []],
         ]);
     }
 

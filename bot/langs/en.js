@@ -1,4 +1,18 @@
 module.exports = {
+  booking_model_other: "Other models",
+  booking_choose_model: "Choose a model:",
+  booking_menu_show: "▾ More actions",
+  booking_menu_hide: "▴ Hide actions",
+  rent_contract_copy: "Agreement copy for review. Confirm handover terms with the manager.",
+  booking_request_policy: "Requests are reviewed within 48 hours and before the rental starts. Until confirmation, the vehicle remains available to other customers. Prepayment and deposit are separate; the administrator records receipt.",
+  rent_status_cancelled_unavailable: "cancelled: vehicle unavailable",
+  rent_payment_prepayment: "Prepayment",
+  rent_payment_deposit: "Security deposit",
+  rent_payment_received: "received",
+  rent_payment_due: "due",
+  rent_payment_line: "{label}: {amount} — {status}",
+  booking_dates_invalid: "The rental dates are no longer valid. Your draft may contain an old item. Return to the draft to remove it, or reset the draft and select new dates.",
+  booking_minimum_days_error: "Minimum rental duration for this category: {days} days. Choose a later return date.",
   lang_prompt: "🌍 Оберіть мову / Choose your language / Выберите язык",
   lang_saved: "✅ Language saved.",
   lang_unsupported: "Unsupported language.",
@@ -93,7 +107,7 @@ module.exports = {
   account_passport_number_value: "Number: {number}",
   account_profile_hint: "Choose what you want to update:",
   conditions_info:
-    "🆔 Documents\nRequired:\n• Photo of international passport\n• Driver’s license (international preferred)\n• Age 18+\nSigning the rental agreement is mandatory.\n\n💰 Deposit & payment\nDeposit:\n• Passport or cash deposit\n• Amount depends on model:\n▫️ Standard bikes — $100–$300\n▫️ Powerful bikes (300–350cc) — from $400 and above\n\nPayment:\n• Cash or online\n• All terms are discussed in advance — no hidden fees\n\nEarly return:\nIf you plan to return earlier, please note:\n• Daily rental — return less than 3 days before end is not refunded\n• Monthly rental — return less than 7 days before end is also not recalculated\n• Other cases: possible recalculation by agreement\n\n🛵 Damage & responsibility\nWe take photos/video of the bike before rental.\nIf damaged:\n• Payment at real cost of original parts and labor\n• Rarely, downtime for repair may be considered\nInsurance doesn’t cover scooters.\nPunctured tire: tenant fixes it (usually 100–200 THB nearby).\nIf battery drained due to lights left on — service fee 100–400 THB, depending on location.\n\n⏱ Return & extension\nRental is per 24h — return at the same time you received the bike.\nIf you want to extend, warn us in advance (ideally a few days).\nIn high season bikes are often booked day-to-day — we must honor other bookings.\nHalf-day extension (e.g., noon to evening) — possible by agreement, usually ~50% of day price.\n\n📍 Pickup\nPickup on Bantai.\nDelivery:\n• Around the island — 100–400 THB (distance-based)\n• Thong Sala pier — 150 THB\n• Within Bantai — free",
+    "🆔 Documents\nUploading a passport in the bot is optional. Discuss handover documents with the manager.\nAt pickup:\n• Passport\n• Driver’s license (international preferred)\n• Age 18+\nSigning the rental agreement is mandatory.\n\n💰 Deposit & payment\nDeposit:\n• Passport or cash deposit\n• Amount depends on model:\n▫️ Standard bikes — $100–$300\n▫️ Powerful bikes (300–350cc) — from $400 and above\n\nPayment:\n• Cash or online\n• All terms are discussed in advance — no hidden fees\n\nEarly return:\nIf you plan to return earlier, please note:\n• Daily rental — return less than 3 days before end is not refunded\n• Monthly rental — return less than 7 days before end is also not recalculated\n• Other cases: possible recalculation by agreement\n\n🛵 Damage & responsibility\nWe take photos/video of the bike before rental.\nIf damaged:\n• Payment at real cost of original parts and labor\n• Rarely, downtime for repair may be considered\nInsurance doesn’t cover scooters.\nPunctured tire: tenant fixes it (usually 100–200 THB nearby).\nIf battery drained due to lights left on — service fee 100–400 THB, depending on location.\n\n⏱ Return & extension\nThe bot calculates rental days from dates, without hours. Agree pickup and return times with the manager.\nIf you want to extend, warn us in advance (ideally a few days).\nIn high season bikes are often booked day-to-day — we must honor other bookings.\nHalf-day extension (e.g., noon to evening) — possible by agreement, usually ~50% of day price.\n\n📍 Pickup\nPickup on Bantai.\nDelivery:\n• Around the island — 100–400 THB (distance-based)\n• Thong Sala pier — 150 THB\n• Within Bantai — free",
   conditions_accept_btn: "✅ Accept rental terms",
   conditions_accepted_label: "✅ Terms accepted",
   conditions_book_btn: "📅 Book now",
@@ -181,7 +195,7 @@ module.exports = {
     "Less than 24 hours remain before pickup. Automatic cancellation is unavailable; please contact us through Support.",
   rent_history_details: "📍 Details (history)",
   about_info:
-    "🏝️ DRIVE PHANGAN — scooter and car rental on Koh Phangan.\nOfficially operating since 2019.\n🛵 Every year we update our fleet with new models — for those who value comfort, style, and freedom.\n\n🚀 Renting with us is honest and transparent — no shady tricks or scratch scams.\n⭐ Over 100 positive reviews on Google Maps and many returning customers season after season.\nReliable, simple, and with care for your perfect vacation ✨\n\n🤖 This bot is made to keep booking quick and effortless — everything is automated. You can complete all steps right here. If you have any questions, we are always online!\n\n📍 Find us easily:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://www.instagram.com/drive_phangan/\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
+    "🏝️ DRIVE PHANGAN — scooter and car rental on Koh Phangan.\nOfficially operating since 2019.\n🛵 Every year we update our fleet with new models — for those who value comfort, style, and freedom.\n\n🚀 Renting with us is honest and transparent — no shady tricks or scratch scams.\n⭐ Over 150 positive reviews on Google Maps and many returning customers season after season.\nReliable, simple, and with care for your perfect vacation ✨\n\n🤖 This bot is made to keep booking quick and effortless — everything is automated. You can complete all steps right here. If you have any questions, we are always online!\n\n📍 Find us easily:\n🔗 <a href=\"https://maps.app.goo.gl/TwjvSmA6TjJuka1t8\">Google Maps</a>\n📸 <a href=\"https://www.instagram.com/drive_phangan/\">Instagram</a>\n📘 <a href=\"https://www.facebook.com/drivephangan\">Facebook</a>",
   support_info:
     "💬 Support.\nIf you have questions, choose a convenient contact option below.",
   support_btn_call: "📞 Call us",
@@ -285,7 +299,7 @@ module.exports = {
     "The booking service is temporarily unavailable. Your data is saved; please try the action again shortly.",
 
   booking_confirmed:
-    "✅ Your rental is confirmed!\nPlease wait for admin confirmation.",
+    "✅ Request submitted!\nWe will process it within 48 hours and before the rental starts. Until confirmation, the vehicle remains available to other customers.",
   booking_no_bookings_to_confirm: "No bookings to confirm.",
   booking_bike_busy:
     'Vehicle "{name}" is already booked for these dates. Please choose another period.',

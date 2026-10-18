@@ -80,4 +80,20 @@ else
     printf 'Skipping lock contention scenario: flock is unavailable.\n' >&2
 fi
 
+GUARD_BACKEND="${TEST_ROOT}/guard-backend"
+TARGET_BACKEND="${TEST_ROOT}/target-backend"
+MOCK_PHP_LOG="${TEST_ROOT}/rollback-guard.log"
+mkdir -p "$GUARD_BACKEND" "$TARGET_BACKEND"
+touch "${GUARD_BACKEND}/artisan" "${TARGET_BACKEND}/artisan"
+php() {
+    printf '%s\n' "$*" >"$MOCK_PHP_LOG"
+    return "${MOCK_PHP_EXIT:-0}"
+}
+MOCK_PHP_EXIT=0 assert_release_rollback_compatible "$GUARD_BACKEND" "$TARGET_BACKEND"
+grep -F "${GUARD_BACKEND}/artisan operations:rollback-guard ${TARGET_BACKEND}" "$MOCK_PHP_LOG" >/dev/null
+if MOCK_PHP_EXIT=1 assert_release_rollback_compatible "$GUARD_BACKEND" "$TARGET_BACKEND"; then
+    printf 'Rollback compatibility guard failure was not propagated.\n' >&2
+    exit 1
+fi
+
 printf 'Release hardening shell tests passed.\n'

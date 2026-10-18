@@ -3,6 +3,7 @@
 namespace App\Domain\Notifications\Services;
 
 use App\Domain\Bookings\Enums\BookingStatus;
+use App\Domain\Bookings\Services\PendingRequestPolicy;
 use App\Domain\Customers\Enums\IdentityProvider;
 use App\Models\Booking;
 use App\Models\CustomerIdentity;
@@ -32,7 +33,7 @@ class NotificationOutboxService
             'payload' => $payload,
             'status' => NotificationOutbox::STATUS_PENDING,
             'attempts' => 0,
-            'available_at' => $availableAt ?? now(),
+            'available_at' => CarbonImmutable::instance($availableAt ?? now())->setTimezone((string) config('app.timezone', 'UTC')),
         ]);
     }
 
@@ -143,6 +144,46 @@ class NotificationOutboxService
                 $hourTarget->isBefore($now) ? $now : $hourTarget,
             );
         }
+    }
+
+    public function schedulePendingReminders(Booking $booking): void
+    {
+        if ($booking->bookingStatus() !== BookingStatus::Pending || (int) $booking->request_policy_version < PendingRequestPolicy::VERSION
+            || $booking->submittedAt() === null || $booking->pendingExpiresAt() === null) {
+            return;
+        }
+        $deadline = $booking->pendingExpiresAt();
+        $this->discardPendingReminders($booking, 'Request deadline changed.', $deadline);
+        foreach (app(PendingRequestPolicy::class)->reminderSlots($booking->submittedAt(), $deadline) as $slot) {
+            if (! $slot->isFuture()) {
+                continue;
+            }
+            $notifications = $this->enqueueAdmins('booking.pending_reminder',
+                "booking:{$booking->public_id}:pending-reminder:".$slot->format('YmdHi'), [
+                    'booking_public_id' => $booking->public_id,
+                    'scheduled_for' => $slot->toIso8601String(),
+                ], $slot);
+            foreach ($notifications as $notification) {
+                // A changed start may make a previously invalid future slot valid again.
+                if ($notification->status === NotificationOutbox::STATUS_DISCARDED) {
+                    $notification->update(['status' => NotificationOutbox::STATUS_PENDING,
+                        'discarded_at' => null, 'last_error' => null, 'available_at' => $slot->setTimezone((string) config('app.timezone', 'UTC'))]);
+                }
+            }
+        }
+    }
+
+    public function discardPendingReminders(Booking $booking, string $reason, ?DateTimeInterface $from = null): int
+    {
+        $query = NotificationOutbox::query()
+            ->where('deduplication_key', 'like', "booking:{$booking->public_id}:pending-reminder:%")
+            ->whereIn('status', [NotificationOutbox::STATUS_PENDING, NotificationOutbox::STATUS_PROCESSING]);
+        if ($from !== null) {
+            $query->where('available_at', '>=', $from);
+        }
+
+        return $query->update(['status' => NotificationOutbox::STATUS_DISCARDED,
+            'processing_started_at' => null, 'discarded_at' => now(), 'last_error' => $reason, 'updated_at' => now()]);
     }
 
     public function discardPickupReminders(Booking $booking, string $reason, ?int $exceptVersion = null): int

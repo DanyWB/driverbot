@@ -14,6 +14,17 @@ use Illuminate\Support\Facades\RateLimiter;
 
 class BotApiAuthCustomerCatalogTest extends BotApiTestCase
 {
+    public function test_archived_vehicle_is_absent_from_bot_catalog_and_quotes_even_with_stale_flags(): void
+    {
+        $vehicle = $this->bookableVehicle();
+        $vehicle->forceFill(['archived_at' => now()])->save();
+        $this->withHeaders($this->apiHeaders())->getJson('/api/v1/bot/vehicles')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/bot/vehicles/'.$vehicle->id)->assertNotFound();
+        $this->postJson('/api/v1/bot/quotes', [
+            'vehicle_id' => $vehicle->id, 'starts_on' => '2026-08-20', 'ends_on' => '2026-08-27',
+        ])->assertNotFound();
+    }
+
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
@@ -226,7 +237,7 @@ class BotApiAuthCustomerCatalogTest extends BotApiTestCase
                 'ends_on' => '2026-08-16',
             ])
             ->assertOk()
-            ->assertJsonPath('data.final_total', 700)
+            ->assertJsonPath('data.final_total', 600)
             ->assertJsonPath('data.available', false);
     }
 
@@ -241,7 +252,7 @@ class BotApiAuthCustomerCatalogTest extends BotApiTestCase
             ->assertJsonValidationErrors(['start_date'], 'error.fields');
 
         $this->withHeaders($this->apiHeaders())
-            ->getJson('/api/v1/bot/vehicles/available?start_date=2026-08-10&end_date=2027-08-11')
+            ->getJson('/api/v1/bot/vehicles/available?start_date=2026-08-10&end_date=2027-08-12')
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['end_date'], 'error.fields');
     }

@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'name_required' => 'Enter a preset name.',
+    'name_string' => 'The preset name must be text.',
+    'name_max' => 'The preset name cannot exceed 255 characters.',
+    'name_unique' => 'A pricing preset with this name already exists.',
+    'vehicle_type_invalid' => 'Select scooter, car, or all vehicle types.',
+    'full_matrix' => 'Enter all 15 preset prices.',
+    'price_integer' => 'Each preset price must be a positive whole THB amount.',
+    'price_too_large' => 'A preset price cannot exceed 100,000,000 THB.',
+    'version_invalid' => 'Refresh the preset and try again.',
+    'links_count_invalid' => 'Refresh the linked vehicle list and try again.',
+    'preset_invalid' => 'Select an available pricing preset.',
+    'expected_preset_invalid' => 'Refresh the vehicle and try again.',
+    'revision_invalid' => 'Refresh the vehicle pricing and try again.',
+    'version_conflict' => 'This pricing preset was changed in another tab. Refresh it before saving.',
+    'links_conflict' => 'The number of linked vehicles changed. Refresh the preset before saving.',
+    'vehicle_conflict' => 'This vehicle pricing was changed in another tab. Refresh the vehicle before continuing.',
+    'vehicle_type_conflict' => 'This preset is not compatible with the vehicle type.',
+    'linked_type_conflict' => 'The selected type is not compatible with one or more linked vehicles.',
+    'linked_individual_update' => 'Detach the vehicle from its pricing preset before editing individual prices.',
+    'attached' => 'Pricing preset attached.',
+    'detached' => 'Pricing preset detached. Current prices were preserved.',
+];

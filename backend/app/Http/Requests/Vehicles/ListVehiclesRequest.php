@@ -12,6 +12,7 @@ class ListVehiclesRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'tab' => ['nullable', Rule::in(['fleet', 'archive'])],
             'search' => ['nullable', 'string', 'max:100'],
             'type' => ['nullable', Rule::enum(VehicleType::class)],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
@@ -27,13 +28,14 @@ class ListVehiclesRequest extends FormRequest
     public function filters(): array
     {
         return [
+            'tab' => (string) $this->validated('tab', 'fleet'),
             'search' => (string) $this->validated('search', ''),
             'type' => (string) $this->validated('type', ''),
             'category_id' => $this->validated('category_id'),
             'state' => (string) $this->validated('state', 'all'),
             'visibility' => (string) $this->validated('visibility', 'all'),
             'pricing' => (string) $this->validated('pricing', 'all'),
-            'per_page' => (int) $this->validated('per_page', 25),
+            'per_page' => (int) $this->validated('per_page', 50),
         ];
     }
 }

@@ -54,7 +54,7 @@ class VehiclePhotoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Photo uploaded.']);
 
-        return to_route('vehicles.edit', $vehicle);
+        return to_route('vehicles.edit', $this->fleetEditParameters($request, $vehicle));
     }
 
     public function arrange(
@@ -81,7 +81,7 @@ class VehiclePhotoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Photo order saved.']);
 
-        return to_route('vehicles.edit', $vehicle);
+        return to_route('vehicles.edit', $this->fleetEditParameters($request, $vehicle));
     }
 
     public function destroy(
@@ -109,6 +109,6 @@ class VehiclePhotoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Photo deleted.']);
 
-        return to_route('vehicles.edit', $vehicle);
+        return to_route('vehicles.edit', $this->fleetEditParameters($request, $vehicle));
     }
 }

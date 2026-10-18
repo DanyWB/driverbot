@@ -3,6 +3,7 @@
 namespace App\Domain\Notifications\Services;
 
 use App\Domain\Bookings\Enums\BookingStatus;
+use App\Domain\Bookings\Services\PendingRequestPolicy;
 use App\Domain\Customers\Enums\ContactType;
 use App\Domain\Notifications\Data\RenderedTelegramMessage;
 use App\Domain\Notifications\Exceptions\NotificationDeliveryException;
@@ -11,6 +12,7 @@ use App\Models\Booking;
 use App\Models\BookingPriceSnapshot;
 use App\Models\CustomerContact;
 use App\Models\NotificationOutbox;
+use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Lang;
 
@@ -39,6 +41,9 @@ class TelegramNotificationRenderer
 
         if ($this->isReminder($notification)) {
             $this->assertCurrentReminder($booking, $payload);
+        }
+        if (in_array($notification->event_type, ['booking.pending', 'booking.pending_reminder'], true)) {
+            $this->assertCurrentPending($booking, $payload, $notification->event_type === 'booking.pending_reminder');
         }
 
         if ($admin) {
@@ -83,6 +88,7 @@ class TelegramNotificationRenderer
         if ($admin) {
             return match ($notification->event_type) {
                 'booking.pending' => 'notifications.admin.pending',
+                'booking.pending_reminder' => 'notifications.admin.pending_reminder',
                 'booking.cancelled_by_client' => 'notifications.admin.cancelled_by_client',
                 'booking.expired' => 'notifications.admin.expired',
                 default => throw NotificationDeliveryException::permanent(
@@ -98,6 +104,7 @@ class TelegramNotificationRenderer
                 ? 'notifications.customer.cancelled'
                 : 'notifications.customer.cancelled_with_reason',
             'booking.expired' => 'notifications.customer.expired',
+            'booking.cancelled_unavailable' => 'notifications.customer.cancelled_unavailable',
             'booking.dates_changed' => 'notifications.customer.dates_changed',
             'booking.price_changed' => 'notifications.customer.price_changed',
             'booking.reminder.pickup_day' => 'notifications.customer.reminder_pickup_day',
@@ -124,6 +131,31 @@ class TelegramNotificationRenderer
         }
     }
 
+    /** @param array<string, mixed> $payload */
+    private function assertCurrentPending(Booking $booking, array $payload, bool $scheduled): void
+    {
+        if ($booking->bookingStatus() !== BookingStatus::Pending || ! $booking->pendingExpiresAt()?->isFuture()) {
+            throw new NotificationNotApplicableException('The request is no longer awaiting confirmation.');
+        }
+        if (! $scheduled) {
+            return;
+        }
+        if ($booking->submittedAt() === null) {
+            throw new NotificationNotApplicableException('Request has no submission timestamp.');
+        }
+        $latestDue = null;
+        foreach (app(PendingRequestPolicy::class)->reminderSlots($booking->submittedAt(), $booking->pendingExpiresAt()) as $slot) {
+            if ($slot->lessThanOrEqualTo(now())) {
+                $latestDue = $slot;
+            }
+        }
+        $scheduledFor = (string) ($payload['scheduled_for'] ?? '');
+        if ($latestDue === null || $scheduledFor !== $latestDue->toIso8601String()
+            || $latestDue->lt(CarbonImmutable::now()->subHour())) {
+            throw new NotificationNotApplicableException('The pending reminder slot is stale or not due.');
+        }
+    }
+
     /** @param array<string, mixed> $payload
      * @return array<string, string>
      */
@@ -139,11 +171,12 @@ class TelegramNotificationRenderer
 
         return array_map($this->escape(...), [
             'booking' => '#'.$this->shortBookingId((string) $booking->public_id),
-            'customer' => $this->preview((string) $booking->customer->name, 120),
-            'phone' => $this->preview($this->contact($booking, ContactType::Phone) ?? '-', 120),
-            'telegram' => $this->preview($this->contact($booking, ContactType::TelegramUsername) ?? '-', 120),
+            'customer' => $this->preview((string) ($booking->contact_name ?? $booking->customer->name), 120),
+            'phone' => $this->preview($booking->contact_phone ?? $this->contact($booking, ContactType::Phone) ?? '-', 120),
+            'telegram' => $this->preview($booking->contact_telegram ?? $this->contact($booking, ContactType::TelegramUsername) ?? '-', 120),
             'vehicle' => $this->preview((string) $booking->vehicle->name, 160),
             'period' => $this->period($booking),
+            'days' => $snapshot instanceof BookingPriceSnapshot ? (string) $snapshot->total_days : '-',
             'old_period' => $this->periodValues($oldDates),
             'new_period' => $this->periodValues($newDates),
             'price' => $finalTotal === null ? '-' : number_format($finalTotal, 0, '.', ' ').' '.($currency !== '' ? $currency : 'THB'),
@@ -185,7 +218,7 @@ class TelegramNotificationRenderer
     /** @return array<string, mixed> */
     private function customerKeyboard(Booking $booking, NotificationOutbox $notification, string $locale): array
     {
-        if ($notification->event_type === 'booking.expired') {
+        if (in_array($notification->event_type, ['booking.expired', 'booking.cancelled_unavailable'], true)) {
             return [
                 'inline_keyboard' => [[[
                     'text' => $this->button('notifications.buttons.create_booking', $locale),

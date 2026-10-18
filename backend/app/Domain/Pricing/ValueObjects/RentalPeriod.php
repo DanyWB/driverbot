@@ -27,13 +27,14 @@ final readonly class RentalPeriod
 
     public function totalDays(): int
     {
-        return (int) $this->startsOn->diff($this->endsOn)->format('%a') + 1;
+        return max(1, (int) $this->startsOn->diff($this->endsOn)->format('%a'));
     }
 
     /** @return iterable<DateTimeImmutable> */
     public function dates(): iterable
     {
-        for ($date = $this->startsOn; $date <= $this->endsOn; $date = $date->modify('+1 day')) {
+        $date = $this->startsOn;
+        for ($day = 0; $day < $this->totalDays(); $day++, $date = $date->modify('+1 day')) {
             yield $date;
         }
     }

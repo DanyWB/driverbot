@@ -23,6 +23,8 @@ class SaveVehicleRequest extends FormRequest
             'inventory_code' => ['nullable', 'string', 'max:100', Rule::unique('vehicles', 'inventory_code')->ignore($vehicleId)],
             'year' => ['nullable', 'integer', 'between:1900,2200'],
             'description' => ['nullable', 'string', 'max:10000'],
+            'description_ru' => ['nullable', 'string', 'max:10000'],
+            'description_ua' => ['nullable', 'string', 'max:10000'],
             'characteristics_text' => ['nullable', 'string', 'max:10000'],
             'emoji' => ['nullable', 'string', 'max:32'],
             'is_active' => ['required', 'boolean'],

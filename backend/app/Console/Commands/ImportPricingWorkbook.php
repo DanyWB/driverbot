@@ -20,7 +20,10 @@ class ImportPricingWorkbook extends Command
     public function handle(PricingWorkbookParser $parser, PricingWorkbookImporter $importer): int
     {
         $configuredPath = config('pricing_import.workbook_path');
-        $path = (string) ($this->argument('path') ?: (is_string($configuredPath) ? $configuredPath : ''));
+        $pathArgument = $this->argument('path');
+        $path = is_string($pathArgument) && ! in_array($pathArgument, ['', '0'], true)
+            ? $pathArgument
+            : (is_string($configuredPath) ? $configuredPath : '');
 
         if ($path === '') {
             $this->error('Provide a workbook path or set PRICING_WORKBOOK_PATH.');

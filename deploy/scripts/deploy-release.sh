@@ -63,12 +63,24 @@ cleanup_failed_deploy() {
     set +e
 
     if [[ "$CUTOVER_STARTED" == "true" && -n "$PREVIOUS_RELEASE" && -d "$PREVIOUS_RELEASE" ]]; then
-        printf 'Deployment failed; restoring previous application symlink: %s\n' "$PREVIOUS_RELEASE" >&2
         sudo systemctl stop drive-phangan.target >/dev/null 2>&1 || true
-        atomic_symlink "$PREVIOUS_RELEASE" "$CURRENT"
-        php "${CURRENT}/backend/artisan" up >/dev/null 2>&1 || true
-        sudo systemctl start drive-phangan.target >/dev/null 2>&1 || true
-        sudo systemctl reload "${PHP_FPM_SERVICE:-php8.3-fpm}" >/dev/null 2>&1 || true
+        if ! php "${RELEASE_DIR}/backend/artisan" down --retry=30 >/dev/null 2>&1; then
+            printf 'Failed to enter maintenance mode; refusing automatic rollback and stopping PHP-FPM: %s\n' \
+                "$RELEASE_DIR" >&2
+            atomic_symlink "$RELEASE_DIR" "$CURRENT"
+            sudo systemctl stop "${PHP_FPM_SERVICE:-php8.3-fpm}" >/dev/null 2>&1 || true
+        elif assert_release_rollback_compatible "${RELEASE_DIR}/backend" "${PREVIOUS_RELEASE}/backend"; then
+            printf 'Deployment failed; restoring compatible previous application symlink: %s\n' "$PREVIOUS_RELEASE" >&2
+            atomic_symlink "$PREVIOUS_RELEASE" "$CURRENT"
+            php "${CURRENT}/backend/artisan" up >/dev/null 2>&1 || true
+            sudo systemctl start drive-phangan.target >/dev/null 2>&1 || true
+            sudo systemctl reload "${PHP_FPM_SERVICE:-php8.3-fpm}" >/dev/null 2>&1 || true
+        else
+            printf 'Rollback compatibility guard failed; keeping the new release in maintenance for incident review: %s\n' \
+                "$RELEASE_DIR" >&2
+            atomic_symlink "$RELEASE_DIR" "$CURRENT"
+            sudo systemctl reload "${PHP_FPM_SERVICE:-php8.3-fpm}" >/dev/null 2>&1 || true
+        fi
     fi
 
     active_release="$(readlink -f "$CURRENT" 2>/dev/null || true)"
@@ -76,7 +88,7 @@ cleanup_failed_deploy() {
         printf 'Removing incomplete release: %s\n' "$RELEASE_DIR" >&2
         remove_release_if_safe "$RELEASE_DIR" || true
     elif [[ "$RELEASE_DIR_CREATED" == "true" && "$active_release" == "$RELEASE_DIR" ]]; then
-        printf 'No previous release exists; leaving failed current release for incident review: %s\n' \
+        printf 'Leaving failed current release for incident review: %s\n' \
             "$RELEASE_DIR" >&2
     fi
 
@@ -174,6 +186,7 @@ BACKUP_OWNER="${APP_SERVICE_USER:-drive-phangan}" \
     "${RELEASE_DIR}/deploy/scripts/backup.sh"
 
 php "${RELEASE_DIR}/backend/artisan" migrate --force
+php "${RELEASE_DIR}/backend/artisan" vehicles:optimize-telegram-photos
 php "${RELEASE_DIR}/backend/artisan" optimize
 php "${RELEASE_DIR}/backend/artisan" operations:release-preflight --strict
 seal_release_read_only "$RELEASE_DIR"

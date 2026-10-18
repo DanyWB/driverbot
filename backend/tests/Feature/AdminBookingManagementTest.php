@@ -44,6 +44,7 @@ class AdminBookingManagementTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->travelTo(CarbonImmutable::parse('2026-08-01 10:00:00', 'Asia/Bangkok'));
 
         $this->seed();
         $this->bookings = app(BookingService::class);
@@ -193,7 +194,8 @@ class AdminBookingManagementTest extends TestCase
 
     public function test_conflicting_manual_booking_rolls_back_customer_and_preserves_input(): void
     {
-        $this->createBooking();
+        $booking = $this->createBooking();
+        app(BookingService::class)->approve($booking, BookingActor::admin($this->admin->id));
         $customerCount = Customer::query()->count();
 
         $response = $this->actingAs($this->admin)
@@ -241,7 +243,7 @@ class AdminBookingManagementTest extends TestCase
             'recipient' => 'telegram-100500',
         ]);
         $datesEvent = NotificationOutbox::query()->where('event_type', 'booking.dates_changed')->firstOrFail();
-        $this->assertSame(900, $datesEvent->payload['final_total']);
+        $this->assertSame(600, $datesEvent->payload['final_total']);
         $this->assertSame('THB', $datesEvent->payload['currency']);
 
         $this->actingAs($this->admin)
@@ -278,7 +280,7 @@ class AdminBookingManagementTest extends TestCase
         $this->actingAs($this->admin)
             ->post(route('bookings.price-recalculations.store', $booking))
             ->assertSessionHasNoErrors();
-        $this->assertSame(900, $booking->priceSnapshots()->firstOrFail()->final_total);
+        $this->assertSame(600, $booking->priceSnapshots()->firstOrFail()->final_total);
         $this->assertDatabaseHas('audit_logs', [
             'subject_id' => $booking->public_id,
             'action' => 'booking.price_recalculated',
@@ -370,20 +372,20 @@ class AdminBookingManagementTest extends TestCase
 
     public function test_quote_endpoint_reports_conflicts_but_excludes_the_current_booking(): void
     {
-        $booking = $this->createBooking();
+        $booking = $this->createBooking(status: BookingStatus::Approved);
         $query = ['vehicle_id' => $this->vehicle->id, 'starts_on' => '2026-08-11', 'ends_on' => '2026-08-13'];
 
         $this->actingAs($this->admin)
             ->getJson(route('bookings.quote', $query))
             ->assertOk()
             ->assertJsonPath('available', false)
-            ->assertJsonPath('quote.final_total', 900);
+            ->assertJsonPath('quote.final_total', 600);
 
         $this->actingAs($this->admin)
             ->getJson(route('bookings.booking-quote', [$booking, ...$query]))
             ->assertOk()
             ->assertJsonPath('available', true)
-            ->assertJsonPath('quote.total_days', 3);
+            ->assertJsonPath('quote.total_days', 2);
     }
 
     private function createBooking(

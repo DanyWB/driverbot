@@ -3,6 +3,7 @@
 namespace App\Domain\Availability\Services;
 
 use App\Domain\Availability\Enums\OccupancyType;
+use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Bookings\Exceptions\BookingException;
 use App\Models\Booking;
 use App\Models\Vehicle;
@@ -69,7 +70,7 @@ class BookingAvailabilityService
 
     public function syncBookingOccupancy(Booking $booking): ?VehicleOccupancy
     {
-        if (! $booking->bookingStatus()->blocksAvailability()) {
+        if (! $booking->blocksAvailability() && $booking->bookingStatus() !== BookingStatus::Pending) {
             $booking->occupancy()->delete();
 
             return null;
@@ -80,7 +81,7 @@ class BookingAvailabilityService
             'type' => OccupancyType::Booking,
             'starts_on' => $this->bookingDate($booking, 'starts_on'),
             'ends_on' => $this->bookingDate($booking, 'ends_on'),
-            'blocks_availability' => true,
+            'blocks_availability' => $booking->blocksAvailability(),
             'label' => null,
             'created_by_admin_id' => $booking->created_by_admin_id,
             'metadata' => null,

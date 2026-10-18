@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
-#[Fillable(['customer_id', 'vehicle_id', 'starts_on', 'ends_on', 'pickup_time', 'return_time', 'status', 'source', 'client_comment', 'admin_note', 'cancellation_reason', 'no_show_reason', 'deposit_note', 'helmets_quantity', 'delivery_required', 'delivery_address', 'terms_accepted_at', 'terms_version', 'created_by_admin_id', 'pending_expires_at', 'reminder_version', 'approved_at', 'activated_at', 'completed_at', 'cancelled_at', 'expired_at', 'no_show_at'])]
+#[Fillable(['customer_id', 'vehicle_id', 'starts_on', 'ends_on', 'pickup_time', 'return_time', 'status', 'source', 'client_comment', 'admin_note', 'cancellation_reason', 'no_show_reason', 'deposit_note', 'helmets_quantity', 'delivery_required', 'delivery_address', 'terms_accepted_at', 'terms_version', 'created_by_admin_id', 'pending_expires_at', 'reminder_version', 'approved_at', 'activated_at', 'completed_at', 'cancelled_at', 'expired_at', 'no_show_at', 'request_policy_version', 'submitted_at', 'prepayment_amount', 'prepayment_currency', 'deposit_amount', 'deposit_currency'])]
 class Booking extends Model
 {
     /** @use HasFactory<BookingFactory> */
@@ -87,6 +87,12 @@ class Booking extends Model
         return BookingStatus::from((string) $this->getRawOriginal('status'));
     }
 
+    public function blocksAvailability(): bool
+    {
+        return $this->bookingStatus()->blocksAvailability()
+            || ($this->bookingStatus() === BookingStatus::Pending && (int) $this->request_policy_version < 2);
+    }
+
     public function pendingExpiresAt(): ?CarbonImmutable
     {
         $value = $this->getAttribute('pending_expires_at');
@@ -102,10 +108,47 @@ class Booking extends Model
         return CarbonImmutable::instance($value);
     }
 
+    public function submittedAt(): ?CarbonImmutable
+    {
+        $value = $this->getAttribute('submitted_at');
+        if ($value === null) {
+            return null;
+        }
+        if (! $value instanceof DateTimeInterface) {
+            throw new LogicException('Booking submission is not a date-time value.');
+        }
+
+        return CarbonImmutable::instance($value);
+    }
+
+    /** @return array<string, array{amount: string|null, currency: string|null, received: bool, received_at: string|null}> */
+    public function paymentsSummary(): array
+    {
+        $payments = [];
+        foreach (['prepayment', 'deposit'] as $payment) {
+            $receivedAt = $this->getAttribute($payment.'_received_at');
+            $payments[$payment] = [
+                'amount' => $this->getAttribute($payment.'_amount'),
+                'currency' => $this->getAttribute($payment.'_currency'),
+                'received' => $receivedAt !== null,
+                'received_at' => $receivedAt instanceof DateTimeInterface ? $receivedAt->format(DATE_ATOM) : null,
+            ];
+        }
+
+        return $payments;
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
+            'request_policy_version' => 'integer',
+            'details_version' => 'integer',
+            'submitted_at' => 'immutable_datetime',
+            'prepayment_amount' => 'decimal:2',
+            'deposit_amount' => 'decimal:2',
+            'prepayment_received_at' => 'datetime',
+            'deposit_received_at' => 'datetime',
             'starts_on' => 'date',
             'ends_on' => 'date',
             'status' => BookingStatus::class,

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Bookings\Services\BookingStatusMutationGuard;
 use App\Domain\Notifications\Exceptions\NotificationNotApplicableException;
 use App\Domain\Notifications\Services\NotificationDeliveryService;
 use App\Domain\Notifications\Services\NotificationOutboxService;
@@ -197,9 +198,11 @@ class AdminTelegramNotificationFanoutTest extends TestCase
 
     private function booking(): Booking
     {
-        return Booking::factory()->create([
+        return app(BookingStatusMutationGuard::class)->run(fn () => Booking::factory()->create([
+            'status' => 'pending',
+            'pending_expires_at' => now()->addHours(48),
             'customer_id' => Customer::factory()->create(['name' => 'Test customer'])->id,
             'vehicle_id' => Vehicle::factory()->create(['name' => 'Test vehicle'])->id,
-        ]);
+        ]));
     }
 }

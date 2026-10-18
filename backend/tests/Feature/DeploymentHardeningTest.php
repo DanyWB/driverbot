@@ -28,6 +28,8 @@ class DeploymentHardeningTest extends TestCase
         $this->assertStringContainsString('RELEASE_RETENTION_COUNT', $common);
         $this->assertStringContainsString('Refusing to remove the current release', $common);
         $this->assertStringContainsString('seal_release_read_only()', $common);
+        $this->assertStringContainsString('assert_release_rollback_compatible()', $common);
+        $this->assertStringContainsString('operations:rollback-guard', $common);
         $this->assertStringContainsString('! -type l -exec chown root:root', $common);
 
         $this->assertStringContainsString('DEPLOY_MIN_FREE_MB', $deploy);
@@ -39,13 +41,41 @@ class DeploymentHardeningTest extends TestCase
         $this->assertStringContainsString("--exclude='*.sql.gz'", $deploy);
         $this->assertStringContainsString('Removing incomplete release', $deploy);
         $this->assertStringContainsString('audit --locked --no-dev --no-interaction', $deploy);
+        $this->assertStringContainsString('vehicles:optimize-telegram-photos', $deploy);
+        $this->assertTrue(
+            strpos($deploy, 'vehicles:optimize-telegram-photos') < strpos($deploy, 'operations:release-preflight --strict'),
+            'Prepare legacy Telegram photos before the strict release photo check.',
+        );
         $this->assertSame(2, substr_count($deploy, 'audit --omit=dev'));
         $this->assertStringContainsString('seal_release_read_only "$RELEASE_DIR"', $deploy);
         $this->assertStringContainsString('ALLOW_PRE_CUTOVER_SMOKE is not permitted during deploy cutover', $deploy);
+        $this->assertStringContainsString('Failed to enter maintenance mode; refusing automatic rollback and stopping PHP-FPM', $deploy);
+        $this->assertStringContainsString('Rollback compatibility guard failed; keeping the new release in maintenance', $deploy);
+        $this->assertStringContainsString('assert_release_rollback_compatible "${RELEASE_DIR}/backend" "${PREVIOUS_RELEASE}/backend"', $deploy);
+        $this->assertTrue(
+            strpos($deploy, 'php "${RELEASE_DIR}/backend/artisan" down --retry=30') < strpos($deploy, 'assert_release_rollback_compatible'),
+            'Enter maintenance mode before inspecting automatic rollback compatibility.',
+        );
 
         $this->assertStringContainsString('ORIGINAL_RELEASE=', $rollback);
         $this->assertStringContainsString('Rollback smoke failed; restoring original application symlink', $rollback);
+        $this->assertStringContainsString('Failed to enter maintenance mode; rollback denied and PHP-FPM will be stopped', $rollback);
+        $this->assertStringContainsString('Rollback blocked; original release was not changed and application writers remain stopped', $rollback);
+        $this->assertStringContainsString('assert_release_rollback_compatible "${ORIGINAL_RELEASE}/backend" "${TARGET_RELEASE}/backend"', $rollback);
         $this->assertStringContainsString('ALLOW_PRE_CUTOVER_SMOKE is not permitted during rollback cutover', $rollback);
+        $this->assertStringNotContainsString('php "${ORIGINAL_RELEASE}/backend/artisan" down --retry=30 || true', $rollback);
+        $this->assertTrue(
+            strpos($rollback, 'systemctl stop drive-phangan.target') < strpos($rollback, 'assert_release_rollback_compatible'),
+            'Stop application writers before inspecting rollback compatibility.',
+        );
+        $this->assertTrue(
+            strpos($rollback, 'php "${ORIGINAL_RELEASE}/backend/artisan" down --retry=30') < strpos($rollback, 'assert_release_rollback_compatible'),
+            'Enter maintenance mode before inspecting explicit rollback compatibility.',
+        );
+        $this->assertTrue(
+            strpos($rollback, 'assert_release_rollback_compatible') < strpos($rollback, 'atomic_symlink "$TARGET_RELEASE"'),
+            'Reject an incompatible target before changing the current symlink.',
+        );
 
         $this->assertStringContainsString('ALLOW_PRE_CUTOVER_SMOKE', $smoke);
         $this->assertStringContainsString('drive-phangan-worker-notifications.service', $common);
