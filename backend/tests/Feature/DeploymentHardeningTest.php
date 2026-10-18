@@ -30,6 +30,10 @@ class DeploymentHardeningTest extends TestCase
         $this->assertStringContainsString('seal_release_read_only()', $common);
         $this->assertStringContainsString('assert_release_rollback_compatible()', $common);
         $this->assertStringContainsString('operations:rollback-guard', $common);
+        $this->assertStringContainsString('run_release_preflight()', $common);
+        $this->assertStringContainsString('RELEASE_ACCEPTED_RISKS', $common);
+        $this->assertStringContainsString('RELEASE_RISK_REASON', $common);
+        $this->assertStringContainsString('arguments+=(--accept-risk="$risk")', $common);
         $this->assertStringContainsString('! -type l -exec chown root:root', $common);
 
         $this->assertStringContainsString('DEPLOY_MIN_FREE_MB', $deploy);
@@ -42,8 +46,11 @@ class DeploymentHardeningTest extends TestCase
         $this->assertStringContainsString('Removing incomplete release', $deploy);
         $this->assertStringContainsString('audit --locked --no-dev --no-interaction', $deploy);
         $this->assertStringContainsString('vehicles:optimize-telegram-photos', $deploy);
+        $this->assertStringContainsString('sudo -u "${APP_SERVICE_USER:-drive-phangan}"', $deploy);
+        $this->assertStringContainsString('release-preflight.json', $deploy);
+        $this->assertStringContainsString('run_release_preflight "${RELEASE_DIR}/backend"', $deploy);
         $this->assertTrue(
-            strpos($deploy, 'vehicles:optimize-telegram-photos') < strpos($deploy, 'operations:release-preflight --strict'),
+            strpos($deploy, 'vehicles:optimize-telegram-photos') < strpos($deploy, 'run_release_preflight'),
             'Prepare legacy Telegram photos before the strict release photo check.',
         );
         $this->assertSame(2, substr_count($deploy, 'audit --omit=dev'));
@@ -78,6 +85,7 @@ class DeploymentHardeningTest extends TestCase
         );
 
         $this->assertStringContainsString('ALLOW_PRE_CUTOVER_SMOKE', $smoke);
+        $this->assertStringContainsString('run_release_preflight "${CURRENT}/backend"', $smoke);
         $this->assertStringContainsString('drive-phangan-worker-notifications.service', $common);
         $this->assertStringContainsString('systemctl is-active --quiet', $smoke);
         $this->assertStringContainsString('run release:smoke', $smoke);

@@ -11,7 +11,9 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehiclePhoto;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Console\Command\Command;
 use Tests\TestCase;
 
 class ReleaseOperationsTest extends TestCase
@@ -59,13 +61,101 @@ class ReleaseOperationsTest extends TestCase
         User::factory()->create(['two_factor_confirmed_at' => null]);
         $preflight = app(ReleasePreflightService::class);
 
-        $strictCheck = collect($preflight->inspect(true))->firstWhere('id', 'admin.accounts');
-        $advisoryCheck = collect($preflight->inspect(false))->firstWhere('id', 'admin.accounts');
+        $accountsCheck = collect($preflight->inspect(true))->firstWhere('id', 'admin.accounts');
+        $strictCheck = collect($preflight->inspect(true))->firstWhere('id', 'admin.two_factor');
+        $advisoryCheck = collect($preflight->inspect(false))->firstWhere('id', 'admin.two_factor');
 
+        $this->assertInstanceOf(ReleaseCheck::class, $accountsCheck);
+        $this->assertSame(ReleaseCheck::PASS, $accountsCheck->status);
         $this->assertInstanceOf(ReleaseCheck::class, $strictCheck);
         $this->assertSame(ReleaseCheck::FAILURE, $strictCheck->status);
         $this->assertInstanceOf(ReleaseCheck::class, $advisoryCheck);
         $this->assertSame(ReleaseCheck::WARNING, $advisoryCheck->status);
+    }
+
+    public function test_release_preflight_is_strict_by_default_and_reports_no_accepted_risks(): void
+    {
+        $exitCode = Artisan::call('operations:release-preflight', ['--json' => true]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(Command::FAILURE, $exitCode);
+        $this->assertIsArray($payload);
+        $this->assertTrue($payload['strict']);
+        $this->assertSame([], $payload['accepted_risks']);
+        $this->assertNull($payload['risk_reason']);
+        $environment = collect($payload['checks'])->firstWhere('id', 'app.environment');
+        $this->assertIsArray($environment);
+        $this->assertSame(ReleaseCheck::FAILURE, $environment['status']);
+    }
+
+    public function test_release_preflight_accepts_only_supported_risks_and_preserves_other_failures(): void
+    {
+        $reason = 'SMTP is explicitly deferred for this one deployment.';
+        $exitCode = Artisan::call('operations:release-preflight', [
+            '--json' => true,
+            '--accept-risk' => ['mail.transport'],
+            '--risk-reason' => $reason,
+        ]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(Command::FAILURE, $exitCode);
+        $this->assertIsArray($payload);
+        $this->assertSame(['mail.transport'], $payload['accepted_risks']);
+        $this->assertSame($reason, $payload['risk_reason']);
+        $mail = collect($payload['checks'])->firstWhere('id', 'mail.transport');
+        $environment = collect($payload['checks'])->firstWhere('id', 'app.environment');
+        $this->assertIsArray($mail);
+        $this->assertSame(ReleaseCheck::WARNING, $mail['status']);
+        $this->assertStringContainsString($reason, $mail['message']);
+        $this->assertIsArray($environment);
+        $this->assertSame(ReleaseCheck::FAILURE, $environment['status']);
+    }
+
+    public function test_release_preflight_rejects_unknown_risks_and_missing_reasons(): void
+    {
+        $unknownExit = Artisan::call('operations:release-preflight', [
+            '--json' => true,
+            '--accept-risk' => ['admin.accounts'],
+            '--risk-reason' => 'Must not bypass administrator identity requirements.',
+        ]);
+        $unknown = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(Command::INVALID, $unknownExit);
+        $this->assertIsArray($unknown);
+        $this->assertStringContainsString('Unsupported release risk IDs', $unknown['error']);
+
+        $missingReasonExit = Artisan::call('operations:release-preflight', [
+            '--json' => true,
+            '--accept-risk' => ['admin.two_factor'],
+            '--risk-reason' => '   ',
+        ]);
+        $missingReason = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(Command::INVALID, $missingReasonExit);
+        $this->assertIsArray($missingReason);
+        $this->assertStringContainsString('--risk-reason must be non-empty', $missingReason['error']);
+    }
+
+    public function test_accepting_two_factor_risk_does_not_bypass_unverified_admin_accounts(): void
+    {
+        User::factory()->unverified()->create(['two_factor_confirmed_at' => null]);
+        $reason = 'Two-factor enrollment is deferred for this one deployment.';
+
+        $exitCode = Artisan::call('operations:release-preflight', [
+            '--json' => true,
+            '--accept-risk' => ['admin.two_factor'],
+            '--risk-reason' => $reason,
+        ]);
+        $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+        $accounts = collect($payload['checks'])->firstWhere('id', 'admin.accounts');
+        $twoFactor = collect($payload['checks'])->firstWhere('id', 'admin.two_factor');
+
+        $this->assertSame(Command::FAILURE, $exitCode);
+        $this->assertIsArray($accounts);
+        $this->assertSame(ReleaseCheck::FAILURE, $accounts['status']);
+        $this->assertIsArray($twoFactor);
+        $this->assertSame(ReleaseCheck::WARNING, $twoFactor['status']);
+        $this->assertStringContainsString($reason, $twoFactor['message']);
     }
 
     public function test_strict_release_preflight_fails_when_an_active_admin_email_is_unverified(): void

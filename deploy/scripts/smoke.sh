@@ -59,7 +59,7 @@ fi
 
 (
     cd "${CURRENT}/backend"
-    php artisan operations:release-preflight --strict
+    run_release_preflight "${CURRENT}/backend"
     if [[ "$ALLOW_PRE_CUTOVER_SMOKE" == "true" ]]; then
         php artisan operations:runtime-status --skip-queue --skip-scheduler
     else

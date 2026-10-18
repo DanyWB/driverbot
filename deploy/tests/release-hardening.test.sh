@@ -87,6 +87,9 @@ mkdir -p "$GUARD_BACKEND" "$TARGET_BACKEND"
 touch "${GUARD_BACKEND}/artisan" "${TARGET_BACKEND}/artisan"
 php() {
     printf '%s\n' "$*" >"$MOCK_PHP_LOG"
+    if [[ "$*" == *operations:release-preflight* ]]; then
+        printf '{"passed":true,"strict":true,"accepted_risks":[],"risk_reason":null,"checks":[]}\n'
+    fi
     return "${MOCK_PHP_EXIT:-0}"
 }
 MOCK_PHP_EXIT=0 assert_release_rollback_compatible "$GUARD_BACKEND" "$TARGET_BACKEND"
@@ -95,5 +98,25 @@ if MOCK_PHP_EXIT=1 assert_release_rollback_compatible "$GUARD_BACKEND" "$TARGET_
     printf 'Rollback compatibility guard failure was not propagated.\n' >&2
     exit 1
 fi
+
+PREFLIGHT_MANIFEST="${TEST_ROOT}/release-preflight.json"
+unset RELEASE_ACCEPTED_RISKS RELEASE_RISK_REASON
+MOCK_PHP_EXIT=0 run_release_preflight "$GUARD_BACKEND" "$PREFLIGHT_MANIFEST" >/dev/null
+grep -F "${GUARD_BACKEND}/artisan operations:release-preflight --strict --json" "$MOCK_PHP_LOG" >/dev/null
+grep -F '"accepted_risks":[]' "$PREFLIGHT_MANIFEST" >/dev/null
+
+RELEASE_ACCEPTED_RISKS='mail.transport, admin.two_factor'
+RELEASE_RISK_REASON='SMTP and two-factor enrollment are deferred for this deployment.'
+run_release_preflight "$GUARD_BACKEND" >/dev/null
+grep -F -- '--accept-risk=mail.transport' "$MOCK_PHP_LOG" >/dev/null
+grep -F -- '--accept-risk=admin.two_factor' "$MOCK_PHP_LOG" >/dev/null
+grep -F -- '--risk-reason=SMTP and two-factor enrollment are deferred for this deployment.' "$MOCK_PHP_LOG" >/dev/null
+
+RELEASE_ACCEPTED_RISKS='mail.transport,,admin.two_factor'
+if run_release_preflight "$GUARD_BACKEND" >/dev/null 2>&1; then
+    printf 'Empty accepted risk ID was not rejected.\n' >&2
+    exit 1
+fi
+unset RELEASE_ACCEPTED_RISKS RELEASE_RISK_REASON
 
 printf 'Release hardening shell tests passed.\n'

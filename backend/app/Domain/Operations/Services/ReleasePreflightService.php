@@ -244,6 +244,7 @@ class ReleasePreflightService
 
         $checks[] = $this->pendingMigrations();
         $checks[] = $this->adminAccounts($strict);
+        $checks[] = $this->adminTwoFactor($strict);
         $checks[] = $this->serviceClient($strict);
         $checks[] = $this->catalog($strict);
         $checks[] = $this->vehiclePhotos($strict);
@@ -278,10 +279,6 @@ class ReleasePreflightService
     private function adminAccounts(bool $strict): ReleaseCheck
     {
         $active = User::query()->where('is_active', true)->count();
-        $withoutTwoFactor = User::query()
-            ->where('is_active', true)
-            ->whereNull('two_factor_confirmed_at')
-            ->count();
         $withoutVerifiedEmail = User::query()
             ->where('is_active', true)
             ->whereNull('email_verified_at')
@@ -293,10 +290,27 @@ class ReleasePreflightService
 
         return $this->requirement(
             'admin.accounts',
-            $withoutTwoFactor === 0 && $withoutVerifiedEmail === 0,
+            $withoutVerifiedEmail === 0,
             $strict,
-            "Active administrators: {$active}; verified email and two-factor authentication are enabled.",
-            "Active administrators: {$active}; {$withoutVerifiedEmail} require email verification and {$withoutTwoFactor} require two-factor setup.",
+            "Active administrators with verified email: {$active}.",
+            "Active administrators: {$active}; {$withoutVerifiedEmail} require email verification.",
+        );
+    }
+
+    private function adminTwoFactor(bool $strict): ReleaseCheck
+    {
+        $active = User::query()->where('is_active', true)->count();
+        $withoutTwoFactor = User::query()
+            ->where('is_active', true)
+            ->whereNull('two_factor_confirmed_at')
+            ->count();
+
+        return $this->requirement(
+            'admin.two_factor',
+            $withoutTwoFactor === 0,
+            $strict,
+            "Active administrators: {$active}; two-factor authentication is enabled.",
+            "Active administrators: {$active}; {$withoutTwoFactor} require two-factor setup.",
         );
     }
 

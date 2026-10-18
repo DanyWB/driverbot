@@ -186,9 +186,10 @@ BACKUP_OWNER="${APP_SERVICE_USER:-drive-phangan}" \
     "${RELEASE_DIR}/deploy/scripts/backup.sh"
 
 php "${RELEASE_DIR}/backend/artisan" migrate --force
-php "${RELEASE_DIR}/backend/artisan" vehicles:optimize-telegram-photos
+sudo -u "${APP_SERVICE_USER:-drive-phangan}" \
+    php "${RELEASE_DIR}/backend/artisan" vehicles:optimize-telegram-photos
 php "${RELEASE_DIR}/backend/artisan" optimize
-php "${RELEASE_DIR}/backend/artisan" operations:release-preflight --strict
+run_release_preflight "${RELEASE_DIR}/backend" "${RELEASE_DIR}/release-preflight.json"
 seal_release_read_only "$RELEASE_DIR"
 
 atomic_symlink "$RELEASE_DIR" "$CURRENT"

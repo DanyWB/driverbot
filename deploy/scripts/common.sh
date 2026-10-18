@@ -25,6 +25,56 @@ require_file() {
     fi
 }
 
+run_release_preflight() {
+    local backend_dir="$1"
+    local manifest_path="${2:-}"
+    local accepted_csv="${RELEASE_ACCEPTED_RISKS:-}"
+    local risk_reason="${RELEASE_RISK_REASON:-}"
+    local output
+    local exit_code=0
+    local risk
+    local risks=()
+    local arguments=(operations:release-preflight --strict --json)
+
+    require_file "${backend_dir}/artisan"
+
+    if [[ -n "$accepted_csv" ]]; then
+        if [[ "$accepted_csv" == ,* || "$accepted_csv" == *, || "$accepted_csv" == *,,* ]]; then
+            printf 'RELEASE_ACCEPTED_RISKS must be a comma-separated list without empty IDs.\n' >&2
+            return 2
+        fi
+
+        IFS=',' read -r -a risks <<<"$accepted_csv"
+        for risk in "${risks[@]}"; do
+            risk="${risk#"${risk%%[![:space:]]*}"}"
+            risk="${risk%"${risk##*[![:space:]]}"}"
+            if [[ -z "$risk" ]]; then
+                printf 'RELEASE_ACCEPTED_RISKS must not contain blank IDs.\n' >&2
+                return 2
+            fi
+            arguments+=(--accept-risk="$risk")
+        done
+    fi
+
+    if [[ -n "$risk_reason" ]]; then
+        arguments+=(--risk-reason="$risk_reason")
+    fi
+
+    output="$(php "${backend_dir}/artisan" "${arguments[@]}")" || exit_code=$?
+    printf '%s\n' "$output"
+
+    if (( exit_code != 0 )); then
+        return "$exit_code"
+    fi
+
+    if [[ -n "$manifest_path" ]]; then
+        local temporary_manifest="${manifest_path}.tmp.$$"
+
+        (umask 0022 && printf '%s\n' "$output" >"$temporary_manifest")
+        mv -f -- "$temporary_manifest" "$manifest_path"
+    fi
+}
+
 assert_release_rollback_compatible() {
     local guard_backend="$1"
     local target_backend="$2"
