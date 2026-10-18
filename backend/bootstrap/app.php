@@ -8,6 +8,7 @@ use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\AssignRequestId;
 use App\Http\Middleware\AuthenticateServiceApiClient;
 use App\Http\Middleware\EnsureAdminIsActive;
+use App\Http\Middleware\EnsureAdminSessionVersion;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ResolveTelegramCustomer;
@@ -49,6 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: ['admin_locale', 'appearance', 'sidebar_state']);
 
         $middleware->web(append: [
+            EnsureAdminSessionVersion::class,
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,

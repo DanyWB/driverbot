@@ -43,7 +43,7 @@ class ReleasePreflightService
             $this->requirement('session.secure_cookie', (bool) config('session.secure'), $strict, 'Session cookies require HTTPS.', 'SESSION_SECURE_COOKIE must be true.'),
             $this->requirement('security.csp', (bool) config('security.csp.enabled'), $strict, 'Content Security Policy is enabled.', 'SECURITY_CSP_ENABLED must be true.'),
             $this->requirement('security.hsts', (bool) config('security.hsts.enabled'), $strict, 'HSTS is enabled.', 'SECURITY_HSTS_ENABLED must be true.'),
-            $this->mailConfiguration($strict),
+            // Recovery uses verified private Telegram bindings, not SMTP.
             $this->runtimeExtensions(),
             $this->telegramConfiguration($strict),
             $this->managerConfiguration($strict),
@@ -92,36 +92,6 @@ class ReleasePreflightService
             $strict,
             'Database name, user and password are configured.',
             'Database credentials are missing or still contain placeholders.',
-        );
-    }
-
-    private function mailConfiguration(bool $strict): ReleaseCheck
-    {
-        $mailer = (string) config('mail.default');
-        $host = trim((string) config("mail.mailers.{$mailer}.host"));
-        $username = trim((string) config("mail.mailers.{$mailer}.username"));
-        $password = trim((string) config("mail.mailers.{$mailer}.password"));
-        $from = trim((string) config('mail.from.address'));
-        $valid = ! in_array($mailer, ['array', 'log'], true)
-            && filter_var($from, FILTER_VALIDATE_EMAIL) !== false
-            && ! $this->isPlaceholder($from);
-
-        if ($mailer === 'smtp') {
-            $valid = $valid
-                && $host !== ''
-                && $username !== ''
-                && $password !== ''
-                && ! $this->isPlaceholder($host)
-                && ! $this->isPlaceholder($username)
-                && ! $this->isPlaceholder($password);
-        }
-
-        return $this->requirement(
-            'mail.transport',
-            $valid,
-            $strict,
-            'A delivery mail transport is configured.',
-            'Configure a real mail transport for administrator password resets.',
         );
     }
 
@@ -244,6 +214,7 @@ class ReleasePreflightService
 
         $checks[] = $this->pendingMigrations();
         $checks[] = $this->adminAccounts($strict);
+        $checks[] = $this->adminPasswordRecovery($strict);
         $checks[] = $this->adminTwoFactor($strict);
         $checks[] = $this->serviceClient($strict);
         $checks[] = $this->catalog($strict);
@@ -294,6 +265,30 @@ class ReleasePreflightService
             $strict,
             "Active administrators with verified email: {$active}.",
             "Active administrators: {$active}; {$withoutVerifiedEmail} require email verification.",
+        );
+    }
+
+    private function adminPasswordRecovery(bool $strict): ReleaseCheck
+    {
+        $admins = User::query()->where('is_active', true)->with('telegramBinding')->get();
+        $covered = $admins->filter(function (User $admin): bool {
+            $binding = $admin->telegramBinding;
+
+            return $admin->email_verified_at !== null && $binding !== null && $binding->isConnected()
+                && preg_match('/^[1-9][0-9]{0,19}$/', (string) $binding->telegram_user_id) === 1
+                && $binding->telegram_user_id === $binding->telegram_chat_id;
+        })->count();
+
+        if ($covered > 0 && $covered < $admins->count()) {
+            return $this->warn('admin.password_recovery', "Telegram recovery covers {$covered} of {$admins->count()} active administrators. Others must link their own private Telegram while signed in; SMTP is not used.");
+        }
+
+        return $this->requirement(
+            'admin.password_recovery',
+            $covered > 0,
+            $strict,
+            "Telegram recovery is configured for {$covered} active administrators; SMTP is not used.",
+            'No active administrator has a verified private Telegram binding for recovery.',
         );
     }
 

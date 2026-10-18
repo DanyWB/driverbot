@@ -48,6 +48,9 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(Login::class, function (Login $event): void {
             if ($event->user instanceof User) {
                 $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+                if (request()->hasSession()) {
+                    request()->session()->put('admin_session_version', $event->user->session_version);
+                }
             }
         });
 

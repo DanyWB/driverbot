@@ -6,6 +6,17 @@ const STORAGE_KEY = 'admin_locale';
 const COOKIE_KEY = 'admin_locale';
 
 const russianMessages: Record<string, string> = {
+    'Forgot password': 'Восстановление пароля',
+    'Reset password': 'Задать новый пароль',
+    'Please enter your new password below':
+        'Введите новый пароль администратора',
+    'Enter your administrator email. The reset link will arrive in your linked Telegram, not by email.':
+        'Введите email администратора. Ссылка придёт в привязанный Telegram, а не на почту.',
+    'Send link to Telegram': 'Отправить ссылку в Telegram',
+    'The one-time link expires in 15 minutes. Use the Telegram account previously linked in Settings. If you no longer have access to it, contact the owner. Never send your password to the bot.':
+        'Одноразовая ссылка действует 15 минут. Нужен Telegram, ранее привязанный в настройках. Если доступа к нему нет, обратитесь к владельцу. Никогда не отправляйте пароль боту.',
+    'Or, return to': 'Или вернуться ко',
+    'log in': 'входу',
     high: 'Высокий',
     middle: 'Средний',
     low: 'Низкий',

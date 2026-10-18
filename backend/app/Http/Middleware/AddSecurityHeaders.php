@@ -17,7 +17,12 @@ class AddSecurityHeaders
 
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
-        $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
+        $isRecovery = $request->is('forgot-password', 'reset-password', 'reset-password/*');
+        $response->headers->set('Referrer-Policy', $isRecovery ? 'no-referrer' : 'strict-origin-when-cross-origin');
+        if ($isRecovery) {
+            $response->headers->set('Cache-Control', 'no-store, private');
+            $response->headers->set('X-Robots-Tag', 'noindex, nofollow');
+        }
         $response->headers->set('Permissions-Policy', 'camera=(), geolocation=(), microphone=()');
 
         if (is_string($nonce)) {

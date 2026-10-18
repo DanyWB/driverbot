@@ -31,6 +31,20 @@ class AssertRollbackCompatible extends Command
             return self::FAILURE;
         }
 
+        try {
+            if (! is_file($targetBackend.'/app/Http/Middleware/EnsureAdminSessionVersion.php')
+                && Schema::hasColumn('admin_users', 'session_version')
+                && DB::table('admin_users')->where('session_version', '>', 0)->exists()) {
+                $this->error('Rollback denied: target would restore sessions invalidated by Telegram password recovery.');
+
+                return self::FAILURE;
+            }
+        } catch (Throwable) {
+            $this->error('Session compatibility inspection failed; rollback denied.');
+
+            return self::FAILURE;
+        }
+
         if (is_file($targetBackend.DIRECTORY_SEPARATOR.'app'.DIRECTORY_SEPARATOR.'Domain'.DIRECTORY_SEPARATOR.'Bookings'.DIRECTORY_SEPARATOR.'Services'.DIRECTORY_SEPARATOR.'PendingRequestPolicy.php')) {
             $this->info('Rollback target supports the current booking request policy.');
 

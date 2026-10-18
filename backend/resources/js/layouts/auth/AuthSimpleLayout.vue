@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import { useLocale } from '@/composables/useLocale';
 import { home } from '@/routes';
 
 const name = usePage().props.name;
+const { t } = useLocale();
 
 defineProps<{
     title?: string;
@@ -30,11 +32,13 @@ defineProps<{
                         <span class="text-sm font-semibold">{{ name }}</span>
                     </Link>
                     <div class="min-w-0 space-y-2 text-center">
-                        <h1 class="text-xl font-medium">{{ title }}</h1>
+                        <h1 class="text-xl font-medium">
+                            {{ t(title ?? '') }}
+                        </h1>
                         <p
                             class="max-w-full text-center text-sm break-words text-muted-foreground"
                         >
-                            {{ description }}
+                            {{ t(description ?? '') }}
                         </p>
                     </div>
                 </div>

@@ -90,19 +90,20 @@ class ReleaseOperationsTest extends TestCase
 
     public function test_release_preflight_accepts_only_supported_risks_and_preserves_other_failures(): void
     {
-        $reason = 'SMTP is explicitly deferred for this one deployment.';
+        $reason = 'Two-factor enrollment is explicitly deferred for this one deployment.';
+        User::factory()->create(['two_factor_confirmed_at' => null]);
         $exitCode = Artisan::call('operations:release-preflight', [
             '--json' => true,
-            '--accept-risk' => ['mail.transport'],
+            '--accept-risk' => ['admin.two_factor'],
             '--risk-reason' => $reason,
         ]);
         $payload = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
 
         $this->assertSame(Command::FAILURE, $exitCode);
         $this->assertIsArray($payload);
-        $this->assertSame(['mail.transport'], $payload['accepted_risks']);
+        $this->assertSame(['admin.two_factor'], $payload['accepted_risks']);
         $this->assertSame($reason, $payload['risk_reason']);
-        $mail = collect($payload['checks'])->firstWhere('id', 'mail.transport');
+        $mail = collect($payload['checks'])->firstWhere('id', 'admin.two_factor');
         $environment = collect($payload['checks'])->firstWhere('id', 'app.environment');
         $this->assertIsArray($mail);
         $this->assertSame(ReleaseCheck::WARNING, $mail['status']);
@@ -192,6 +193,17 @@ class ReleaseOperationsTest extends TestCase
 
         $this->assertInstanceOf(ReleaseCheck::class, $check);
         $this->assertSame(ReleaseCheck::PASS, $check->status);
+
+        $checks = collect(app(ReleasePreflightService::class)->inspect(true));
+        $this->assertNull($checks->firstWhere('id', 'mail.transport'));
+        $this->assertSame(ReleaseCheck::PASS, $checks->firstWhere('id', 'admin.password_recovery')->status);
+        User::factory()->create();
+        $partial = collect(app(ReleasePreflightService::class)->inspect(true))->firstWhere('id', 'admin.password_recovery');
+        $this->assertSame(ReleaseCheck::WARNING, $partial->status);
+        $this->assertStringContainsString('1 of 2', $partial->message);
+        $admin->telegramBinding()->update(['disconnected_at' => now()]);
+        $none = collect(app(ReleasePreflightService::class)->inspect(true))->firstWhere('id', 'admin.password_recovery');
+        $this->assertSame(ReleaseCheck::FAILURE, $none->status);
     }
 
     public function test_release_preflight_does_not_restore_bootstrap_recipient_after_disconnect(): void

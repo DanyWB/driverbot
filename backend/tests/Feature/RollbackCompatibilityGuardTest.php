@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Booking;
 use App\Models\Customer;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -56,6 +57,14 @@ class RollbackCompatibilityGuardTest extends TestCase
         $this->rollbackGuard($this->legacyBackend)
             ->expectsOutputToContain('legacy rollback is compatible')
             ->assertSuccessful();
+    }
+
+    public function test_target_without_session_revocation_is_denied_after_password_reset(): void
+    {
+        User::factory()->create(['session_version' => 1]);
+        $this->rollbackGuard($this->legacyBackend)
+            ->expectsOutputToContain('restore sessions invalidated')->assertFailed();
+        $this->rollbackGuard(base_path())->assertSuccessful();
     }
 
     /** @param array<string, mixed> $attributes */

@@ -28,6 +28,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string|null $remember_token
  * @property string $role
  * @property bool $is_active
+ * @property int $session_version
  * @property Carbon|null $last_login_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -40,6 +41,8 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     protected $table = 'admin_users';
+
+    protected $attributes = ['session_version' => 0];
 
     /** @return HasOne<AdminTelegramBinding, $this> */
     public function telegramBinding(): HasOne
@@ -64,6 +67,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'session_version' => 'integer',
             'last_login_at' => 'datetime',
             /* @chisel-2fa */
             'two_factor_confirmed_at' => 'datetime',
