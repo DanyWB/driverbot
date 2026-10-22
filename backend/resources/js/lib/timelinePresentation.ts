@@ -51,6 +51,29 @@ export function vehicleNameParts(name: string): {
     };
 }
 
+export function vehicleNameLines(name: string): {
+    model: string;
+    details: string;
+} {
+    const comma = name.indexOf(',');
+    const color = /\b(red|blue|black|white|green|silver|orange)\b/i.exec(name);
+    // Prefer the explicit catalogue separator. With legacy names, split only
+    // before a known paint word or a trailing year; never discard the suffix.
+    const split =
+        comma > 0
+            ? comma
+            : color && color.index > 0
+              ? color.index
+              : name.search(/\s+(?:19|20)\d{2}\b/);
+
+    return split > 0
+        ? {
+              model: name.slice(0, split).trim(),
+              details: name.slice(split + (comma === split ? 1 : 0)).trim(),
+          }
+        : { model: name, details: '' };
+}
+
 export function timelineMonthBands(
     dates: Array<{ date: string; month: string }>,
 ): Array<{ start: number; span: number; label: string; month: string }> {

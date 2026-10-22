@@ -6,6 +6,14 @@ const STORAGE_KEY = 'admin_locale';
 const COOKIE_KEY = 'admin_locale';
 
 const russianMessages: Record<string, string> = {
+    'Timeline density': 'Плотность календаря',
+    'Show more days': 'Показать больше дней',
+    'Show fewer days': 'Показать меньше дней',
+    'Reset day width': 'Обычная ширина дня',
+    ':count pixels per day': ':count пикселей на день',
+    'Details for :vehicle': 'Сведения: :vehicle',
+    'Vehicle details': 'Сведения о технике',
+    'Edit :vehicle': 'Редактировать: :vehicle',
     'Forgot password': 'Восстановление пароля',
     'Reset password': 'Задать новый пароль',
     'Please enter your new password below':

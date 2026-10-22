@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Head, Link, router, useRemember } from '@inertiajs/vue3';
-import { useMediaQuery } from '@vueuse/core';
 import {
     CalendarDays,
     ChevronLeft,
@@ -8,6 +7,7 @@ import {
     ChevronDown,
     Expand,
     FilterX,
+    Minus,
     Minimize,
     Plus,
     X,
@@ -26,6 +26,7 @@ import AdminDateInput from '@/components/AdminDateInput.vue';
 import AdminSelect from '@/components/AdminSelect.vue';
 import TimelineBookingSheet from '@/components/timeline/TimelineBookingSheet.vue';
 import TimelineVehicleName from '@/components/timeline/TimelineVehicleName.vue';
+import TimelineVehicleInfo from '@/components/timeline/TimelineVehicleInfo.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -36,6 +37,15 @@ import {
 import { getActiveLocale, useLocale } from '@/composables/useLocale';
 import { lockBodyScroll } from '@/lib/bodyScrollLock';
 import { timelineEscapeAction } from '@/lib/timelineInteraction';
+import {
+    timelineAnchorScroll,
+    timelineBookingGeometry,
+    timelineDayWidth,
+    timelineGridWidth,
+    timelinePointerMoved,
+    timelineVehicleWidth,
+    timelineVisibleDay,
+} from '@/lib/timelineGeometry';
 import { timelineStatusClasses, timelineStatusLabels } from '@/lib/timeline';
 import {
     occupancyLanes,
@@ -71,13 +81,15 @@ defineOptions({
     },
 });
 
-const smallScreen = useMediaQuery('(max-width: 640px)');
-const vehicleColumnWidth = computed(() => (smallScreen.value ? 160 : 255));
-const dayWidth = 48;
+const viewportWidth = ref(1024);
+const vehicleColumnWidth = computed(() =>
+    timelineVehicleWidth(viewportWidth.value),
+);
 const display = useRemember(
-    { filtersOpen: true, compact: false, customRange: false },
+    { filtersOpen: true, compact: false, customRange: false, dayWidth: 48 },
     'Timeline:display',
 );
+const dayWidth = computed(() => timelineDayWidth(unref(display).dayWidth));
 const localizedDates = computed(() =>
     props.timeline.dates.map((day) => ({
         ...day,
@@ -94,8 +106,26 @@ const localizedDates = computed(() =>
 const monthBands = computed(() => timelineMonthBands(localizedDates.value));
 const timelineHead = ref<HTMLElement | null>(null);
 const timelineBody = ref<HTMLElement | null>(null);
+let visibleDay = 0;
+let restoringScroll = false;
+let restoreRevision = 0;
+let resizeObserver: ResizeObserver | undefined;
+const vehicleInfoOpen = ref(false);
+let pointerGesture: {
+    id: number;
+    x: number;
+    y: number;
+    moved: boolean;
+} | null = null;
+let suppressPointerClick = false;
 function syncHorizontal(event: Event, target: HTMLElement | null): void {
     const source = event.currentTarget as HTMLElement;
+
+    if (restoringScroll) {
+        return;
+    }
+
+    visibleDay = timelineVisibleDay(source.scrollLeft, dayWidth.value);
 
     if (target && target.scrollLeft !== source.scrollLeft) {
         target.scrollLeft = source.scrollLeft;
@@ -134,9 +164,120 @@ watch(isFullscreen, (fullscreen) => {
     releaseBodyScroll = fullscreen ? lockBodyScroll(document) : undefined;
 });
 
-const gridWidth = computed(
-    () => vehicleColumnWidth.value + props.timeline.dates.length * dayWidth,
+const gridWidth = computed(() =>
+    timelineGridWidth(
+        vehicleColumnWidth.value,
+        props.timeline.dates.length,
+        dayWidth.value,
+    ),
 );
+
+watch([dayWidth, vehicleColumnWidth, isFullscreen], async () => {
+    const revision = ++restoreRevision;
+    const anchor = visibleDay;
+    restoringScroll = true;
+    await nextTick();
+
+    if (revision !== restoreRevision) {
+        return;
+    }
+
+    const body = timelineBody.value;
+
+    if (body) {
+        const scrollLeft = timelineAnchorScroll(
+            anchor,
+            dayWidth.value,
+            gridWidth.value,
+            body.clientWidth,
+        );
+        body.scrollLeft = scrollLeft;
+
+        if (timelineHead.value) {
+            timelineHead.value.scrollLeft = scrollLeft;
+        }
+
+        visibleDay = timelineVisibleDay(scrollLeft, dayWidth.value);
+    }
+
+    // Keep generated scroll events from re-anchoring during the same frame.
+    requestAnimationFrame(() => {
+        if (revision === restoreRevision) {
+            restoringScroll = false;
+        }
+    });
+});
+
+function changeDensity(direction: -1 | 0 | 1): void {
+    unref(display).dayWidth =
+        direction === 0
+            ? 48
+            : Math.max(36, Math.min(60, dayWidth.value + direction * 12));
+}
+
+function startPointerGesture(event: PointerEvent): void {
+    if (event.pointerType === 'mouse') {
+        suppressPointerClick = false;
+        pointerGesture = null;
+
+        return;
+    }
+
+    if (pointerGesture) {
+        pointerGesture.moved = true;
+        suppressPointerClick = true;
+
+        return;
+    }
+
+    suppressPointerClick = false;
+    pointerGesture = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        moved: false,
+    };
+}
+
+function movePointerGesture(event: PointerEvent): void {
+    if (!pointerGesture || pointerGesture.id !== event.pointerId) {
+        return;
+    }
+
+    if (
+        timelinePointerMoved(pointerGesture, {
+            x: event.clientX,
+            y: event.clientY,
+        })
+    ) {
+        pointerGesture.moved = true;
+        suppressPointerClick = true;
+    }
+}
+
+function endPointerGesture(event: PointerEvent): void {
+    if (pointerGesture?.id !== event.pointerId) {
+        return;
+    }
+
+    suppressPointerClick =
+        pointerGesture.moved || event.type === 'pointercancel';
+    pointerGesture = null;
+}
+
+function handleDateClick(
+    event: MouseEvent,
+    row: TimelineVehicle,
+    date: string,
+    index: number,
+): void {
+    // Keyboard activation has detail=0 and remains available after a scroll.
+    if (event.detail !== 0 && (suppressPointerClick || pointerGesture?.moved)) {
+        return;
+    }
+
+    selectTimelineDate(row, date, index);
+}
 const rangeLabel = computed(() =>
     formatRange(props.timeline.range.starts_on, props.timeline.range.ends_on),
 );
@@ -200,10 +341,20 @@ const selectionPreview = computed(() => {
     };
 });
 
-onMounted(() => document.addEventListener('keydown', onTimelineKeydown));
+onMounted(() => {
+    document.addEventListener('keydown', onTimelineKeydown);
+    resizeObserver = new ResizeObserver((entries) => {
+        viewportWidth.value = entries[0].contentRect.width;
+    });
+
+    if (timelineContainer.value) {
+        resizeObserver.observe(timelineContainer.value);
+    }
+});
 onBeforeUnmount(() => {
     document.removeEventListener('keydown', onTimelineKeydown);
     releaseBodyScroll?.();
+    resizeObserver?.disconnect();
 });
 
 function toggleFullscreen(): void {
@@ -470,6 +621,10 @@ function handleBookingSheetOpen(open: boolean): void {
 }
 
 function onTimelineKeydown(event: KeyboardEvent): void {
+    if (vehicleInfoOpen.value || event.defaultPrevented) {
+        return;
+    }
+
     const action = timelineEscapeAction({
         key: event.key,
         fullscreen: isFullscreen.value,
@@ -566,10 +721,17 @@ function bookingHref(publicId: string): string {
 function occupancyStyle(
     occupancy: TimelineOccupancy & { lane: number },
 ): Record<string, string> {
+    const geometry = timelineBookingGeometry(
+        vehicleColumnWidth.value,
+        dayWidth.value,
+        occupancy.start_index,
+        occupancy.span_days,
+    );
+
     return {
         top: `${(unref(display).compact ? 5 : 10) + occupancy.lane * 30}px`,
-        left: `${vehicleColumnWidth.value + occupancy.start_index * dayWidth + 2}px`,
-        width: `${Math.max(dayWidth - 4, occupancy.span_days * dayWidth - 4)}px`,
+        left: `${geometry.left}px`,
+        width: `${geometry.width}px`,
     };
 }
 
@@ -598,7 +760,7 @@ function vehicleDetails(row: TimelineVehicle): string {
 
 function rowStyle(row: TimelineVehicle): Record<string, string> {
     return {
-        height: `${Math.max(unref(display).compact ? 38 : 48, ...occupancyLanes(row.occupancies).map((item) => item.lane * 30 + (unref(display).compact ? 38 : 48)))}px`,
+        minHeight: `${Math.max(unref(display).compact ? 72 : 92, ...occupancyLanes(row.occupancies).map((item) => item.lane * 30 + (unref(display).compact ? 38 : 48)))}px`,
         width: `${gridWidth.value}px`,
         '--bike-color': vehicleRowColor(row.id),
         '--paint-color':
@@ -1212,29 +1374,74 @@ function formatRange(startsOn: string, endsOn: string): string {
                     :style="{ width: `${gridWidth}px` }"
                 >
                     <div
-                        class="timeline-vehicle-head sticky left-0 z-40 flex shrink-0 items-center justify-between gap-2 border-r bg-background px-3 text-xs font-semibold text-muted-foreground"
+                        class="timeline-vehicle-head sticky left-0 z-40 flex shrink-0 flex-col justify-center gap-1 border-r bg-background px-2 text-xs font-semibold text-muted-foreground"
                         :style="{ width: `${vehicleColumnWidth}px` }"
                     >
-                        {{ t('Vehicle') }}
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            class="size-7"
-                            :aria-expanded="!display.compact"
-                            :aria-label="
-                                t(
-                                    display.compact
-                                        ? 'Show vehicle details'
-                                        : 'Hide vehicle details',
-                                )
-                            "
-                            @click="display.compact = !display.compact"
-                            ><Plus
-                                v-if="display.compact"
-                                class="size-3" /><Minimize
-                                v-else
-                                class="size-3"
-                        /></Button>
+                        <div class="flex w-full items-center justify-between">
+                            {{ t('Vehicle') }}
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                class="size-7"
+                                :aria-expanded="!display.compact"
+                                :aria-label="
+                                    t(
+                                        display.compact
+                                            ? 'Show vehicle details'
+                                            : 'Hide vehicle details',
+                                    )
+                                "
+                                @click="display.compact = !display.compact"
+                                ><Plus
+                                    v-if="display.compact"
+                                    class="size-3" /><Minimize
+                                    v-else
+                                    class="size-3"
+                            /></Button>
+                        </div>
+                        <div
+                            class="flex items-center gap-1"
+                            role="group"
+                            :aria-label="t('Timeline density')"
+                        >
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                class="size-9"
+                                :disabled="dayWidth === 36"
+                                :aria-label="t('Show more days')"
+                                :title="t('Show more days')"
+                                @click="changeDensity(-1)"
+                                ><Minus class="size-3.5"
+                            /></Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                class="h-9 min-w-12 px-2 text-xs tabular-nums"
+                                :aria-label="t('Reset day width')"
+                                :title="
+                                    t(':count pixels per day', {
+                                        count: dayWidth,
+                                    })
+                                "
+                                @click="changeDensity(0)"
+                                ><span aria-live="polite">{{
+                                    dayWidth
+                                }}</span></Button
+                            >
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                class="size-9"
+                                :disabled="dayWidth === 60"
+                                :aria-label="t('Show fewer days')"
+                                :title="t('Show fewer days')"
+                                @click="changeDensity(1)"
+                                ><Plus class="size-3.5"
+                            /></Button>
+                        </div>
                     </div>
                     <div class="relative flex pt-12">
                         <div class="absolute inset-x-0 top-0 flex h-12">
@@ -1278,6 +1485,10 @@ function formatRange(startsOn: string, endsOn: string): string {
                 v-if="timeline.rows.length > 0"
                 ref="timelineBody"
                 @scroll="syncHorizontal($event, timelineHead)"
+                @pointerdown.capture="startPointerGesture"
+                @pointermove.capture="movePointerGesture"
+                @pointerup.capture="endPointerGesture"
+                @pointercancel.capture="endPointerGesture"
                 class="timeline-scroll-area max-w-full overflow-auto overscroll-x-contain overscroll-y-auto [contain:paint]"
                 :class="[
                     isFullscreen
@@ -1296,7 +1507,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                         @mouseleave="clearHoveredCell(row.id)"
                     >
                         <div
-                            class="timeline-vehicle-label sticky left-0 z-20 flex shrink-0 items-center gap-2 border-r px-3"
+                            class="timeline-vehicle-label sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r px-2 py-2"
                             :style="{ width: `${vehicleColumnWidth}px` }"
                         >
                             <span
@@ -1305,54 +1516,88 @@ function formatRange(startsOn: string, endsOn: string): string {
                                     backgroundColor: vehicleRowColor(row.id),
                                 }"
                             />
-                            <div class="flex min-w-0 flex-1 items-center gap-2">
+                            <div
+                                class="min-w-0 flex-1"
+                                :class="
+                                    display.compact
+                                        ? 'flex items-center gap-1'
+                                        : ''
+                                "
+                            >
                                 <div class="min-w-0 flex-1">
-                                    <Tooltip :delay-duration="1000"
-                                        ><TooltipTrigger as-child
-                                            ><Link
-                                                :href="`/vehicles/${row.id}/edit`"
-                                                class="timeline-name block w-fit max-w-full truncate text-xs font-semibold"
-                                                :aria-label="row.name"
-                                                ><TimelineVehicleName
-                                                    :name="
-                                                        row.name
-                                                    " /></Link></TooltipTrigger
-                                        ><TooltipContent
-                                            ><TimelineVehicleName
-                                                :name="row.name"
-                                            />
-                                            <p class="mt-1 text-xs">
-                                                {{ vehicleDetails(row) }}
-                                            </p></TooltipContent
-                                        ></Tooltip
+                                    <Link
+                                        :href="`/vehicles/${row.id}/edit`"
+                                        class="timeline-name block w-full text-xs font-semibold"
+                                        :aria-label="
+                                            t('Edit :vehicle', {
+                                                vehicle: row.name,
+                                            })
+                                        "
+                                        ><TimelineVehicleName
+                                            :name="row.name"
+                                            stacked
+                                    /></Link>
+                                    <span
+                                        v-if="
+                                            display.compact &&
+                                            (!row.is_active || !row.is_visible)
+                                        "
+                                        class="mt-1 inline-block rounded border px-1 py-0.5 text-[9px] leading-none font-medium text-muted-foreground"
                                     >
-                                    <p
-                                        v-if="!display.compact"
-                                        class="truncate text-[11px] text-muted-foreground"
-                                        :title="vehicleDetails(row)"
-                                    >
-                                        <span>{{ t(row.type) }}</span>
-                                        <span v-if="row.category">
-                                            · {{ row.category.name }}</span
-                                        >
-                                        <span v-if="row.inventory_code">
-                                            · {{ row.inventory_code }}</span
-                                        >
-                                    </p>
+                                        {{
+                                            t(
+                                                !row.is_active
+                                                    ? 'inactive'
+                                                    : 'internal',
+                                            )
+                                        }}
+                                    </span>
                                 </div>
-                                <span
-                                    v-if="!row.is_active || !row.is_visible"
-                                    class="shrink-0 rounded border px-1 py-0.5 text-[9px] leading-none font-medium text-muted-foreground"
-                                    :title="vehicleDetails(row)"
+                                <TimelineVehicleInfo
+                                    v-if="display.compact"
+                                    :vehicle="row"
+                                    @update:open="vehicleInfoOpen = $event"
+                                />
+                                <div
+                                    v-else
+                                    class="mt-1 flex items-center gap-1"
                                 >
-                                    {{
-                                        t(
-                                            !row.is_active
-                                                ? 'inactive'
-                                                : 'internal',
-                                        )
-                                    }}
-                                </span>
+                                    <div class="min-w-0 flex-1">
+                                        <p
+                                            v-if="!display.compact"
+                                            class="text-[11px] leading-4 [overflow-wrap:anywhere] break-words text-muted-foreground"
+                                            :title="vehicleDetails(row)"
+                                        >
+                                            <span>{{ t(row.type) }}</span>
+                                            <span v-if="row.category">
+                                                · {{ row.category.name }}</span
+                                            >
+                                            <span v-if="row.inventory_code">
+                                                · {{ row.inventory_code }}</span
+                                            >
+                                        </p>
+                                        <span
+                                            v-if="
+                                                !row.is_active ||
+                                                !row.is_visible
+                                            "
+                                            class="inline-block rounded border px-1 py-0.5 text-[9px] leading-none font-medium text-muted-foreground"
+                                            :title="vehicleDetails(row)"
+                                        >
+                                            {{
+                                                t(
+                                                    !row.is_active
+                                                        ? 'inactive'
+                                                        : 'internal',
+                                                )
+                                            }}
+                                        </span>
+                                    </div>
+                                    <TimelineVehicleInfo
+                                        :vehicle="row"
+                                        @update:open="vehicleInfoOpen = $event"
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -1363,7 +1608,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             <button
                                 v-if="row.is_active && isCellFree(row, index)"
                                 type="button"
-                                class="timeline-day group/cell relative h-full shrink-0 border-r p-0 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-600"
+                                class="timeline-day group/cell relative shrink-0 self-stretch border-r p-0 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-600"
                                 :class="[
                                     date.is_weekend ? 'bg-muted/25' : '',
                                     date.is_today
@@ -1383,7 +1628,12 @@ function formatRange(startsOn: string, endsOn: string): string {
                                 @focus="previewTimelineDate(row, index)"
                                 @blur="clearHoveredCell(row.id)"
                                 @click="
-                                    selectTimelineDate(row, date.date, index)
+                                    handleDateClick(
+                                        $event,
+                                        row,
+                                        date.date,
+                                        index,
+                                    )
                                 "
                             >
                                 <Plus
@@ -1392,7 +1642,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             </button>
                             <div
                                 v-else
-                                class="timeline-day h-full shrink-0 border-r"
+                                class="timeline-day shrink-0 self-stretch border-r"
                                 @mouseenter="hoverDateIndex = index"
                                 :class="[
                                     date.is_weekend ? 'bg-muted/25' : '',
@@ -1578,13 +1828,50 @@ main:has(> .timeline-page) {
     -webkit-text-stroke: 0.35px #eef2f0;
 }
 .dark .timeline-paint-black {
-    -webkit-text-stroke: 0.45px #f4f6f5;
-    text-shadow: 0 0 1px #f4f6f5;
+    color: #050607;
+    -webkit-text-stroke: 0.7px #f4f6f5;
+    paint-order: stroke fill;
+    text-shadow: none;
+}
+@supports not (-webkit-text-stroke: 1px white) {
+    .dark .timeline-paint-black {
+        text-shadow:
+            -0.5px 0 #f4f6f5,
+            0.5px 0 #f4f6f5,
+            0 -0.5px #f4f6f5,
+            0 0.5px #f4f6f5;
+    }
+}
+.timeline-vehicle-info[data-state='open'] {
+    animation: timeline-info-in 350ms ease;
+}
+.timeline-vehicle-info[data-state='closed'] {
+    animation: timeline-info-out 350ms ease;
+}
+@keyframes timeline-info-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+@keyframes timeline-info-out {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
 }
 @media (prefers-reduced-motion: reduce) {
     .timeline-page *,
-    .timeline-collapse {
+    .timeline-collapse,
+    .timeline-vehicle-info {
         transition: none !important;
+        animation: none !important;
     }
 }
 </style>
