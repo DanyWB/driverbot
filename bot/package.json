@@ -28,7 +28,7 @@
     "release:smoke": "node scripts/release-preflight.js --online"
   },
   "dependencies": {
-    "dayjs": "^1.11.13",
+    "dayjs": "^1.11.21",
     "dotenv": "^16.3.1",
     "googleapis": "^173.0.0",
     "grammy": "^1.17.0",
