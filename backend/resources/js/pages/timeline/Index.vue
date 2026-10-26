@@ -38,6 +38,14 @@ import { getActiveLocale, useLocale } from '@/composables/useLocale';
 import { lockBodyScroll } from '@/lib/bodyScrollLock';
 import { timelineEscapeAction } from '@/lib/timelineInteraction';
 import {
+    timelineTouchPair,
+    timelineZoom,
+    timelineZoomDay,
+    timelineZoomLimits,
+    timelineZoomScroll,
+    timelineZoomTop,
+} from '@/lib/timelineZoom';
+import {
     timelineAnchorScroll,
     timelineBookingGeometry,
     timelineDayWidth,
@@ -82,14 +90,22 @@ defineOptions({
 });
 
 const viewportWidth = ref(1024);
-const vehicleColumnWidth = computed(() =>
-    timelineVehicleWidth(viewportWidth.value),
+const longestNameWidth = ref(0);
+const zoom = ref(1);
+const vehicleColumnWidth = computed(
+    () =>
+        timelineVehicleWidth(viewportWidth.value, longestNameWidth.value) *
+        zoom.value,
 );
 const display = useRemember(
     { filtersOpen: true, compact: false, customRange: false, dayWidth: 48 },
     'Timeline:display',
 );
-const dayWidth = computed(() => timelineDayWidth(unref(display).dayWidth));
+const dayWidth = computed(
+    () => timelineDayWidth(unref(display).dayWidth) * zoom.value,
+);
+const zoomPercent = computed(() => Math.round(zoom.value * 100));
+const zoomStyles = computed(() => ({ '--timeline-zoom': zoom.value }));
 const localizedDates = computed(() =>
     props.timeline.dates.map((day) => ({
         ...day,
@@ -118,6 +134,16 @@ let pointerGesture: {
     moved: boolean;
 } | null = null;
 let suppressPointerClick = false;
+let pinchOwned = false;
+let pinch: {
+    ids: number[];
+    distance: number;
+    zoom: number;
+    day: number;
+    contentY: number;
+} | null = null;
+let zoomAnchor: { day: number; x: number; y: number; contentY: number } | null =
+    null;
 function syncHorizontal(event: Event, target: HTMLElement | null): void {
     const source = event.currentTarget as HTMLElement;
 
@@ -172,9 +198,11 @@ const gridWidth = computed(() =>
     ),
 );
 
-watch([dayWidth, vehicleColumnWidth, isFullscreen], async () => {
+watch([dayWidth, vehicleColumnWidth, isFullscreen, viewportWidth], async () => {
     const revision = ++restoreRevision;
     const anchor = visibleDay;
+    const gestureAnchor = zoomAnchor;
+    zoomAnchor = null;
     restoringScroll = true;
     await nextTick();
 
@@ -185,13 +213,32 @@ watch([dayWidth, vehicleColumnWidth, isFullscreen], async () => {
     const body = timelineBody.value;
 
     if (body) {
-        const scrollLeft = timelineAnchorScroll(
-            anchor,
-            dayWidth.value,
-            gridWidth.value,
-            body.clientWidth,
-        );
+        const scrollLeft = gestureAnchor
+            ? timelineZoomScroll(
+                  gestureAnchor.day,
+                  gestureAnchor.x,
+                  vehicleColumnWidth.value,
+                  dayWidth.value,
+                  gridWidth.value,
+                  body.clientWidth,
+              )
+            : timelineAnchorScroll(
+                  anchor,
+                  dayWidth.value,
+                  gridWidth.value,
+                  body.clientWidth,
+              );
         body.scrollLeft = scrollLeft;
+
+        if (gestureAnchor) {
+            body.scrollTop = timelineZoomTop(
+                gestureAnchor.contentY,
+                gestureAnchor.y,
+                zoom.value,
+                body.scrollHeight,
+                body.clientHeight,
+            );
+        }
 
         if (timelineHead.value) {
             timelineHead.value.scrollLeft = scrollLeft;
@@ -208,14 +255,146 @@ watch([dayWidth, vehicleColumnWidth, isFullscreen], async () => {
     });
 });
 
-function changeDensity(direction: -1 | 0 | 1): void {
-    unref(display).dayWidth =
+function changeZoom(direction: -1 | 0 | 1): void {
+    zoom.value = timelineZoom(
         direction === 0
-            ? 48
-            : Math.max(36, Math.min(60, dayWidth.value + direction * 12));
+            ? 1
+            : Math.round((zoom.value + direction * 0.1) * 100) / 100,
+    );
+}
+
+function measureVehicleNames(): void {
+    const name = timelineBody.value?.querySelector('.timeline-name');
+
+    if (!name) {
+        return;
+    }
+
+    const context = document.createElement('canvas').getContext('2d');
+
+    if (!context) {
+        return;
+    }
+
+    const style = getComputedStyle(name);
+    // Measure the unscaled 12px name font. Zoom is applied to the complete grid.
+    // Paint words are bolder than the model. Measuring at 800 also leaves a
+    // safe margin for every palette word and the unscaled accessible info tap.
+    context.font = `800 12px ${style.fontFamily}`;
+    longestNameWidth.value = Math.max(
+        0,
+        ...props.timeline.rows.map(
+            (row) => context.measureText(row.name).width,
+        ),
+    );
+}
+
+function startTimelineTouch(event: TouchEvent): void {
+    const surface = event.currentTarget as HTMLElement;
+    // Both contacts must originate inside this grid, never an outside control.
+    const touches = Array.from(event.touches);
+
+    if (
+        touches.length !== 2 ||
+        touches.some(
+            (touch) =>
+                !(touch.target instanceof Node) ||
+                !surface.contains(touch.target),
+        )
+    ) {
+        return;
+    }
+
+    const pair = timelineTouchPair(touches);
+
+    if (!pair || !event.cancelable) {
+        return;
+    }
+
+    event.preventDefault();
+    pinchOwned = true;
+    suppressPointerClick = true;
+    const rect = surface.getBoundingClientRect();
+    pinch = {
+        ids: touches.map((touch) => touch.identifier),
+        distance: pair.distance,
+        zoom: zoom.value,
+        day: timelineZoomDay(
+            surface.scrollLeft,
+            pair.x - rect.left,
+            vehicleColumnWidth.value,
+            dayWidth.value,
+        ),
+        contentY: (surface.scrollTop + pair.y - rect.top) / zoom.value,
+    };
+}
+
+function moveTimelineTouch(event: TouchEvent): void {
+    if (!pinchOwned) {
+        return;
+    }
+
+    // Once claimed, do not turn the remaining finger into a tap/drag.
+    if (!event.cancelable) {
+        return;
+    }
+
+    event.preventDefault();
+    const touches = Array.from(event.touches);
+    const pair = timelineTouchPair(touches, pinch?.ids);
+
+    if (!pinch || !pair) {
+        return;
+    }
+
+    const nextZoom = timelineZoom(
+        (pinch.zoom * pair.distance) / pinch.distance,
+    );
+
+    if (nextZoom === zoom.value) {
+        return;
+    }
+
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    zoomAnchor = {
+        day: pinch.day,
+        x: pair.x - rect.left,
+        y: pair.y - rect.top,
+        contentY: pinch.contentY,
+    };
+    zoom.value = nextZoom;
+}
+
+function endTimelineTouch(event: TouchEvent): void {
+    if (!pinchOwned) {
+        return;
+    }
+
+    suppressPointerClick = true;
+
+    if (event.cancelable) {
+        event.preventDefault();
+    }
+
+    pinch = null;
+
+    if (event.touches.length === 0) {
+        pinchOwned = false;
+    }
+}
+
+function guardGestureClick(event: MouseEvent): void {
+    if (event.detail !== 0 && (pinchOwned || suppressPointerClick)) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
 }
 
 function startPointerGesture(event: PointerEvent): void {
+    if (pinchOwned) {
+        return;
+    }
+
     if (event.pointerType === 'mouse') {
         suppressPointerClick = false;
         pointerGesture = null;
@@ -261,7 +440,10 @@ function endPointerGesture(event: PointerEvent): void {
     }
 
     suppressPointerClick =
-        pointerGesture.moved || event.type === 'pointercancel';
+        suppressPointerClick ||
+        pinchOwned ||
+        pointerGesture.moved ||
+        event.type === 'pointercancel';
     pointerGesture = null;
 }
 
@@ -350,6 +532,21 @@ onMounted(() => {
     if (timelineContainer.value) {
         resizeObserver.observe(timelineContainer.value);
     }
+
+    measureVehicleNames();
+    void document.fonts.ready.then(() => {
+        if (timelineBody.value) {
+            measureVehicleNames();
+        }
+    });
+});
+watch(
+    () => props.timeline.rows,
+    () => nextTick(measureVehicleNames),
+);
+watch([viewportWidth, isFullscreen], () => {
+    pinch = null;
+    pinchOwned = false;
 });
 onBeforeUnmount(() => {
     document.removeEventListener('keydown', onTimelineKeydown);
@@ -726,10 +923,12 @@ function occupancyStyle(
         dayWidth.value,
         occupancy.start_index,
         occupancy.span_days,
+        zoom.value,
     );
 
     return {
-        top: `${(unref(display).compact ? 5 : 10) + occupancy.lane * 30}px`,
+        top: `${((unref(display).compact ? 5 : 10) + occupancy.lane * 30) * zoom.value}px`,
+        height: `${26 * zoom.value}px`,
         left: `${geometry.left}px`,
         width: `${geometry.width}px`,
     };
@@ -760,7 +959,7 @@ function vehicleDetails(row: TimelineVehicle): string {
 
 function rowStyle(row: TimelineVehicle): Record<string, string> {
     return {
-        minHeight: `${Math.max(unref(display).compact ? 72 : 92, ...occupancyLanes(row.occupancies).map((item) => item.lane * 30 + (unref(display).compact ? 38 : 48)))}px`,
+        minHeight: `${Math.max(unref(display).compact ? 72 : 92, ...occupancyLanes(row.occupancies).map((item) => item.lane * 30 + (unref(display).compact ? 38 : 48))) * zoom.value}px`,
         width: `${gridWidth.value}px`,
         '--bike-color': vehicleRowColor(row.id),
         '--paint-color':
@@ -1368,10 +1567,14 @@ function formatRange(startsOn: string, endsOn: string): string {
                 class="sticky top-0 z-30 shrink-0 overflow-x-auto bg-background"
                 :class="isFullscreen ? 'pt-12' : ''"
                 @scroll="syncHorizontal($event, timelineBody)"
+                :style="zoomStyles"
             >
                 <div
                     class="timeline-grid-head flex h-24 border-b bg-background shadow-xs"
-                    :style="{ width: `${gridWidth}px` }"
+                    :style="{
+                        width: `${gridWidth}px`,
+                        height: `${96 * zoom}px`,
+                    }"
                 >
                     <div
                         class="timeline-vehicle-head sticky left-0 z-40 flex shrink-0 flex-col justify-center gap-1 border-r bg-background px-2 text-xs font-semibold text-muted-foreground"
@@ -1402,49 +1605,51 @@ function formatRange(startsOn: string, endsOn: string): string {
                         <div
                             class="flex items-center gap-1"
                             role="group"
-                            :aria-label="t('Timeline density')"
+                            :aria-label="t('Timeline zoom')"
                         >
                             <Button
                                 type="button"
                                 variant="outline"
                                 size="icon"
-                                class="size-9"
-                                :disabled="dayWidth === 36"
-                                :aria-label="t('Show more days')"
-                                :title="t('Show more days')"
-                                @click="changeDensity(-1)"
+                                class="size-8"
+                                :disabled="zoom <= timelineZoomLimits.min"
+                                :aria-label="t('Zoom out')"
+                                :title="t('Zoom out')"
+                                @click="changeZoom(-1)"
                                 ><Minus class="size-3.5"
                             /></Button>
                             <Button
                                 type="button"
                                 variant="outline"
-                                class="h-9 min-w-12 px-2 text-xs tabular-nums"
-                                :aria-label="t('Reset day width')"
-                                :title="
-                                    t(':count pixels per day', {
-                                        count: dayWidth,
-                                    })
-                                "
-                                @click="changeDensity(0)"
-                                ><span aria-live="polite">{{
-                                    dayWidth
-                                }}</span></Button
+                                class="h-8 min-w-10 px-1 text-xs tabular-nums"
+                                :aria-label="t('Reset zoom')"
+                                :title="`${zoomPercent}% (75–150%)`"
+                                @click="changeZoom(0)"
+                                ><span aria-live="polite"
+                                    >{{ zoomPercent }}%</span
+                                ></Button
                             >
                             <Button
                                 type="button"
                                 variant="outline"
                                 size="icon"
-                                class="size-9"
-                                :disabled="dayWidth === 60"
-                                :aria-label="t('Show fewer days')"
-                                :title="t('Show fewer days')"
-                                @click="changeDensity(1)"
+                                class="size-8"
+                                :disabled="zoom >= timelineZoomLimits.max"
+                                :aria-label="t('Zoom in')"
+                                :title="t('Zoom in')"
+                                @click="changeZoom(1)"
                                 ><Plus class="size-3.5"
                             /></Button>
                         </div>
                     </div>
-                    <div class="relative flex pt-12">
-                        <div class="absolute inset-x-0 top-0 flex h-12">
+                    <div
+                        class="relative flex"
+                        :style="{ paddingTop: `${48 * zoom}px` }"
+                    >
+                        <div
+                            class="absolute inset-x-0 top-0 flex"
+                            :style="{ height: `${48 * zoom}px` }"
+                        >
                             <div
                                 v-for="band in monthBands"
                                 :key="band.start"
@@ -1489,6 +1694,12 @@ function formatRange(startsOn: string, endsOn: string): string {
                 @pointermove.capture="movePointerGesture"
                 @pointerup.capture="endPointerGesture"
                 @pointercancel.capture="endPointerGesture"
+                @touchstart.capture="startTimelineTouch"
+                @touchmove.capture="moveTimelineTouch"
+                @touchend.capture="endTimelineTouch"
+                @touchcancel.capture="endTimelineTouch"
+                @click.capture="guardGestureClick"
+                :style="zoomStyles"
                 class="timeline-scroll-area max-w-full overflow-auto overscroll-x-contain overscroll-y-auto [contain:paint]"
                 :class="[
                     isFullscreen
@@ -1528,6 +1739,12 @@ function formatRange(startsOn: string, endsOn: string): string {
                                     <Link
                                         :href="`/vehicles/${row.id}/edit`"
                                         class="timeline-name block w-full text-xs font-semibold"
+                                        :class="
+                                            viewportWidth > 640
+                                                ? 'whitespace-nowrap'
+                                                : ''
+                                        "
+                                        :title="row.name"
                                         :aria-label="
                                             t('Edit :vehicle', {
                                                 vehicle: row.name,
@@ -1535,7 +1752,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                                         "
                                         ><TimelineVehicleName
                                             :name="row.name"
-                                            stacked
+                                            :stacked="viewportWidth <= 640"
                                     /></Link>
                                     <span
                                         v-if="
@@ -1565,7 +1782,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                                     <div class="min-w-0 flex-1">
                                         <p
                                             v-if="!display.compact"
-                                            class="text-[11px] leading-4 [overflow-wrap:anywhere] break-words text-muted-foreground"
+                                            class="timeline-vehicle-details text-[11px] leading-4 [overflow-wrap:anywhere] break-words text-muted-foreground"
                                             :title="vehicleDetails(row)"
                                         >
                                             <span>{{ t(row.type) }}</span>
@@ -1668,7 +1885,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             <Link
                                 v-if="occupancy.booking_public_id"
                                 :href="bookingHref(occupancy.booking_public_id)"
-                                class="absolute z-10 flex h-[26px] items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                                class="timeline-occupancy absolute z-10 flex items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
                                 :class="occupancyClass(occupancy)"
                                 :style="occupancyStyle(occupancy)"
                                 :title="occupancyTitle(occupancy)"
@@ -1680,7 +1897,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             </Link>
                             <div
                                 v-else
-                                class="absolute z-10 flex h-[26px] items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs"
+                                class="timeline-occupancy absolute z-10 flex items-center overflow-hidden rounded-sm border px-2 text-xs font-semibold shadow-xs"
                                 :class="occupancyClass(occupancy)"
                                 :style="occupancyStyle(occupancy)"
                                 :title="occupancyTitle(occupancy)"
@@ -1801,7 +2018,8 @@ main:has(> .timeline-page) {
         0 0 6px #3988ff;
 }
 .timeline-name {
-    padding: 3px 7px;
+    padding: calc(3px * var(--timeline-zoom, 1))
+        calc(7px * var(--timeline-zoom, 1));
     border: 1px solid color-mix(in srgb, var(--paint-color) 48%, #777e7b);
     border-radius: 6px;
     background: var(--background);
@@ -1819,28 +2037,73 @@ main:has(> .timeline-page) {
         0 0 34px color-mix(in srgb, var(--paint-color) 58%, transparent);
 }
 .timeline-paint-word {
+    display: inline-grid;
+    vertical-align: baseline;
     color: var(--paint-ink);
     font-weight: 800;
-    -webkit-text-stroke: 0.35px #6b7471;
-    paint-order: stroke fill;
+    --paint-outline: #6b7471;
+    --paint-outline-width: 0.6px;
 }
 .dark .timeline-paint-word {
-    -webkit-text-stroke: 0.35px #eef2f0;
+    --paint-outline: #eef2f0;
 }
 .dark .timeline-paint-black {
-    color: #050607;
-    -webkit-text-stroke: 0.7px #f4f6f5;
-    paint-order: stroke fill;
+    --paint-outline: #f4f6f5;
     text-shadow: none;
 }
+.timeline-paint-outline,
+.timeline-paint-fill {
+    grid-area: 1 / 1;
+    text-shadow: none;
+}
+.timeline-paint-outline {
+    -webkit-text-stroke: var(--paint-outline-width) var(--paint-outline);
+    paint-order: stroke fill;
+}
+/* A separate foreground glyph covers the inward half of the stroke, even in
+   engines without paint-order. Red/Black keep their original filled shapes. */
+.timeline-paint-fill {
+    position: relative;
+    -webkit-text-stroke: 0;
+}
 @supports not (-webkit-text-stroke: 1px white) {
-    .dark .timeline-paint-black {
+    .timeline-paint-outline {
         text-shadow:
-            -0.5px 0 #f4f6f5,
-            0.5px 0 #f4f6f5,
-            0 -0.5px #f4f6f5,
-            0 0.5px #f4f6f5;
+            -0.3px 0 var(--paint-outline),
+            0.3px 0 var(--paint-outline),
+            0 -0.3px var(--paint-outline),
+            0 0.3px var(--paint-outline);
     }
+}
+/* Only the grid owns pinch. Native single-finger panning stays available and
+   browser/page zoom outside this surface is unchanged. No transform scaling:
+   real geometry keeps frozen labels, scroll extents and hit targets aligned. */
+.timeline-scroll-area {
+    touch-action: pan-x pan-y;
+}
+.timeline-name,
+.timeline-month,
+.timeline-date-head,
+.timeline-occupancy {
+    font-size: calc(12px * var(--timeline-zoom, 1));
+    line-height: calc(16px * var(--timeline-zoom, 1));
+}
+.timeline-name span {
+    line-height: inherit;
+}
+.timeline-date-head > span {
+    font-size: calc(10px * var(--timeline-zoom, 1));
+}
+.timeline-vehicle-details {
+    font-size: calc(11px * var(--timeline-zoom, 1));
+    line-height: calc(16px * var(--timeline-zoom, 1));
+}
+.timeline-vehicle-label {
+    padding: calc(8px * var(--timeline-zoom, 1));
+    gap: calc(6px * var(--timeline-zoom, 1));
+}
+.timeline-occupancy {
+    padding-inline: calc(8px * var(--timeline-zoom, 1));
 }
 .timeline-vehicle-info[data-state='open'] {
     animation: timeline-info-in 350ms ease;

@@ -27,6 +27,15 @@ const paints: Record<string, string> = {
     orange: '#ffad54',
 };
 
+export function vehicleNameSegments(
+    name: string,
+): Array<{ text: string; ink: string | null }> {
+    return name
+        .split(/(\b(?:red|blue|black|white|green|silver|orange)\b)/gi)
+        .filter(Boolean)
+        .map((text) => ({ text, ink: paints[text.toLowerCase()] ?? null }));
+}
+
 export function vehicleRowColor(id: number): string {
     return rowColors[Math.abs(Math.trunc(id) - 1) % rowColors.length];
 }

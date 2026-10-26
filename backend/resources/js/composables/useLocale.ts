@@ -6,6 +6,10 @@ const STORAGE_KEY = 'admin_locale';
 const COOKIE_KEY = 'admin_locale';
 
 const russianMessages: Record<string, string> = {
+    'Timeline zoom': 'Масштаб календаря',
+    'Zoom out': 'Уменьшить масштаб',
+    'Zoom in': 'Увеличить масштаб',
+    'Reset zoom': 'Сбросить масштаб',
     'Timeline density': 'Плотность календаря',
     'Show more days': 'Показать больше дней',
     'Show fewer days': 'Показать меньше дней',

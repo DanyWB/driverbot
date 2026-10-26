@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { vehicleNameLines, vehicleNameParts } from '@/lib/timelinePresentation';
+import {
+    vehicleNameLines,
+    vehicleNameSegments,
+} from '@/lib/timelinePresentation';
 const props = defineProps<{ name: string; stacked?: boolean }>();
-const parts = computed(() => vehicleNameParts(props.name));
+const segments = computed(() => vehicleNameSegments(props.name));
 const lines = computed(() => vehicleNameLines(props.name));
 </script>
 
@@ -19,15 +22,19 @@ const lines = computed(() => vehicleNameLines(props.name));
         />
     </span>
     <span v-else
-        >{{ parts.before
-        }}<span
-            v-if="parts.ink"
-            class="timeline-paint-word"
-            :class="{
-                'timeline-paint-black': parts.color.toLowerCase() === 'black',
-            }"
-            :style="{ '--paint-ink': parts.ink }"
-            >{{ parts.color }}</span
-        >{{ parts.after }}</span
+        ><template v-for="(part, index) in segments" :key="index"
+            ><span
+                v-if="part.ink"
+                class="timeline-paint-word"
+                :class="{
+                    'timeline-paint-black': part.text.toLowerCase() === 'black',
+                }"
+                :style="{ '--paint-ink': part.ink }"
+                ><span class="timeline-paint-outline" aria-hidden="true">{{
+                    part.text
+                }}</span
+                ><span class="timeline-paint-fill">{{ part.text }}</span></span
+            ><template v-else>{{ part.text }}</template></template
+        ></span
     >
 </template>

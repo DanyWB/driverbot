@@ -7,8 +7,18 @@ export function timelineDayWidth(value: number): number {
         : defaultTimelineDayWidth;
 }
 
-export function timelineVehicleWidth(viewportWidth: number): number {
-    return viewportWidth <= 640 ? 180 : viewportWidth <= 1024 ? 220 : 255;
+export function timelineVehicleWidth(
+    viewportWidth: number,
+    nameWidth = 0,
+): number {
+    // Phones wrap the complete name; landscape/desktop reserve enough room
+    // for the measured longest name, padding and compact-mode info button.
+    return viewportWidth <= 640
+        ? 180
+        : Math.max(
+              viewportWidth <= 1024 ? 320 : 360,
+              Math.ceil(nameWidth) + 112,
+          );
 }
 
 export function timelineGridWidth(
@@ -24,10 +34,11 @@ export function timelineBookingGeometry(
     dayWidth: number,
     startIndex: number,
     span: number,
+    zoom = 1,
 ): { left: number; width: number } {
     return {
-        left: vehicleWidth + startIndex * dayWidth + 2,
-        width: Math.max(dayWidth - 4, span * dayWidth - 4),
+        left: vehicleWidth + startIndex * dayWidth + 2 * zoom,
+        width: Math.max(dayWidth - 4 * zoom, span * dayWidth - 4 * zoom),
     };
 }
 

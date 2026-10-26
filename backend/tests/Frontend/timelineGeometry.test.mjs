@@ -15,7 +15,7 @@ import { vehicleNameLines } from '../../resources/js/lib/timelinePresentation.ts
 test('one geometry serves all three densities, frozen widths and booking spans', () => {
     for (const viewport of [320, 390, 640, 844, 1024, 1440]) {
         const frozen = timelineVehicleWidth(viewport);
-        assert.equal(frozen, viewport <= 640 ? 180 : viewport <= 1024 ? 220 : 255);
+        assert.equal(frozen, viewport <= 640 ? 180 : viewport <= 1024 ? 320 : 360);
 
         for (const width of [36, 48, 60]) {
             assert.equal(timelineGridWidth(frozen, 180, width), frozen + 180 * width);
@@ -67,13 +67,13 @@ test('scroll gestures cannot masquerade as ordinary taps', () => {
     assert.equal(timelinePointerMoved({ x: 100, y: 100 }, { x: 100, y: 40 }), true);
 });
 
-test('mobile controls remain explicit, keyboard accessible, unscaled and motion aware', async () => {
+test('mobile controls remain explicit, keyboard accessible and motion aware', async () => {
     const page = await readFile(new URL('../../resources/js/pages/timeline/Index.vue', import.meta.url), 'utf8');
     const info = await readFile(new URL('../../resources/js/components/timeline/TimelineVehicleInfo.vue', import.meta.url), 'utf8');
     assert.match(page, /vehicleInfoOpen.value \|\| event.defaultPrevented/);
     assert.match(page, /@pointercancel.capture="endPointerGesture"/);
     assert.match(page, /handleDateClick\(\s*\$event,\s*row,\s*date.date,\s*index,?\s*\)/);
-    assert.match(page, /'Timeline density'/);
+    assert.match(page, /'Timeline zoom'/);
     assert.match(page, /prefers-reduced-motion: reduce/);
     assert.match(page, /\.dark \.timeline-paint-black\s*\{[^}]*text-shadow: none;/s);
     assert.doesNotMatch(page, /transform:\s*scale\(/);
