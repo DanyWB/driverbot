@@ -60,7 +60,7 @@ jobs:
           bash deploy/tests/release-hardening.test.sh
 
       - name: Audit runtime dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev
 
       - name: Check JavaScript syntax
         run: npm run check:syntax
