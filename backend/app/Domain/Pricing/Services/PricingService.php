@@ -13,10 +13,23 @@ use App\Models\Vehicle;
 use App\Models\VehiclePriceTier;
 use Brick\Math\BigRational;
 use Brick\Math\RoundingMode;
+use Illuminate\Support\Facades\DB;
 
 class PricingService
 {
     public function quote(Vehicle $vehicle, RentalPeriod $period, bool $requireBookable = true): PriceQuote
+    {
+        return DB::transaction(function () use ($vehicle, $period, $requireBookable): PriceQuote {
+            // Every matrix writer locks the vehicle before changing settings
+            // or prices. Never read its preset here: writers lock preset first,
+            // so acquiring one after this vehicle would invert their order.
+            $snapshot = Vehicle::query()->whereKey($vehicle->getKey())->sharedLock()->firstOrFail();
+
+            return $this->quoteSnapshot($snapshot, $period, $requireBookable);
+        });
+    }
+
+    private function quoteSnapshot(Vehicle $vehicle, RentalPeriod $period, bool $requireBookable): PriceQuote
     {
         if ($vehicle->archived_at !== null || ! $vehicle->is_active || ($requireBookable && ! $vehicle->is_visible_for_booking)) {
             throw new PricingException('vehicle_hidden', 'Vehicle is not available for booking.', [
@@ -31,6 +44,10 @@ class PricingService
                 'minimum_days' => $minimumDays,
                 'total_days' => $period->totalDays(),
             ]);
+        }
+
+        if ($vehicle->calculation_settings !== null) {
+            return $this->calculatorQuote($vehicle, $period);
         }
 
         $tier = PricingTier::forDuration($period->totalDays());
@@ -113,6 +130,48 @@ class PricingService
             finalTotal: $roundedTotal,
             currency: $currency ?? config('business.currency'),
             breakdown: $breakdown,
+        );
+    }
+
+    private function calculatorQuote(Vehicle $vehicle, RentalPeriod $period): PriceQuote
+    {
+        $rows = $vehicle->priceTiers()->where('is_active', true)->with('season')->get();
+        $prices = [];
+        $currency = null;
+        foreach ($rows as $row) {
+            if ($currency !== null && $currency !== $row->currency) {
+                throw new PricingException('currency_mismatch', 'Price tiers use different currencies.');
+            }
+            $currency = $row->currency;
+            $prices[$row->season->seasonKey()->value][$row->getRawOriginal('tier_key')] = (int) $row->package_total;
+        }
+        foreach (PricingCalculator::SEASONS as $season) {
+            foreach (PricingCalculator::TIERS as $tier) {
+                if (! isset($prices[$season][$tier])) {
+                    throw new PricingException('price_missing', 'Calculator requires a complete active price matrix.', ['season' => $season, 'tier' => $tier]);
+                }
+            }
+        }
+        $calculation = app(PricingCalculator::class)->quote($prices, $vehicle->calculation_settings, $period);
+        $total = $calculation['total'];
+        $tier = PricingTier::forDuration($period->totalDays());
+
+        return new PriceQuote(
+            vehicleId: (int) $vehicle->id,
+            startsOn: $period->startsOn->format('Y-m-d'),
+            endsOn: $period->endsOn->format('Y-m-d'),
+            totalDays: $period->totalDays(),
+            tier: $tier,
+            calculatedTotal: number_format($total, 6, '.', ''),
+            roundedTotal: $total,
+            finalTotal: $total,
+            currency: $currency,
+            breakdown: [new PriceBreakdownItem(
+                season: $calculation['season'], days: $period->totalDays(), tier: $tier,
+                packageTotal: $prices[$calculation['season']][$tier->value], anchorDays: $tier->anchorDays(),
+                dailyRate: number_format($total / $period->totalDays(), 6, '.', ''), subtotal: number_format($total, 6, '.', ''),
+            )],
+            calculation: $calculation,
         );
     }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, useRemember } from '@inertiajs/vue3';
 import {
+    ArrowLeftRight,
     CalendarDays,
     ChevronLeft,
     ChevronRight,
@@ -50,14 +51,19 @@ import {
     timelineBookingGeometry,
     timelineDayWidth,
     timelineGridWidth,
+    timelineOccupancyLayout,
     timelinePointerMoved,
-    timelineVehicleWidth,
+    timelineScaledVehicleWidth,
     timelineVisibleDay,
 } from '@/lib/timelineGeometry';
 import { timelineStatusClasses, timelineStatusLabels } from '@/lib/timeline';
 import {
+    filterTimelineRows,
+    timelineVehicleModels,
+    timelineVisibleStats,
     occupancyLanes,
     timelineMonthBands,
+    vehicleNameLines,
     vehicleNameParts,
     vehicleRowColor,
 } from '@/lib/timelinePresentation';
@@ -91,24 +97,40 @@ defineOptions({
 
 const viewportWidth = ref(1024);
 const longestNameWidth = ref(0);
+const longestStackedNameWidth = ref(0);
+const narrowVehicleColumn = ref(false);
 const zoom = ref(1);
-const vehicleColumnWidth = computed(
-    () =>
-        timelineVehicleWidth(viewportWidth.value, longestNameWidth.value) *
-        zoom.value,
+const timelineHeaderRangeDays = timelineQuickRangeDays.filter(
+    (days) => days !== 45,
 );
 const display = useRemember(
-    { filtersOpen: true, compact: false, customRange: false, dayWidth: 48 },
+    {
+        filtersOpen: true,
+        compact: true,
+        customRange: false,
+        dayWidth: 48,
+    },
     'Timeline:display',
 );
-const dayWidth = computed(
-    () => timelineDayWidth(unref(display).dayWidth) * zoom.value,
+const vehicleHeaderHeight = computed(() => Math.max(80, 96 * zoom.value));
+const vehicleColumnWidth = computed(() =>
+    timelineScaledVehicleWidth(
+        narrowVehicleColumn.value
+            ? longestStackedNameWidth.value
+            : longestNameWidth.value,
+        zoom.value,
+        narrowVehicleColumn.value,
+    ),
+);
+const dayWidth = computed(() =>
+    Math.max(24, timelineDayWidth(unref(display).dayWidth) * zoom.value),
 );
 const zoomPercent = computed(() => Math.round(zoom.value * 100));
 const zoomStyles = computed(() => ({ '--timeline-zoom': zoom.value }));
 const localizedDates = computed(() =>
     props.timeline.dates.map((day) => ({
         ...day,
+        weekdayIndex: new Date(`${day.date}T00:00:00Z`).getUTCDay(),
         month: new Intl.DateTimeFormat(getActiveLocale(), {
             month: 'long',
             timeZone: 'UTC',
@@ -133,6 +155,14 @@ let pointerGesture: {
     y: number;
     moved: boolean;
 } | null = null;
+let mousePan: {
+    id: number;
+    x: number;
+    y: number;
+    scrollLeft: number;
+    scrollTop: number;
+    active: boolean;
+} | null = null;
 let suppressPointerClick = false;
 let pinchOwned = false;
 let pinch: {
@@ -141,9 +171,15 @@ let pinch: {
     zoom: number;
     day: number;
     contentY: number;
+    rowAnchor: { id: number; fraction: number } | null;
 } | null = null;
-let zoomAnchor: { day: number; x: number; y: number; contentY: number } | null =
-    null;
+let zoomAnchor: {
+    day: number;
+    x: number;
+    y: number;
+    contentY: number;
+    rowAnchor: { id: number; fraction: number } | null;
+} | null = null;
 function syncHorizontal(event: Event, target: HTMLElement | null): void {
     const source = event.currentTarget as HTMLElement;
 
@@ -177,6 +213,35 @@ const hoveredCell = ref<{
 } | null>(null);
 const filterState = reactive<TimelineFilters>({ ...props.filters });
 const { t } = useLocale();
+const vehicleNameSearch = ref('');
+const vehicleModelFilter = ref('');
+const vehicleModelOptions = computed(() => {
+    const models = timelineVehicleModels(props.timeline.rows);
+
+    return [
+        { value: '', label: t('All models') },
+        ...models.map((model) => ({ value: model, label: model })),
+    ];
+});
+const visibleTimelineRows = computed(() => {
+    return filterTimelineRows(
+        props.timeline.rows,
+        vehicleNameSearch.value,
+        vehicleModelFilter.value,
+    );
+});
+const visibleStats = computed(() =>
+    timelineVisibleStats(visibleTimelineRows.value),
+);
+watch(vehicleModelOptions, (options) => {
+    if (!options.some((option) => option.value === vehicleModelFilter.value)) {
+        vehicleModelFilter.value = '';
+    }
+});
+watch([vehicleNameSearch, vehicleModelFilter], () => {
+    clearTimelineSelection();
+    hoverDateIndex.value = null;
+});
 let releaseBodyScroll: (() => void) | undefined;
 
 watch(
@@ -231,13 +296,24 @@ watch([dayWidth, vehicleColumnWidth, isFullscreen, viewportWidth], async () => {
         body.scrollLeft = scrollLeft;
 
         if (gestureAnchor) {
-            body.scrollTop = timelineZoomTop(
-                gestureAnchor.contentY,
-                gestureAnchor.y,
-                zoom.value,
-                body.scrollHeight,
-                body.clientHeight,
-            );
+            const anchoredRow = gestureAnchor.rowAnchor
+                ? body.querySelector<HTMLElement>(
+                      `[data-timeline-vehicle="${gestureAnchor.rowAnchor.id}"]`,
+                  )
+                : null;
+            body.scrollTop =
+                anchoredRow && gestureAnchor.rowAnchor
+                    ? anchoredRow.offsetTop +
+                      anchoredRow.offsetHeight *
+                          gestureAnchor.rowAnchor.fraction -
+                      gestureAnchor.y
+                    : timelineZoomTop(
+                          gestureAnchor.contentY,
+                          gestureAnchor.y,
+                          zoom.value,
+                          body.scrollHeight,
+                          body.clientHeight,
+                      );
         }
 
         if (timelineHead.value) {
@@ -259,7 +335,7 @@ function changeZoom(direction: -1 | 0 | 1): void {
     zoom.value = timelineZoom(
         direction === 0
             ? 1
-            : Math.round((zoom.value + direction * 0.1) * 100) / 100,
+            : Math.round((zoom.value + direction * 0.05) * 100) / 100,
     );
 }
 
@@ -278,9 +354,20 @@ function measureVehicleNames(): void {
 
     const style = getComputedStyle(name);
     // Measure the unscaled 12px name font. Zoom is applied to the complete grid.
-    // Paint words are bolder than the model. Measuring at 800 also leaves a
-    // safe margin for every palette word and the unscaled accessible info tap.
-    context.font = `800 12px ${style.fontFamily}`;
+    // All customer Timeline names use Rajdhani 700; geometry reserves the
+    // separate unscaled accessible info target rather than scaling the DOM.
+    context.font = `700 12px ${style.fontFamily}`;
+    longestStackedNameWidth.value = Math.max(
+        0,
+        ...props.timeline.rows.map((row) => {
+            const lines = vehicleNameLines(row.name);
+
+            return Math.max(
+                context.measureText(lines.model).width,
+                context.measureText(lines.details).width,
+            );
+        }),
+    );
     longestNameWidth.value = Math.max(
         0,
         ...props.timeline.rows.map(
@@ -315,6 +402,14 @@ function startTimelineTouch(event: TouchEvent): void {
     pinchOwned = true;
     suppressPointerClick = true;
     const rect = surface.getBoundingClientRect();
+    const anchoredRow = Array.from(
+        surface.querySelectorAll<HTMLElement>('[data-timeline-vehicle]'),
+    ).find((row) => {
+        const bounds = row.getBoundingClientRect();
+
+        return pair.y >= bounds.top && pair.y < bounds.bottom;
+    });
+    const rowBounds = anchoredRow?.getBoundingClientRect();
     pinch = {
         ids: touches.map((touch) => touch.identifier),
         distance: pair.distance,
@@ -326,6 +421,13 @@ function startTimelineTouch(event: TouchEvent): void {
             dayWidth.value,
         ),
         contentY: (surface.scrollTop + pair.y - rect.top) / zoom.value,
+        rowAnchor:
+            anchoredRow && rowBounds
+                ? {
+                      id: Number(anchoredRow.dataset.timelineVehicle),
+                      fraction: (pair.y - rowBounds.top) / rowBounds.height,
+                  }
+                : null,
     };
 }
 
@@ -361,6 +463,7 @@ function moveTimelineTouch(event: TouchEvent): void {
         x: pair.x - rect.left,
         y: pair.y - rect.top,
         contentY: pinch.contentY,
+        rowAnchor: pinch.rowAnchor,
     };
     zoom.value = nextZoom;
 }
@@ -396,8 +499,31 @@ function startPointerGesture(event: PointerEvent): void {
     }
 
     if (event.pointerType === 'mouse') {
+        const target = event.target;
+        const surface = event.currentTarget as HTMLElement;
+
         suppressPointerClick = false;
         pointerGesture = null;
+        mousePan = null;
+
+        if (
+            event.button !== 0 ||
+            !(target instanceof Element) ||
+            target.closest(
+                'a, button:not(.timeline-day), input, select, textarea, [role="separator"]',
+            )
+        ) {
+            return;
+        }
+
+        mousePan = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            scrollLeft: surface.scrollLeft,
+            scrollTop: surface.scrollTop,
+            active: false,
+        };
 
         return;
     }
@@ -419,6 +545,30 @@ function startPointerGesture(event: PointerEvent): void {
 }
 
 function movePointerGesture(event: PointerEvent): void {
+    if (mousePan?.id === event.pointerId) {
+        const surface = event.currentTarget as HTMLElement;
+        const deltaX = event.clientX - mousePan.x;
+        const deltaY = event.clientY - mousePan.y;
+
+        if (!mousePan.active && Math.hypot(deltaX, deltaY) >= 5) {
+            mousePan.active = true;
+            suppressPointerClick = true;
+            surface.classList.add('timeline-panning');
+            surface.setPointerCapture(event.pointerId);
+        }
+
+        if (mousePan.active) {
+            if (event.cancelable) {
+                event.preventDefault();
+            }
+
+            surface.scrollLeft = mousePan.scrollLeft - deltaX;
+            surface.scrollTop = mousePan.scrollTop - deltaY;
+        }
+
+        return;
+    }
+
     if (!pointerGesture || pointerGesture.id !== event.pointerId) {
         return;
     }
@@ -435,6 +585,24 @@ function movePointerGesture(event: PointerEvent): void {
 }
 
 function endPointerGesture(event: PointerEvent): void {
+    if (mousePan?.id === event.pointerId) {
+        const surface = event.currentTarget as HTMLElement;
+
+        if (mousePan.active) {
+            suppressPointerClick = true;
+        }
+
+        surface.classList.remove('timeline-panning');
+
+        if (surface.hasPointerCapture(event.pointerId)) {
+            surface.releasePointerCapture(event.pointerId);
+        }
+
+        mousePan = null;
+
+        return;
+    }
+
     if (pointerGesture?.id !== event.pointerId) {
         return;
     }
@@ -525,6 +693,11 @@ const selectionPreview = computed(() => {
 
 onMounted(() => {
     document.addEventListener('keydown', onTimelineKeydown);
+
+    if (window.matchMedia('(max-width: 640px)').matches) {
+        zoom.value = 0.7;
+    }
+
     resizeObserver = new ResizeObserver((entries) => {
         viewportWidth.value = entries[0].contentRect.width;
     });
@@ -614,6 +787,8 @@ function visitTimeline(): void {
 }
 
 function resetFilters(): void {
+    vehicleNameSearch.value = '';
+    vehicleModelFilter.value = '';
     Object.assign(filterState, {
         vehicle_type: '',
         category_id: null,
@@ -925,10 +1100,15 @@ function occupancyStyle(
         occupancy.span_days,
         zoom.value,
     );
+    const layout = timelineOccupancyLayout(
+        zoom.value,
+        unref(display).compact,
+        occupancy.lane,
+    );
 
     return {
-        top: `${((unref(display).compact ? 5 : 10) + occupancy.lane * 30) * zoom.value}px`,
-        height: `${26 * zoom.value}px`,
+        top: `${layout.top}px`,
+        height: `${layout.height}px`,
         left: `${geometry.left}px`,
         width: `${geometry.width}px`,
     };
@@ -959,7 +1139,19 @@ function vehicleDetails(row: TimelineVehicle): string {
 
 function rowStyle(row: TimelineVehicle): Record<string, string> {
     return {
-        minHeight: `${Math.max(unref(display).compact ? 72 : 92, ...occupancyLanes(row.occupancies).map((item) => item.lane * 30 + (unref(display).compact ? 38 : 48))) * zoom.value}px`,
+        minHeight: `${Math.max(
+            32,
+            (unref(display).compact ? 36 : 52) * zoom.value,
+            ...occupancyLanes(row.occupancies).map((item) => {
+                const lane = timelineOccupancyLayout(
+                    zoom.value,
+                    unref(display).compact,
+                    item.lane,
+                );
+
+                return lane.top + lane.height + 4;
+            }),
+        )}px`,
         width: `${gridWidth.value}px`,
         '--bike-color': vehicleRowColor(row.id),
         '--paint-color':
@@ -1100,7 +1292,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                         ><Plus />{{ t('New booking') }}</Link
                     >
                 </Button>
-                <Tooltip>
+                <Tooltip v-if="timeline.rows.length === 0">
                     <TooltipTrigger as-child>
                         <Button
                             type="button"
@@ -1229,15 +1421,13 @@ function formatRange(startsOn: string, endsOn: string): string {
                                 @click="applyQuickRange(days)"
                                 >{{ t(':count days', { count: days }) }}</Button
                             >
-                            <Button
-                                variant="ghost"
-                                :aria-expanded="display.customRange"
-                                @click="
-                                    display.customRange = !display.customRange
-                                "
-                                >{{ t('Other period') }}</Button
-                            >
                         </div>
+                        <Button
+                            variant="ghost"
+                            :aria-expanded="display.customRange"
+                            @click="display.customRange = !display.customRange"
+                            >{{ t('Other period') }}</Button
+                        >
                     </div>
                     <form
                         v-if="display.customRange"
@@ -1384,7 +1574,9 @@ function formatRange(startsOn: string, endsOn: string): string {
                             />
                             {{ t('Available only') }}
                         </label>
-                        <div class="flex items-end gap-1">
+                        <div
+                            class="flex flex-wrap items-end gap-2 sm:col-span-full lg:col-span-1 lg:gap-1"
+                        >
                             <Button
                                 type="submit"
                                 variant="secondary"
@@ -1404,6 +1596,22 @@ function formatRange(startsOn: string, endsOn: string): string {
                                     t('Reset filters')
                                 }}</span>
                             </Button>
+                            <input
+                                id="timeline_vehicle_search_mobile"
+                                v-model="vehicleNameSearch"
+                                type="search"
+                                class="h-9 min-w-0 flex-1 basis-28 rounded-md border bg-background px-3 text-sm lg:hidden"
+                                :placeholder="t('Search by name or model')"
+                                :aria-label="t('Search by name')"
+                                @keydown.enter.prevent
+                            />
+                            <AdminSelect
+                                id="timeline_model_filter_mobile"
+                                v-model="vehicleModelFilter"
+                                :aria-label="t('Model')"
+                                class="w-32 shrink-0 lg:hidden"
+                                :options="vehicleModelOptions"
+                            />
                         </div>
                     </form>
                 </div>
@@ -1412,20 +1620,45 @@ function formatRange(startsOn: string, endsOn: string): string {
 
         <section
             v-if="!isFullscreen"
-            class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 text-sm sm:px-6 lg:px-8"
+            class="flex flex-wrap items-center gap-x-4 gap-y-3 border-b px-4 py-3 text-sm sm:px-6 lg:px-8"
         >
-            <div class="flex flex-wrap gap-x-5 gap-y-1 tabular-nums">
+            <div
+                class="flex w-full flex-wrap gap-x-5 gap-y-1 tabular-nums lg:w-auto"
+            >
                 <span>{{
-                    t('Vehicles count', { count: timeline.stats.vehicles })
+                    t('Vehicles count', { count: visibleStats.vehicles })
                 }}</span>
                 <span class="text-emerald-700 dark:text-emerald-400">{{
-                    t('Fully free count', { count: timeline.stats.available })
+                    t('Fully free count', { count: visibleStats.available })
                 }}</span>
                 <span class="text-muted-foreground">{{
-                    t('Blocks count', { count: timeline.stats.occupancies })
+                    t('Blocks count', { count: visibleStats.occupancies })
                 }}</span>
             </div>
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <div class="hidden min-w-0 items-center gap-2 lg:flex lg:flex-1">
+                <label class="sr-only" for="timeline_vehicle_search">{{
+                    t('Search by name')
+                }}</label>
+                <input
+                    id="timeline_vehicle_search"
+                    v-model="vehicleNameSearch"
+                    type="search"
+                    class="h-9 w-full min-w-0 rounded-md border bg-background px-3 text-sm sm:max-w-60 sm:flex-1"
+                    :placeholder="t('Search by name or model')"
+                />
+                <label class="sr-only" for="timeline_model_filter">{{
+                    t('Model')
+                }}</label>
+                <AdminSelect
+                    id="timeline_model_filter"
+                    v-model="vehicleModelFilter"
+                    class="w-full sm:w-44 sm:flex-none"
+                    :options="vehicleModelOptions"
+                />
+            </div>
+            <div
+                class="flex w-full flex-wrap items-center gap-x-4 gap-y-1 lg:w-auto"
+            >
                 <span
                     v-for="status in options.statuses"
                     :key="status"
@@ -1439,7 +1672,6 @@ function formatRange(startsOn: string, endsOn: string): string {
                 </span>
             </div>
         </section>
-
         <section
             v-if="!isFullscreen && rangeSelection"
             class="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 sm:px-6 lg:px-8 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-100"
@@ -1495,54 +1727,18 @@ function formatRange(startsOn: string, endsOn: string): string {
             :class="isFullscreen ? 'h-dvh' : ''"
             :aria-label="t('Vehicle availability')"
         >
-            <Tooltip v-if="isFullscreen">
-                <TooltipTrigger as-child>
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        class="absolute top-2 right-2 z-50 border bg-background/90 shadow-md backdrop-blur-sm"
-                        data-timeline-fullscreen-toggle
-                        aria-keyshortcuts="Escape"
-                        :aria-label="t('Collapse calendar')"
-                        :aria-pressed="true"
-                        :title="t('Collapse calendar')"
-                        @click="exitFullscreen(true)"
-                    >
-                        <Minimize />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent>{{ t('Collapse calendar') }}</TooltipContent>
-            </Tooltip>
-
-            <div
-                v-if="isFullscreen"
-                class="absolute top-2 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-background/90 p-1 shadow-md backdrop-blur-sm"
-                data-timeline-fullscreen-range
-                role="group"
-                :aria-label="t('Calendar range')"
-            >
-                <Button
-                    v-for="days in timelineQuickRangeDays"
-                    :key="days"
-                    type="button"
-                    size="sm"
-                    class="h-8 min-w-9 px-2 text-xs tabular-nums"
-                    :variant="
-                        activeQuickRangeDays === days ? 'default' : 'outline'
-                    "
-                    :disabled="loading"
-                    :aria-pressed="activeQuickRangeDays === days"
-                    :aria-label="
-                        t('Show :count days from today', { count: days })
-                    "
-                    :title="t('Show :count days from today', { count: days })"
-                    @click="applyQuickRange(days)"
-                >
-                    {{ days }}
-                </Button>
-            </div>
-
+            <Button
+                v-if="isFullscreen && timeline.rows.length === 0"
+                type="button"
+                variant="secondary"
+                size="icon"
+                class="absolute top-2 right-2 z-50"
+                data-timeline-fullscreen-toggle
+                :aria-label="t('Collapse calendar')"
+                aria-keyshortcuts="Escape"
+                @click="exitFullscreen(true)"
+                ><Minimize
+            /></Button>
             <div
                 v-if="timeline.rows.length === 0"
                 class="flex h-full min-h-80 flex-col items-center justify-center px-6 text-center"
@@ -1565,7 +1761,6 @@ function formatRange(startsOn: string, endsOn: string): string {
                 v-if="timeline.rows.length > 0"
                 ref="timelineHead"
                 class="sticky top-0 z-30 shrink-0 overflow-x-auto bg-background"
-                :class="isFullscreen ? 'pt-12' : ''"
                 @scroll="syncHorizontal($event, timelineBody)"
                 :style="zoomStyles"
             >
@@ -1573,19 +1768,257 @@ function formatRange(startsOn: string, endsOn: string): string {
                     class="timeline-grid-head flex h-24 border-b bg-background shadow-xs"
                     :style="{
                         width: `${gridWidth}px`,
-                        height: `${96 * zoom}px`,
+                        height: `${vehicleHeaderHeight}px`,
                     }"
                 >
                     <div
-                        class="timeline-vehicle-head sticky left-0 z-40 flex shrink-0 flex-col justify-center gap-1 border-r bg-background px-2 text-xs font-semibold text-muted-foreground"
-                        :style="{ width: `${vehicleColumnWidth}px` }"
+                        class="timeline-vehicle-head sticky left-0 z-40 flex min-w-0 shrink-0 flex-col justify-between border-r bg-background text-xs font-semibold text-muted-foreground"
+                        :style="{
+                            width: `${vehicleColumnWidth}px`,
+                            height: `${vehicleHeaderHeight}px`,
+                            fontSize: `${12 * zoom}px`,
+                            paddingInline: `${8 * zoom}px`,
+                            paddingBlock: `${6 * zoom}px`,
+                        }"
                     >
-                        <div class="flex w-full items-center justify-between">
-                            {{ t('Vehicle') }}
+                        <div
+                            class="flex items-center justify-between"
+                            :class="
+                                narrowVehicleColumn
+                                    ? 'timeline-compact-header-controls'
+                                    : ''
+                            "
+                            :style="{ gap: `${4 * zoom}px` }"
+                        >
+                            <div
+                                class="flex items-center"
+                                :class="
+                                    narrowVehicleColumn
+                                        ? 'timeline-compact-period-grid'
+                                        : ''
+                                "
+                                :style="{
+                                    gap: `${(narrowVehicleColumn ? 2 : 4) * zoom}px`,
+                                }"
+                                role="group"
+                                :aria-label="t('Calendar range')"
+                            >
+                                <Button
+                                    v-for="days in timelineHeaderRangeDays"
+                                    :key="days"
+                                    type="button"
+                                    variant="outline"
+                                    :style="{
+                                        width: `${(narrowVehicleColumn ? 30 : 40) * zoom}px`,
+                                        height: `${(narrowVehicleColumn ? 24 : 32) * zoom}px`,
+                                        minWidth: `${(narrowVehicleColumn ? 30 : 40) * zoom}px`,
+                                        paddingInline: `${4 * zoom}px`,
+                                        paddingBlock: `${(narrowVehicleColumn ? 2 : 4) * zoom}px`,
+                                        fontSize: `${(narrowVehicleColumn ? 10 : 12) * zoom}px`,
+                                    }"
+                                    :class="
+                                        activeQuickRangeDays === days
+                                            ? 'timeline-range-active'
+                                            : ''
+                                    "
+                                    :disabled="loading"
+                                    :aria-pressed="
+                                        activeQuickRangeDays === days
+                                    "
+                                    :aria-label="
+                                        t('Show :count days from today', {
+                                            count: days,
+                                        })
+                                    "
+                                    :title="
+                                        t('Show :count days from today', {
+                                            count: days,
+                                        })
+                                    "
+                                    @click="applyQuickRange(days)"
+                                    >{{ days }}</Button
+                                >
+                            </div>
                             <Button
+                                type="button"
                                 variant="outline"
                                 size="icon"
-                                class="size-7"
+                                :class="
+                                    narrowVehicleColumn
+                                        ? 'timeline-compact-fullscreen'
+                                        : ''
+                                "
+                                :style="{
+                                    width: `${(narrowVehicleColumn ? 24 : 28) * zoom}px`,
+                                    height: `${(narrowVehicleColumn ? 24 : 28) * zoom}px`,
+                                }"
+                                data-timeline-fullscreen-toggle
+                                aria-keyshortcuts="Escape"
+                                :aria-label="
+                                    t(
+                                        isFullscreen
+                                            ? 'Collapse calendar'
+                                            : 'Expand calendar',
+                                    )
+                                "
+                                :aria-pressed="isFullscreen"
+                                :title="
+                                    t(
+                                        isFullscreen
+                                            ? 'Collapse calendar'
+                                            : 'Expand calendar',
+                                    )
+                                "
+                                @click="toggleFullscreen"
+                            >
+                                <Minimize
+                                    v-if="isFullscreen"
+                                    :style="{
+                                        width: `${12 * zoom}px`,
+                                        height: `${12 * zoom}px`,
+                                    }"
+                                />
+                                <Expand
+                                    v-else
+                                    :style="{
+                                        width: `${12 * zoom}px`,
+                                        height: `${12 * zoom}px`,
+                                    }"
+                                />
+                            </Button>
+                        </div>
+                        <div
+                            class="flex items-center justify-between"
+                            :class="
+                                narrowVehicleColumn
+                                    ? 'timeline-compact-tool-grid'
+                                    : ''
+                            "
+                            :style="{ gap: `${6 * zoom}px` }"
+                        >
+                            <span
+                                v-if="!narrowVehicleColumn && zoom >= 1"
+                                class="shrink-0"
+                                >{{ t('Vehicle') }}</span
+                            >
+                            <div
+                                class="flex items-center"
+                                :class="
+                                    narrowVehicleColumn
+                                        ? 'timeline-compact-zoom'
+                                        : ''
+                                "
+                                :style="{ gap: `${3 * zoom}px` }"
+                                role="group"
+                                :aria-label="t('Timeline zoom')"
+                            >
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    :style="{
+                                        width: `${(narrowVehicleColumn ? 26 : 32) * zoom}px`,
+                                        height: `${(narrowVehicleColumn ? 26 : 32) * zoom}px`,
+                                    }"
+                                    :disabled="zoom <= timelineZoomLimits.min"
+                                    :aria-label="t('Zoom out')"
+                                    :title="t('Zoom out')"
+                                    @click="changeZoom(-1)"
+                                    ><Minus
+                                        :style="{
+                                            width: `${14 * zoom}px`,
+                                            height: `${14 * zoom}px`,
+                                        }"
+                                /></Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    class="text-xs tabular-nums"
+                                    :style="{
+                                        height: `${(narrowVehicleColumn ? 26 : 32) * zoom}px`,
+                                        minWidth: `${(narrowVehicleColumn ? 34 : 40) * zoom}px`,
+                                        paddingInline: `${4 * zoom}px`,
+                                        paddingBlock: `${4 * zoom}px`,
+                                        fontSize: `${(narrowVehicleColumn ? 11 : 12) * zoom}px`,
+                                    }"
+                                    :aria-label="t('Reset zoom')"
+                                    :title="`${zoomPercent}% (50–150%)`"
+                                    @click="changeZoom(0)"
+                                    ><span aria-live="polite"
+                                        >{{ zoomPercent }}%</span
+                                    ></Button
+                                >
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    :style="{
+                                        width: `${(narrowVehicleColumn ? 26 : 32) * zoom}px`,
+                                        height: `${(narrowVehicleColumn ? 26 : 32) * zoom}px`,
+                                    }"
+                                    :disabled="zoom >= timelineZoomLimits.max"
+                                    :aria-label="t('Zoom in')"
+                                    :title="t('Zoom in')"
+                                    @click="changeZoom(1)"
+                                    ><Plus
+                                        :style="{
+                                            width: `${14 * zoom}px`,
+                                            height: `${14 * zoom}px`,
+                                        }"
+                                /></Button>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                :class="
+                                    narrowVehicleColumn
+                                        ? 'timeline-compact-toggle'
+                                        : ''
+                                "
+                                :style="{
+                                    width: `${(narrowVehicleColumn ? 24 : 28) * zoom}px`,
+                                    height: `${(narrowVehicleColumn ? 24 : 28) * zoom}px`,
+                                }"
+                                :aria-pressed="narrowVehicleColumn"
+                                :aria-label="
+                                    t(
+                                        narrowVehicleColumn
+                                            ? 'Restore vehicle column width'
+                                            : 'Compact vehicle column',
+                                    )
+                                "
+                                :title="
+                                    t(
+                                        narrowVehicleColumn
+                                            ? 'Restore vehicle column width'
+                                            : 'Compact vehicle column',
+                                    )
+                                "
+                                @click="
+                                    narrowVehicleColumn = !narrowVehicleColumn
+                                "
+                            >
+                                <ArrowLeftRight
+                                    :style="{
+                                        width: `${14 * zoom}px`,
+                                        height: `${14 * zoom}px`,
+                                    }"
+                                />
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                :class="
+                                    narrowVehicleColumn
+                                        ? 'timeline-compact-details'
+                                        : ''
+                                "
+                                :style="{
+                                    width: `${(narrowVehicleColumn ? 24 : 28) * zoom}px`,
+                                    height: `${(narrowVehicleColumn ? 24 : 28) * zoom}px`,
+                                }"
                                 :aria-expanded="!display.compact"
                                 :aria-label="
                                     t(
@@ -1594,61 +2027,37 @@ function formatRange(startsOn: string, endsOn: string): string {
                                             : 'Hide vehicle details',
                                     )
                                 "
+                                :title="
+                                    t(
+                                        display.compact
+                                            ? 'Show vehicle details'
+                                            : 'Hide vehicle details',
+                                    )
+                                "
                                 @click="display.compact = !display.compact"
-                                ><Plus
-                                    v-if="display.compact"
-                                    class="size-3" /><Minimize
-                                    v-else
-                                    class="size-3"
-                            /></Button>
-                        </div>
-                        <div
-                            class="flex items-center gap-1"
-                            role="group"
-                            :aria-label="t('Timeline zoom')"
-                        >
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                class="size-8"
-                                :disabled="zoom <= timelineZoomLimits.min"
-                                :aria-label="t('Zoom out')"
-                                :title="t('Zoom out')"
-                                @click="changeZoom(-1)"
-                                ><Minus class="size-3.5"
-                            /></Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                class="h-8 min-w-10 px-1 text-xs tabular-nums"
-                                :aria-label="t('Reset zoom')"
-                                :title="`${zoomPercent}% (75–150%)`"
-                                @click="changeZoom(0)"
-                                ><span aria-live="polite"
-                                    >{{ zoomPercent }}%</span
-                                ></Button
                             >
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                class="size-8"
-                                :disabled="zoom >= timelineZoomLimits.max"
-                                :aria-label="t('Zoom in')"
-                                :title="t('Zoom in')"
-                                @click="changeZoom(1)"
-                                ><Plus class="size-3.5"
-                            /></Button>
+                                <ChevronDown
+                                    :class="
+                                        !display.compact ? 'rotate-180' : ''
+                                    "
+                                    :style="{
+                                        width: `${14 * zoom}px`,
+                                        height: `${14 * zoom}px`,
+                                    }"
+                                />
+                            </Button>
                         </div>
                     </div>
                     <div
                         class="relative flex"
-                        :style="{ paddingTop: `${48 * zoom}px` }"
+                        :style="{
+                            height: `${vehicleHeaderHeight}px`,
+                            paddingTop: `${vehicleHeaderHeight / 2}px`,
+                        }"
                     >
                         <div
                             class="absolute inset-x-0 top-0 flex"
-                            :style="{ height: `${48 * zoom}px` }"
+                            :style="{ height: `${vehicleHeaderHeight / 2}px` }"
                         >
                             <div
                                 v-for="band in monthBands"
@@ -1666,7 +2075,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                             :key="date.date"
                             class="timeline-date-head flex shrink-0 flex-col items-center justify-center border-r text-xs tabular-nums"
                             :class="[
-                                date.is_weekend ? 'bg-muted/45' : '',
+                                date.is_weekend ? 'timeline-weekend-head' : '',
                                 hoverDateIndex === index
                                     ? 'timeline-date-hover'
                                     : '',
@@ -1680,6 +2089,14 @@ function formatRange(startsOn: string, endsOn: string): string {
                             <strong>{{ date.day }}</strong>
                             <span
                                 class="text-[10px] text-muted-foreground uppercase"
+                                :class="[
+                                    date.weekdayIndex === 6
+                                        ? 'timeline-saturday-label'
+                                        : '',
+                                    date.weekdayIndex === 0
+                                        ? 'timeline-sunday-label'
+                                        : '',
+                                ]"
                                 >{{ date.weekday.slice(0, 2) }}</span
                             >
                         </div>
@@ -1711,19 +2128,32 @@ function formatRange(startsOn: string, endsOn: string): string {
             >
                 <div class="relative" :style="{ width: `${gridWidth}px` }">
                     <div
-                        v-for="row in timeline.rows"
+                        v-if="visibleTimelineRows.length === 0"
+                        class="flex min-h-32 items-center text-sm text-muted-foreground"
+                        :style="{
+                            width: `${vehicleColumnWidth + 300}px`,
+                            paddingLeft: `${vehicleColumnWidth + 16}px`,
+                        }"
+                    >
+                        {{ t('No vehicles match these filters') }}
+                    </div>
+                    <div
+                        v-for="row in visibleTimelineRows"
                         :key="row.id"
+                        :data-timeline-vehicle="row.id"
                         class="timeline-vehicle-row group relative flex border-b"
                         :style="rowStyle(row)"
                         @mouseleave="clearHoveredCell(row.id)"
                     >
                         <div
-                            class="timeline-vehicle-label sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r px-2 py-2"
+                            class="timeline-vehicle-label sticky left-0 z-20 flex min-w-0 shrink-0 items-center gap-1.5 border-r px-2 py-2"
                             :style="{ width: `${vehicleColumnWidth}px` }"
                         >
                             <span
-                                class="h-7 w-1 shrink-0 rounded-full"
+                                class="shrink-0 rounded-full"
                                 :style="{
+                                    width: `${4 * zoom}px`,
+                                    height: `${28 * zoom}px`,
                                     backgroundColor: vehicleRowColor(row.id),
                                 }"
                             />
@@ -1738,12 +2168,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                                 <div class="min-w-0 flex-1">
                                     <Link
                                         :href="`/vehicles/${row.id}/edit`"
-                                        class="timeline-name block w-full text-xs font-semibold"
-                                        :class="
-                                            viewportWidth > 640
-                                                ? 'whitespace-nowrap'
-                                                : ''
-                                        "
+                                        class="timeline-name block w-full min-w-0 text-xs font-bold whitespace-nowrap"
                                         :title="row.name"
                                         :aria-label="
                                             t('Edit :vehicle', {
@@ -1752,7 +2177,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                                         "
                                         ><TimelineVehicleName
                                             :name="row.name"
-                                            :stacked="viewportWidth <= 640"
+                                            :stacked="narrowVehicleColumn"
                                     /></Link>
                                     <span
                                         v-if="
@@ -1773,6 +2198,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                                 <TimelineVehicleInfo
                                     v-if="display.compact"
                                     :vehicle="row"
+                                    :zoom="zoom"
                                     @update:open="vehicleInfoOpen = $event"
                                 />
                                 <div
@@ -1812,6 +2238,7 @@ function formatRange(startsOn: string, endsOn: string): string {
                                     </div>
                                     <TimelineVehicleInfo
                                         :vehicle="row"
+                                        :zoom="zoom"
                                         @update:open="vehicleInfoOpen = $event"
                                     />
                                 </div>
@@ -1827,7 +2254,9 @@ function formatRange(startsOn: string, endsOn: string): string {
                                 type="button"
                                 class="timeline-day group/cell relative shrink-0 self-stretch border-r p-0 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-600"
                                 :class="[
-                                    date.is_weekend ? 'bg-muted/25' : '',
+                                    date.is_weekend
+                                        ? 'timeline-weekend-cell'
+                                        : '',
                                     date.is_today
                                         ? 'bg-cyan-50/50 dark:bg-cyan-950/30'
                                         : '',
@@ -1854,7 +2283,11 @@ function formatRange(startsOn: string, endsOn: string): string {
                                 "
                             >
                                 <Plus
-                                    class="pointer-events-none absolute top-1/2 left-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover/cell:opacity-50"
+                                    class="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover/cell:opacity-50"
+                                    :style="{
+                                        width: `${14 * zoom}px`,
+                                        height: `${14 * zoom}px`,
+                                    }"
                                 />
                             </button>
                             <div
@@ -1862,7 +2295,9 @@ function formatRange(startsOn: string, endsOn: string): string {
                                 class="timeline-day shrink-0 self-stretch border-r"
                                 @mouseenter="hoverDateIndex = index"
                                 :class="[
-                                    date.is_weekend ? 'bg-muted/25' : '',
+                                    date.is_weekend
+                                        ? 'timeline-weekend-cell'
+                                        : '',
                                     date.is_today
                                         ? 'bg-cyan-50/50 dark:bg-cyan-950/30'
                                         : '',
@@ -1965,14 +2400,71 @@ main:has(> .timeline-page) {
 .dark .timeline-vehicle-head {
     background: #171919;
 }
+.timeline-page,
+.timeline-page * {
+    font-family: 'Rajdhani', ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+}
 .timeline-vehicle-row {
     background: color-mix(in srgb, var(--bike-color) 19%, var(--timeline-base));
+}
+.timeline-compact-header-controls {
+    display: grid !important;
+    grid-template-columns: max-content auto;
+    width: 100%;
+}
+.timeline-compact-period-grid {
+    display: flex !important;
+}
+.timeline-compact-fullscreen {
+    justify-self: end;
+    align-self: center;
+}
+.timeline-compact-tool-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: 'zoom toggle details';
+}
+.timeline-compact-zoom {
+    grid-area: zoom;
+}
+.timeline-compact-toggle {
+    grid-area: toggle;
+}
+.timeline-compact-details {
+    grid-area: details;
 }
 .timeline-vehicle-label {
     background: color-mix(in srgb, var(--bike-color) 24%, var(--background));
 }
 .dark .timeline-vehicle-label {
     background: color-mix(in srgb, var(--bike-color) 24%, #151717);
+}
+.timeline-date-head.timeline-weekend-head {
+    background-color: color-mix(in srgb, black 14%, var(--background));
+    border: 1px solid #252a2a;
+}
+.dark .timeline-date-head.timeline-weekend-head {
+    background-color: color-mix(in srgb, black 14%, #171919);
+    border-color: #252a2a;
+}
+.timeline-day.timeline-weekend-cell {
+    background-color: color-mix(
+        in srgb,
+        black 14%,
+        color-mix(in srgb, var(--bike-color) 19%, var(--timeline-base))
+    );
+    border: 1px solid #252a2a;
+}
+.timeline-saturday-label {
+    color: #050505 !important;
+    -webkit-text-stroke: 1px #3988ff;
+    paint-order: stroke fill;
+}
+.timeline-sunday-label {
+    color: #050505 !important;
+    -webkit-text-stroke: 1px #ec4899;
+    paint-order: stroke fill;
 }
 .timeline-vehicle-row,
 .timeline-vehicle-label,
@@ -2004,6 +2496,20 @@ main:has(> .timeline-page) {
         inset 0 0 0 1px color-mix(in srgb, var(--bike-color) 45%, white),
         0 0 10px #3988ff88;
 }
+/* Выходные тоже подсвечиваются, когда курсор на строке байка */
+.timeline-vehicle-row:hover .timeline-day.timeline-weekend-cell,
+.timeline-vehicle-row:focus-within .timeline-day.timeline-weekend-cell {
+    background-color: color-mix(
+        in srgb,
+        black 10%,
+        color-mix(in srgb, var(--bike-color) 48%, var(--timeline-base))
+    );
+}
+/* Сама ячейка под курсором остаётся ярче всех */
+.timeline-vehicle-row .timeline-day.timeline-weekend-cell:hover,
+.timeline-vehicle-row .timeline-day.timeline-weekend-cell:focus-visible {
+    background: color-mix(in srgb, var(--bike-color) 92%, white);
+}
 .timeline-date-hover,
 .timeline-date-head:hover {
     outline: 2px solid #69b7ff;
@@ -2018,7 +2524,10 @@ main:has(> .timeline-page) {
         0 0 6px #3988ff;
 }
 .timeline-name {
-    padding: calc(3px * var(--timeline-zoom, 1))
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    min-height: 24px;
+    padding: calc(1px * var(--timeline-zoom, 1))
         calc(7px * var(--timeline-zoom, 1));
     border: 1px solid color-mix(in srgb, var(--paint-color) 48%, #777e7b);
     border-radius: 6px;
@@ -2039,47 +2548,64 @@ main:has(> .timeline-page) {
 .timeline-paint-word {
     display: inline-grid;
     vertical-align: baseline;
-    color: var(--paint-ink);
-    font-weight: 800;
-    --paint-outline: #6b7471;
-    --paint-outline-width: 0.6px;
-}
-.dark .timeline-paint-word {
-    --paint-outline: #eef2f0;
-}
-.dark .timeline-paint-black {
-    --paint-outline: #f4f6f5;
-    text-shadow: none;
+    color: #000000;
+    font-weight: 700;
+    --paint-stroke: var(--paint-ink);
+    --paint-glow: var(--paint-ink);
 }
 .timeline-paint-outline,
 .timeline-paint-fill {
     grid-area: 1 / 1;
-    text-shadow: none;
 }
 .timeline-paint-outline {
-    -webkit-text-stroke: var(--paint-outline-width) var(--paint-outline);
+    /* A foreground glyph covers the inward half even without paint-order. */
+    -webkit-text-stroke: 2px var(--paint-stroke);
     paint-order: stroke fill;
+    text-shadow:
+        0 0 4px var(--paint-glow),
+        0 0 10px var(--paint-glow);
 }
-/* A separate foreground glyph covers the inward half of the stroke, even in
-   engines without paint-order. Red/Black keep their original filled shapes. */
 .timeline-paint-fill {
     position: relative;
     -webkit-text-stroke: 0;
+    text-shadow: none;
 }
 @supports not (-webkit-text-stroke: 1px white) {
     .timeline-paint-outline {
         text-shadow:
-            -0.3px 0 var(--paint-outline),
-            0.3px 0 var(--paint-outline),
-            0 -0.3px var(--paint-outline),
-            0 0.3px var(--paint-outline);
+            -1px 0 var(--paint-stroke),
+            1px 0 var(--paint-stroke),
+            0 -1px var(--paint-stroke),
+            0 1px var(--paint-stroke),
+            0 0 6px var(--paint-glow);
     }
 }
-/* Only the grid owns pinch. Native single-finger panning stays available and
-   browser/page zoom outside this surface is unchanged. No transform scaling:
-   real geometry keeps frozen labels, scroll extents and hit targets aligned. */
+.timeline-paint-black {
+    --paint-stroke: #aeb4bc;
+    --paint-glow: #aeb4bc;
+}
+/* The grid owns pinch and mouse drag. Native single-finger panning stays
+   available; no transform scaling keeps geometry and hit targets aligned. */
 .timeline-scroll-area {
     touch-action: pan-x pan-y;
+}
+.timeline-scroll-area.timeline-panning {
+    cursor: grabbing;
+    user-select: none;
+}
+.timeline-vehicle-head button {
+    min-width: 32px !important;
+    min-height: 32px;
+    flex-shrink: 0;
+    font-size: max(10px, calc(12px * var(--timeline-zoom, 1))) !important;
+}
+.timeline-vehicle-head button svg {
+    min-width: 12px;
+    min-height: 12px;
+}
+/* Keep today's indicator and selected date states above the weekend wash. */
+.timeline-day.bg-cyan-50\/50 {
+    background-color: color-mix(in srgb, #22d3ee 14%, var(--timeline-base));
 }
 .timeline-name,
 .timeline-month,
@@ -2099,7 +2625,8 @@ main:has(> .timeline-page) {
     line-height: calc(16px * var(--timeline-zoom, 1));
 }
 .timeline-vehicle-label {
-    padding: calc(8px * var(--timeline-zoom, 1));
+    padding-block: calc(2px * var(--timeline-zoom, 1));
+    padding-inline: calc(8px * var(--timeline-zoom, 1));
     gap: calc(6px * var(--timeline-zoom, 1));
 }
 .timeline-occupancy {

@@ -10,15 +10,12 @@ const lines = computed(() => vehicleNameLines(props.name));
 </script>
 
 <template>
-    <span
-        v-if="stacked"
-        class="block leading-5 [overflow-wrap:anywhere] break-words"
-    >
-        <span class="block">{{ lines.model }}</span>
+    <span v-if="stacked" class="block leading-tight">
+        <span class="block whitespace-nowrap">{{ lines.model }}</span>
         <TimelineVehicleName
             v-if="lines.details"
             :name="lines.details"
-            class="block"
+            class="block whitespace-nowrap"
         />
     </span>
     <span v-else

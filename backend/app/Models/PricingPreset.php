@@ -8,7 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'vehicle_type', 'version', 'created_by_admin_id', 'updated_by_admin_id'])]
+/**
+ * @property array<string, mixed>|null $calculation_settings
+ * @property int $sort_order
+ */
+#[Fillable(['name', 'vehicle_type', 'version', 'sort_order', 'calculation_settings', 'created_by_admin_id', 'updated_by_admin_id'])]
 class PricingPreset extends Model
 {
     /** @return HasMany<PricingPresetPrice, $this> */
@@ -41,6 +45,8 @@ class PricingPreset extends Model
         return [
             'vehicle_type' => VehicleType::class,
             'version' => 'integer',
+            'sort_order' => 'integer',
+            'calculation_settings' => 'array',
         ];
     }
 }

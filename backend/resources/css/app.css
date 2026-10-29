@@ -2,6 +2,15 @@
 
 @import 'tw-animate-css';
 
+/* Customer Timeline typography, served with the application (SIL OFL). */
+@font-face {
+    font-family: 'Rajdhani';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/rajdhani/Rajdhani-Bold.ttf') format('truetype');
+}
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 

@@ -6,7 +6,9 @@ import {
     timelineBookingGeometry,
     timelineDayWidth,
     timelineGridWidth,
+    timelineOccupancyLayout,
     timelinePointerMoved,
+    timelineScaledVehicleWidth,
     timelineVehicleWidth,
     timelineVisibleDay,
 } from '../../resources/js/lib/timelineGeometry.ts';
@@ -15,7 +17,7 @@ import { vehicleNameLines } from '../../resources/js/lib/timelinePresentation.ts
 test('one geometry serves all three densities, frozen widths and booking spans', () => {
     for (const viewport of [320, 390, 640, 844, 1024, 1440]) {
         const frozen = timelineVehicleWidth(viewport);
-        assert.equal(frozen, viewport <= 640 ? 180 : viewport <= 1024 ? 320 : 360);
+        assert.equal(frozen, 250);
 
         for (const width of [36, 48, 60]) {
             assert.equal(timelineGridWidth(frozen, 180, width), frozen + 180 * width);
@@ -75,9 +77,21 @@ test('mobile controls remain explicit, keyboard accessible and motion aware', as
     assert.match(page, /handleDateClick\(\s*\$event,\s*row,\s*date.date,\s*index,?\s*\)/);
     assert.match(page, /'Timeline zoom'/);
     assert.match(page, /prefers-reduced-motion: reduce/);
-    assert.match(page, /\.dark \.timeline-paint-black\s*\{[^}]*text-shadow: none;/s);
+    assert.match(page, /\.timeline-paint-black\s*\{[^}]*--paint-stroke: #aeb4bc;/s);
     assert.doesNotMatch(page, /transform:\s*scale\(/);
     assert.match(info, /PopoverTrigger as-child/);
     assert.match(info, /PopoverClose as-child/);
     assert.match(info, /Details for :vehicle/);
+});
+
+test('low zoom retains non-overlapping targets without expanding ordinary rows to full size', () => {
+    for (const zoom of [0.5, 0.75, 1, 1.5]) {
+        assert.ok(timelineScaledVehicleWidth(120, zoom, true) >= 184);
+        const first = timelineOccupancyLayout(zoom, true, 0);
+        const second = timelineOccupancyLayout(zoom, true, 1);
+        assert.ok(first.height >= 24);
+        assert.ok(second.top >= first.top + first.height);
+    }
+
+    assert.ok(timelineScaledVehicleWidth(320, 0.5) < timelineScaledVehicleWidth(320, 1));
 });

@@ -984,7 +984,7 @@ async function preview(): Promise<void> {
             <p class="mt-1 text-xs text-muted-foreground">
                 {{
                     t(
-                        'The final booking quote still follows the existing 100 THB rounding rule.',
+                        'Saved calculator rules apply to this preview. Vehicles in legacy mode keep final rounding to 100 THB.',
                     )
                 }}
             </p>

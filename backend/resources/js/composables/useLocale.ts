@@ -6,6 +6,12 @@ const STORAGE_KEY = 'admin_locale';
 const COOKIE_KEY = 'admin_locale';
 
 const russianMessages: Record<string, string> = {
+    'Compact vehicle column': 'Узкая колонка техники',
+    'Restore vehicle column width': 'Обычная ширина колонки',
+    'All models': 'Все модели',
+    Model: 'Модель',
+    'Search by name': 'Поиск по названию',
+    'Search by name or model': 'Поиск по названию или модели',
     'Timeline zoom': 'Масштаб календаря',
     'Zoom out': 'Уменьшить масштаб',
     'Zoom in': 'Увеличить масштаб',
@@ -353,6 +359,139 @@ const russianMessages: Record<string, string> = {
     'Days count': ':count дн.',
     'Price preview failed.': 'Не удалось рассчитать цену.',
     'Price preview is unavailable.': 'Расчёт цены временно недоступен.',
+    'Calculation rules': 'Правила расчёта',
+    'Interpolation mode': 'Способ интерполяции',
+    'Linear between packages': 'Линейно между пакетами',
+    'Delayed discount': 'Отложенная скидка',
+    'Rounding increment, THB': 'Шаг округления, THB',
+    'Days before discount starts': 'Дней до начала скидки',
+    'Cap at next package': 'Ограничивать следующим пакетом',
+    'Check average daily rate': 'Проверять среднюю цену за сутки',
+    'Apply monthly rate early': 'Применять месячную цену раньше',
+    'Monthly rate start day': 'Месячная цена начиная с дня',
+    'Package totals remain exact. Intermediate days use interpolation and the selected rounding increment. A full calendar month uses the monthly rate.':
+        'Пакетные суммы сохраняются точно. Между пакетами применяется интерполяция с выбранным шагом округления. Полный календарный месяц оплачивается по месячному тарифу.',
+    'Seasonal discounts and package rounding':
+        'Сезонные скидки и округление пакетов',
+    'Calculate middle season from high season':
+        'Считать средний сезон от высокого',
+    'Calculate low season from high season': 'Считать низкий сезон от высокого',
+    'Rounding, THB': 'Округление, THB',
+    'Discount, %': 'Скидка, %',
+    'Season calendar': 'Календарь сезонов',
+    'The season with most rental days applies to the whole rental. Ties use the cheaper monthly package. The return day is excluded.':
+        'На всю аренду действует сезон с наибольшим числом дней. При равенстве выбирается меньшая месячная цена. День возврата не учитывается.',
+    'Daily price overrides': 'Ручные цены по дням',
+    'Reset season overrides': 'Сбросить ручные цены сезона',
+    'Leave an override empty to use the formula. Overrides for days 30 and 31 also set calendar-month and preliminary-month rates respectively.':
+        'Пустое поле означает расчёт по формуле. Ручные цены за 30 и 31 день также задают тариф календарного месяца и предварительного месячного блока соответственно.',
+    'Long-period overrides are retained in this preset and its JSON export.':
+        'Ручные цены для длинных периодов сохраняются в пресете и JSON-экспорте.',
+    'Could not complete pricing operation.':
+        'Не удалось выполнить операцию с ценами.',
+    'Save :count edited presets and update their linked vehicles for future quotes?':
+        'Сохранить изменённые пресеты (:count) и обновить связанные машины для будущих расчётов?',
+    'Pricing presets saved.': 'Пресеты цен сохранены.',
+    'Assign :preset to :count vehicles for future quotes?':
+        'Назначить пресет «:preset» выбранным машинам (:count) для будущих расчётов?',
+    'Fleet assignments saved.': 'Назначения пресетов сохранены.',
+    'Settings file must not exceed 2 MB.':
+        'Файл настроек не должен превышать 2 МБ.',
+    'Import :count presets with the mappings below? Existing bookings will not change.':
+        'Импортировать пресеты (:count) с указанными сопоставлениями? Существующие брони не изменятся.',
+    'Import complete. Assigned: :assigned. Skipped: :skipped.':
+        'Импорт завершён. Назначено: :assigned. Пропущено: :skipped.',
+    'Your draft is retained. Refresh the page or preview after a conflict before trying again.':
+        'Черновик сохранён. При конфликте обновите страницу или предпросмотр перед повторной попыткой.',
+    'Bike group price presets': 'Пресеты цен по моделям',
+    'Edit prices directly in the table': 'Редактировать цены в таблице',
+    'Discard table edits': 'Отменить правки таблицы',
+    'Export settings to JSON': 'Экспорт настроек в JSON',
+    'Import settings from JSON': 'Импорт настроек из JSON',
+    'Select a model to see its daily matrix and rental quote. Hover a package price to see its daily rate.':
+        'Выберите модель для матрицы по дням и расчёта аренды. Наведите курсор на пакетную цену, чтобы увидеть цену за сутки.',
+    'Bike model': 'Модель техники',
+    'Calculator rules': 'Правила калькулятора',
+    'Legacy calculation': 'Прежний расчёт',
+    'Import preview and explicit mapping':
+        'Предпросмотр импорта и сопоставление',
+    'No changes have been saved. Source IDs are labels from the file. Choose real vehicles explicitly or leave them skipped. No vehicles are created.':
+        'Изменения ещё не сохранены. Исходные ID взяты из файла. Явно выберите реальные машины или оставьте позиции пропущенными. Новые машины не создаются.',
+    'Create new preset': 'Создать новый пресет',
+    'linked vehicles': 'связанных машин',
+    'Skip this vehicle': 'Пропустить эту машину',
+    'Preview expires in 20 minutes. Existing preset targets keep their vehicle-type restriction and update all linked vehicles. Review every target before confirming.':
+        'Предпросмотр действует 20 минут. При обновлении существующего пресета сохраняется ограничение типа техники и обновляются все связанные машины. Проверьте каждое сопоставление.',
+    'Confirm import': 'Подтвердить импорт',
+    'Daily prices and rental period calculator': 'Цены по дням и расчёт аренды',
+    'Price preset': 'Пресет цен',
+    'This preset uses legacy calculation. Enable calculator rules in Edit to use the matrix and preview. Existing vehicles are not switched automatically.':
+        'Этот пресет использует прежний расчёт. Включите правила калькулятора в редакторе для матрицы и предпросмотра. Автоматического переключения машин нет.',
+    'Daily prices — all seasons': 'Цены по дням: все сезоны',
+    'Season / metric': 'Сезон / показатель',
+    'Per day': 'За сутки',
+    'Download CSV': 'Скачать CSV',
+    'Calculation mode': 'Режим расчёта',
+    'Calendar dates': 'Календарные даты',
+    'Preliminary: days only': 'Предварительно: только дни',
+    'Number of days': 'Количество дней',
+    'Full calendar months plus remaining days. The return day is excluded.':
+        'Полные календарные месяцы и остаток дней. День возврата не учитывается.',
+    'Preliminary only: uses 31-day blocks. Enter calendar dates for an actual booking; the total can differ.':
+        'Предварительная оценка с блоками по 31 дню. Для реальной брони укажите календарные даты: сумма может отличаться.',
+    Average: 'В среднем',
+    'calendar months / blocks': 'календарных месяцев / блоков',
+    'Manual total override': 'Ручная сумма за весь период',
+    'Tie: cheaper monthly package selected':
+        'Равенство дней: выбрана меньшая месячная цена',
+    'Current fleet and preset assignments':
+        'Текущий автопарк и назначения пресетов',
+    'Real fleet records only. Legacy vehicles keep their existing calculation until an explicit calculator preset assignment. Existing bookings are not recalculated.':
+        'Только реальные записи автопарка. Машины с прежним расчётом сохраняют его до явного назначения нового пресета. Существующие брони не пересчитываются.',
+    'Choose preset for selected vehicles': 'Пресет для выбранных машин',
+    'Assign to selected vehicles': 'Назначить выбранным машинам',
+    'Model / description': 'Модель / описание',
+    'Select a preset': 'Выберите пресет',
+    'No preset assigned': 'Пресет не назначен',
+    'Fleet price sheet': 'Прайс-лист автопарка',
+    'Package totals from the real fleet. Hover a price for its daily rate. Inactive or missing prices are shown as a dash.':
+        'Пакетные суммы реального автопарка. Наведите курсор для цены за сутки. Неактивные и отсутствующие цены показаны прочерком.',
+    'Confirm pricing changes': 'Подтвердите изменения цен',
+    'Existing bookings are not recalculated. Future quotes use the saved calculation rules.':
+        'Существующие брони не пересчитываются. Будущие расчёты используют сохранённые правила.',
+    'Manage package prices, calculation rules and assignments to your real fleet. Save a preset before checking its daily matrix or rental quote.':
+        'Настройте пакетные цены, правила расчёта и назначения реальным машинам. Сохраните пресет перед проверкой матрицы и расчётом аренды.',
+    'Calculator rules are enabled explicitly': 'Новые правила включаются явно',
+    'New presets use interpolation and their own rounding rules. Existing vehicles keep the legacy calculation until you explicitly assign or update a calculator preset.':
+        'Новые пресеты используют интерполяцию и собственное округление. Текущие машины сохраняют прежний расчёт до явного назначения или обновления пресета с новыми правилами.',
+    'Use calculator rules for future quotes':
+        'Использовать правила калькулятора для будущих расчётов',
+    'Legacy mode: seasonal day splitting and final rounding to 100 THB. No change to existing bookings.':
+        'Прежний режим: разбивка дней по сезонам и итоговое округление до 100 THB. Существующие брони не меняются.',
+    'Long-period override day': 'День для ручной цены',
+    'Long-period override, THB': 'Ручная цена за период, THB',
+    day: 'сутки',
+    days: 'дней',
+    Auto: 'Авто',
+    'Save preset order?': 'Сохранить порядок пресетов?',
+    'Delete unused preset :name?': 'Удалить неиспользуемый пресет «:name»?',
+    'Preset details': 'Карточки пресетов',
+    'Select date': 'Выберите дату',
+    'Select return date': 'Выберите дату возврата',
+    'Select pickup date': 'Выберите дату выдачи',
+    'Previous month': 'Предыдущий месяц',
+    'Next month': 'Следующий месяц',
+    'The return day is excluded.': 'День возврата не учитывается.',
+    'Clear dates': 'Очистить даты',
+    'Saved calculator rules apply to this preview. Vehicles in legacy mode keep final rounding to 100 THB.':
+        'Предпросмотр использует сохранённые правила калькулятора. Для машин с прежним расчётом сохраняется итоговое округление до 100 THB.',
+    'Enter exact positive whole THB package totals. Intermediate days and linked seasonal prices follow the saved rounding rules.':
+        'Укажите точные положительные пакетные суммы в целых THB. Промежуточные дни и связанные сезонные цены рассчитываются с сохранённым округлением.',
+    Month: 'Месяц',
+    'This preset changed. Refresh the page before calculating.':
+        'Пресет изменился. Обновите страницу перед расчётом.',
+    'Monthly package applies from day :day, except exact base-package anchors. Calendar months are calculated separately.':
+        'Месячный пакет применяется с :day-го дня, кроме точных опорных пакетов. Календарные месяцы рассчитываются отдельно.',
     'Pricing presets': 'Шаблоны цен',
     'Create preset': 'Создать шаблон',
     'Create pricing preset': 'Создание шаблона цен',

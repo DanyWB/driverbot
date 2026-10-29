@@ -49,12 +49,12 @@ test('fullscreen hides all timeline chrome and gives the grid the viewport', () 
 test('fullscreen keeps compact accessible range and exit controls above the grid', () => {
     assert.match(
         timelinePage,
-        /<Tooltip v-if="isFullscreen">[\s\S]*?data-timeline-fullscreen-toggle[\s\S]*?<Minimize \/>/,
+        /data-timeline-fullscreen-toggle[\s\S]*?<Minimize\s+v-if="isFullscreen"/,
     );
     assert.match(timelinePage, /aria-keyshortcuts="Escape"/);
     assert.match(
         timelinePage,
-        /data-timeline-fullscreen-range[\s\S]*?v-for="days in timelineQuickRangeDays"/,
+        /:aria-label="t\('Calendar range'\)"[\s\S]*?v-for="days in timelineHeaderRangeDays"/,
     );
     assert.match(timelinePage, /@click="applyQuickRange\(days\)"/);
 });

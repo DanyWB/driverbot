@@ -16,7 +16,7 @@ import {
 import { vehicleNameSegments } from '../../resources/js/lib/timelinePresentation.ts';
 
 test('continuous grid zoom is bounded, finite, and independent of density', () => {
-    assert.equal(timelineZoom(0.1), 0.75);
+    assert.equal(timelineZoom(0.1), 0.5);
     assert.equal(timelineZoom(4), 1.5);
     assert.equal(timelineZoom(1.234), 1.234);
 
@@ -24,15 +24,12 @@ test('continuous grid zoom is bounded, finite, and independent of density', () =
         assert.equal(timelineZoom(value), 1);
     }
 
-    for (const zoom of [0.75, 1.234, 1.5]) {
+    for (const zoom of [0.5, 0.75, 1.234, 1.5]) {
         const vehicle = timelineVehicleWidth(844, 340) * zoom;
         const day = 48 * zoom;
-        assert.equal(
-            timelineGridWidth(vehicle, 90, day),
-            (452 + 90 * 48) * zoom,
-        );
+        assert.ok(Math.abs(timelineGridWidth(vehicle, 90, day) - (412 + 90 * 48) * zoom) < 1e-9);
         const booking = timelineBookingGeometry(vehicle, day, 8, 3, zoom);
-        assert.ok(Math.abs(booking.left - (452 + 8 * 48 + 2) * zoom) < 1e-9);
+        assert.ok(Math.abs(booking.left - (412 + 8 * 48 + 2) * zoom) < 1e-9);
         assert.ok(Math.abs(booking.width - (3 * 48 - 4) * zoom) < 1e-9);
     }
 });
@@ -105,10 +102,10 @@ test('pinch clamps at content edges and handles a midpoint over the frozen label
     assert.equal(timelineZoomTop(450, 100, 1.2, 300, 600), 0);
 });
 
-test('desktop width fits full names while narrow phones keep complete wrapped text', () => {
-    assert.equal(timelineVehicleWidth(390, 700), 180);
-    assert.equal(timelineVehicleWidth(844, 400.3), 513);
-    assert.equal(timelineVehicleWidth(1440, 400.3), 513);
+test('explicit normal width fits full names independently of viewport', () => {
+    assert.equal(timelineVehicleWidth(390, 700), 772);
+    assert.equal(timelineVehicleWidth(844, 400.3), 473);
+    assert.equal(timelineVehicleWidth(1440, 400.3), 473);
     const name =
         'Honda PCX 160cc ABS, Black / Silver / Red, 2022 special edition';
     const segments = vehicleNameSegments(name);
@@ -158,7 +155,7 @@ test('pinch capture stays scoped, rejects cross-surface contacts, and guards eve
         page,
         /(?:document|window)\.addEventListener\(['"](?:touch|gesture)/,
     );
-    assert.match(page, /:stacked="viewportWidth <= 640"/);
+    assert.match(page, /:stacked="narrowVehicleColumn"/);
     assert.match(page, /:title="row.name"/);
     assert.match(name, /class="timeline-paint-outline" aria-hidden="true"/);
     assert.match(

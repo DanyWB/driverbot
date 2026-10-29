@@ -165,7 +165,7 @@ async function handleLaravelRentMenuActionWithDeps(ctx, dependencies = {}) {
     const path = require("node:path");
     return renderer.renderDocuments(ctx, {
       screen: "rent_contract",
-      documents: [{path: path.join(__dirname, "../assets/contracts", `agreement-${lang}.png`), filename: `Drive-Phangan-agreement-${lang}.png`}],
+      documents: [{path: path.join(__dirname, "../assets/contracts/opaque", `agreement-${lang}.png`), filename: `Drive-Phangan-agreement-${lang}.png`}],
       text: t(lang, "rent_contract_copy"),
       parseMode: "HTML",
       replyMarkup: {inline_keyboard: [[

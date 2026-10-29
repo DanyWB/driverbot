@@ -1,4 +1,4 @@
-export const timelineZoomLimits = { min: 0.75, max: 1.5 } as const;
+export const timelineZoomLimits = { min: 0.5, max: 1.5 } as const;
 
 export function timelineZoom(value: number): number {
     return Number.isFinite(value)

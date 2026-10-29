@@ -8,17 +8,36 @@ export function timelineDayWidth(value: number): number {
 }
 
 export function timelineVehicleWidth(
-    viewportWidth: number,
+    _viewportWidth: number,
     nameWidth = 0,
 ): number {
-    // Phones wrap the complete name; landscape/desktop reserve enough room
-    // for the measured longest name, padding and compact-mode info button.
-    return viewportWidth <= 640
-        ? 180
-        : Math.max(
-              viewportWidth <= 1024 ? 320 : 360,
-              Math.ceil(nameWidth) + 112,
-          );
+    return Math.max(250, Math.ceil(nameWidth) + 72);
+}
+
+// Controls stay usable at 50%; neither the info button nor the calendar
+// toolbar may force the frozen column wider than its computed geometry.
+export function timelineScaledVehicleWidth(
+    nameWidth: number,
+    zoom: number,
+    narrow = false,
+): number {
+    return Math.max(
+        184,
+        (narrow
+            ? Math.max(180, Math.ceil(nameWidth) + 80)
+            : timelineVehicleWidth(0, nameWidth)) * zoom,
+    );
+}
+
+export function timelineOccupancyLayout(
+    zoom: number,
+    compact: boolean,
+    lane: number,
+): { top: number; height: number } {
+    return {
+        top: (compact ? 5 : 10) * zoom + lane * Math.max(28, 30 * zoom),
+        height: Math.max(24, 26 * zoom),
+    };
 }
 
 export function timelineGridWidth(

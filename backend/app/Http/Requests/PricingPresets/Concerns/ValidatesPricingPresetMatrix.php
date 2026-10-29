@@ -4,6 +4,7 @@ namespace App\Http\Requests\PricingPresets\Concerns;
 
 use App\Domain\Pricing\Enums\PricingSeasonKey;
 use App\Domain\Pricing\Enums\PricingTier;
+use App\Domain\Pricing\Services\PricingSettings;
 
 trait ValidatesPricingPresetMatrix
 {
@@ -14,6 +15,7 @@ trait ValidatesPricingPresetMatrix
         $tierKeys = array_column(PricingTier::cases(), 'value');
         $rules = [
             'prices' => ['required', 'array:'.implode(',', $seasonKeys)],
+            'calculation_settings' => ['sometimes', 'nullable', 'array'],
         ];
 
         foreach (PricingSeasonKey::cases() as $season) {
@@ -67,5 +69,13 @@ trait ValidatesPricingPresetMatrix
     protected function adminLocale(): string
     {
         return $this->cookie('admin_locale') === 'ru' ? 'ru' : 'en';
+    }
+
+    /** @return array<string,mixed>|null */
+    protected function validatedCalculationSettings(): ?array
+    {
+        $value = $this->validated('calculation_settings');
+
+        return is_array($value) ? app(PricingSettings::class)->validate($value) : null;
     }
 }

@@ -6,7 +6,10 @@ use App\Domain\Pricing\Enums\PricingTier;
 
 final readonly class PriceQuote
 {
-    /** @param list<PriceBreakdownItem> $breakdown */
+    /**
+     * @param  list<PriceBreakdownItem>  $breakdown
+     * @param  array<string, mixed>|null  $calculation
+     */
     public function __construct(
         public int $vehicleId,
         public string $startsOn,
@@ -18,6 +21,7 @@ final readonly class PriceQuote
         public int $finalTotal,
         public string $currency,
         public array $breakdown,
+        public ?array $calculation = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -38,6 +42,7 @@ final readonly class PriceQuote
                 $this->breakdown,
             ),
             'missing_prices' => [],
+            ...($this->calculation === null ? [] : ['calculation' => $this->calculation]),
         ];
     }
 }

@@ -34,15 +34,20 @@ class StorePricingPresetRequest extends FormRequest
         ];
     }
 
-    /** @return array{name: string, vehicle_type: string|null, prices: array<string, array<string, int>>} */
+    /** @return array{name: string, vehicle_type: string|null, prices: array<string, array<string, int>>,calculation_settings?:array<string,mixed>|null} */
     public function presetData(): array
     {
         $vehicleType = $this->validated('vehicle_type');
 
-        return [
+        $data = [
             'name' => (string) $this->validated('name'),
             'vehicle_type' => is_string($vehicleType) ? $vehicleType : null,
             'prices' => $this->validatedMatrix(),
         ];
+        if ($this->has('calculation_settings')) {
+            $data['calculation_settings'] = $this->validatedCalculationSettings();
+        }
+
+        return $data;
     }
 }

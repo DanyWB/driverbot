@@ -18,20 +18,24 @@ use RuntimeException;
 class PricingPresetService
 {
     /**
-     * @param  array{name: string, vehicle_type?: string|null, prices: array<string, array<string, int>>}  $data
+     * @param  array{name: string, vehicle_type?: string|null, prices: array<string, array<string, int>>, calculation_settings?:array<string,mixed>|null,sort_order?:int}  $data
      */
     public function create(array $data, int $adminId): PricingPreset
     {
         return DB::transaction(function () use ($data, $adminId): PricingPreset {
+            $settings = isset($data['calculation_settings']) ? app(PricingSettings::class)->validate($data['calculation_settings']) : null;
+            $prices = app(PricingSettings::class)->linkedPrices($data['prices'], $settings);
             $preset = PricingPreset::query()->create([
                 'name' => $data['name'],
                 'vehicle_type' => $data['vehicle_type'] ?? null,
                 'version' => 1,
+                'sort_order' => $data['sort_order'] ?? ((int) PricingPreset::query()->max('sort_order') + 1),
+                'calculation_settings' => $settings,
                 'created_by_admin_id' => $adminId,
                 'updated_by_admin_id' => $adminId,
             ]);
 
-            $this->replacePrices($preset, $data['prices']);
+            $this->replacePrices($preset, $prices);
 
             return $this->fresh($preset);
         });
@@ -57,12 +61,13 @@ class PricingPresetService
                 'name' => $name,
                 'vehicle_type' => $source->getRawOriginal('vehicle_type'),
                 'prices' => $matrix,
+                'calculation_settings' => $source->calculation_settings,
             ], $adminId);
         });
     }
 
     /**
-     * @param  array{name: string, vehicle_type?: string|null, version: int, expected_linked_vehicles_count: int, prices: array<string, array<string, int>>}  $data
+     * @param  array{name: string, vehicle_type?: string|null, version: int, expected_linked_vehicles_count: int, prices: array<string, array<string, int>>, calculation_settings?:array<string,mixed>|null,sort_order?:int}  $data
      */
     public function update(PricingPreset $preset, array $data, int $adminId, string $locale): PricingPreset
     {
@@ -95,16 +100,22 @@ class PricingPresetService
                 ]);
             }
 
+            $settings = array_key_exists('calculation_settings', $data)
+                ? ($data['calculation_settings'] === null ? null : app(PricingSettings::class)->validate($data['calculation_settings']))
+                : $preset->calculation_settings;
+            $prices = app(PricingSettings::class)->linkedPrices($data['prices'], $settings);
             $preset->forceFill([
                 'name' => $data['name'],
+                'calculation_settings' => $settings,
                 'vehicle_type' => $vehicleType,
+                'sort_order' => $data['sort_order'] ?? (int) $preset->sort_order,
                 'version' => (int) $preset->version + 1,
                 'updated_by_admin_id' => $adminId,
             ])->save();
-            $this->replacePrices($preset, $data['prices']);
+            $this->replacePrices($preset, $prices);
 
             foreach ($vehicles as $vehicle) {
-                $this->materialize($vehicle, $preset, $data['prices']);
+                $this->materialize($vehicle, $preset, $prices);
             }
 
             return $this->fresh($preset);
@@ -182,6 +193,7 @@ class PricingPresetService
             $this->assertPresetVersion($preset, $presetVersion, $locale);
             $vehicle->forceFill([
                 'pricing_preset_id' => null,
+                'calculation_settings' => $preset->calculation_settings,
                 'pricing_profile' => null,
                 'pricing_version' => (int) $vehicle->pricing_version + 1,
             ])->save();
@@ -269,6 +281,7 @@ class PricingPresetService
 
         $vehicle->forceFill([
             'pricing_preset_id' => $preset->id,
+            'calculation_settings' => $preset->calculation_settings,
             'pricing_profile' => null,
             'pricing_version' => (int) $vehicle->pricing_version + 1,
         ])->save();

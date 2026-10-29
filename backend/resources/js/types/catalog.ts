@@ -69,11 +69,53 @@ export type PricingPresetSummary = {
 };
 
 export type PricingPreset = PricingPresetSummary & {
+    sort_order?: number;
     linked_vehicles_count: number;
     linked_vehicle_ids: number[];
     prices: PricingPresetPrices;
+    calculation_settings?: PricingCalculationSettings | null;
     created_at: string | null;
     updated_at: string | null;
+};
+
+export type PricingCalculationSettings = {
+    algorithm: 'calculator-v1';
+    rules: {
+        step: number;
+        mode: 'linear' | 'delayed';
+        holdDays: number;
+        cap: boolean;
+        monthly: boolean;
+        monthlyStart: number;
+        avg: boolean;
+    };
+    prefs: {
+        linkMiddle: boolean;
+        linkLow: boolean;
+        roundSteps: Record<'high' | 'middle' | 'low', number[]>;
+        discounts: Record<'middle' | 'low', number[]>;
+        seasonCalendar: ('high' | 'middle' | 'low')[];
+    };
+    dayOverrides: Record<string, number>;
+};
+
+export type PricingFleetVehicle = {
+    id: number;
+    external_code: string;
+    inventory_code: string | null;
+    name: string;
+    year: number | null;
+    type: string;
+    category: string | null;
+    is_visible_for_booking: boolean;
+    pricing_preset_id: number | null;
+    preset_name: string | null;
+    pricing_revision: number;
+    algorithm: 'legacy' | 'calculator-v1';
+    prices: Record<
+        'high' | 'middle' | 'low',
+        Record<'1d' | '7d' | '14d' | '21d' | 'month', VehiclePriceCell>
+    >;
 };
 
 export type VehicleDetail = VehicleListItem & {

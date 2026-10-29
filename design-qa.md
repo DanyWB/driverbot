@@ -1,94 +1,15 @@
-# Проверка пакета Drive Phangan — 18.10.2026
+# Design QA — 29 October package
 
-## Повторный независимый QA и исправление блокеров
+Detailed evidence and limitations: [docs/DESIGN_QA_2026_10_29.md](docs/DESIGN_QA_2026_10_29.md).
 
-Актуальные подробные отчёты:
+Source truth: customer Timeline and pricing screenshots listed in the detailed report and docs/IMPLEMENTATION_2026_10_29.md; original files in C:/Users/user/Desktop/phangan/.tmp/customer-review-20261029.
 
-- [UI/UX и свежие скриншоты](output/blocker-qa-2026-10-18/ui-report.md).
-- [Ошибки логики и cross-engine проверки](output/blocker-qa-2026-10-18/logic-report.md).
-- [Security, очищенная история и ограничения выпуска](output/blocker-qa-2026-10-18/security-and-release.md).
+Implementation evidence: .tmp/timeline-20261029-preview/{portrait,landscape,desktop}-{compact70,normal100}.png and .tmp/pricing-20261029-preview/{desktop-pricing,mobile-pricing,mobile-pricing-calendar}.png. Pricing desktop1440x1000/mobile390x844 and Timeline390x844/844x390/1280x800, DPR1. Source screenshots include Safari/desktop chrome and unknown zoom/DPR; structural and focused comparisons only, not a pixel-perfect assertion.
 
-Исправлены timezone-сдвиг PostgreSQL, пропуск pending-напоминаний при новой админской Telegram-привязке, Tab кастомных селектов и проверка Telegram-копий всех опубликованных фото. Composer/production npm audits теперь 0; Wayfinder и CLI совместимы с обновлённым Laravel. Полный dev npm audit имеет известный upstream braces-риск; он не скрыт.
+Fidelity surfaces: local Rajdhani700 Timeline and existing admin pricing typography; season table colors and Timeline body-color accents retained; readable independent table scroll versus whole-document overflow; compact Timeline hit-area minima are intentional; no image replacement shortcuts; contract originals preserved and composited on white; new pricing labels distinguish Month from legacy30+days, calendar from preliminary31day blocks, and explicit activation from saved historical bookings.
 
-Отдельный PG прогон: 11/11, 120 assertions; pending-policy дополнительно 7/7 при каждом из трёх APP_TIMEZONE. Очищенная локальная Git-копия проверена, исходная история и GitHub не изменены. getMe локального Telegram-токена: 401, живой smoke ещё не подтверждён. Git Bash safety прошёл без flock; Linux остаётся отдельной проверкой.
+Comparison history: calendar popover clipping found/fixed/recaptured by implementer; monthly30+day label found by root/fixed and visually rechecked in editor/table; mobile active-preset Edit/Copy made directly accessible. Root verified 6500THB/29day calendar and preliminary quotes, custom dropdowns, mobile editor cancel, empty error logs. Additional Timeline manual search/reset/fullscreen/zoom evidence in detailed report.
 
-Финальный общий precheck дошёл до последнего шага и остановился **только** на check:history исходного репозитория. До него успешно пройдены 9 security/helper-тестов, check:secrets, три production dependency audit, полный bot preflight с локальными Redis/API, build, lint/format/types, 25 frontend-тестов, Pint, PHPStan (0 ошибок), PHPUnit (306 найдено, 294 passed, 3317 assertions, 12 пропущено = 11 PostgreSQL + 1 Linux shell). История проверена отдельно в очищенной копии; общий precheck не помечается зелёным обходом этого шага.
+No remaining actionable P0/P1/P2 finding in the reviewed local states. Intentional deviations: compatibility notice, standard admin spacing, synthetic fleet content, minimum control sizes. Small text at50% is overview-only (P3). Actual iPhone pinch and authenticated live write flows are not certified by this visual pass; PostgreSQL concurrency is separately pending.
 
-После последнего frontend-build родитель повторно проверил клавиатуру в браузере: Enter/Space, Tab, Shift+Tab, быстрый повтор Tab и Escape проходят. Дополнительно устранена потеря фокуса из-за временного aria-hidden, который библиотека селекта устанавливает на остальной интерфейс. Сохранены 18 свежих кадров; последний — `output/blocker-qa-2026-10-18/ui/17-final-select-keyboard.png`. Повторные build, frontend 25/25, types, lint и format успешны. Проверка reduced-motion в браузере не завершена и остаётся явно указанным ограничением UI-отчёта.
-
-## Исторический срез первой проверки (до исправления блокеров)
-
-Статус: реализация и локальная функциональная проверка выполнены; не разрешение на выпуск.
-Проверено на изолированной SQLite UI-базе с 51 байком и 6 ожидающими заявками,
-включая 3 пересекающиеся на одном байке. Производственные данные не изменялись.
-
-## Визуальный источник и соответствие
-
-Основной источник — новый HTML, вложенный в Word внутри клиентского архива
-Andrew Timeline Corrections, а не более ранний внешний HTML.
-Сохранены тёмная палитра, цветные строки, чёрные компактные метки имён,
-выделение слова цвета, повторение месяца недельными блоками, подсветка даты.
-Статичный макет адаптирован к Vue/Laravel: настоящие права, статусы, доступность,
-переходы и несколько неблокирующих заявок вместо одного демонстрационного блока.
-
-## Подтверждено в браузере
-
-- Desktop 1440×1000: календарь 180 дней, fullscreen, переключение на 30 дней,
-  сохранение компактности, выход Escape. Управление не накрывает даты.
-- 51 байк не теряется; в Fleet первая страница 1–50 из 51, есть страница 2.
-- Mobile 390×844: сворачивание фильтров, компактные имена, горизонтальная шкала;
-  раскрываемая матрица цен прокручивается внутри панели, не расширяя страницу.
-- Кастомный селект: Enter открывает, Escape закрывает. Не системный select.
-- Fleet: 337 THB сохранено и перечитано без округления; изменение на 338 с
-  закрытием требует подтверждения отмены черновика. Модальное окно поясняет
-  область изменения и сохранность исторических цен.
-- Байк с 3 ожидающими заявками: снятие публикации и сохранение работают;
-  архив и деактивация недоступны. Статус публикации обновился после сохранения.
-- Бронь в светлой теме: сохранены полное имя, предоплата 1500 THB «Получено»,
-  залог 200 USD не получен. Два независимых статуса; общий профиль не изменён.
-- Быстрая форма: выбор 20–22 октября показывает 2 суток, не 3; исправлена
-  только длительность аренды, включительные ячейки занятости сохранены.
-- Шкала дат остаётся сверху при PageDown в обычном режиме; исправлен
-  мешавший sticky overflow предка, горизонтальное переполнение ограничено.
-- В ходе проверки консоль не показала ошибок/warnings.
-- Обнаруженные английские подписи новых блоков исправлены; ошибочная подсветка
-  сохранённых точных цен при первом открытии генератора убрана. Генератор
-  валидируется после ввода/попытки генерации; правила его расчёта не менялись.
-
-Скриншоты: output/package-qa-2026-10-18/timeline-desktop.png,
-timeline-mobile.png, fleet-mobile.png, publication-mobile.png,
-booking-payments-light.png. Это тестовые данные, не production.
-Некоторые промежуточные снимки сделаны до финального перевода подписей.
-
-## Автоматические проверки
-
-| Проверка | Результат |
-| --- | --- |
-| backend:check и повторные frontend-проверки | успешно: lint, format, TypeScript, 23 frontend-теста, Pint, PHPStan, 292 PHP-теста |
-| PHPUnit SQLite | 304 найдено, 292 выполнено, 12 пропущено (11 PostgreSQL + Linux deployment shell) |
-| Отдельный PostgreSQL 16 | 11/11 успешно, включая конкурентное создание/подтверждение и версии пресетов |
-| Bot tests | 100/100 |
-| Bot preflight, отдельные Redis/API | успешно: синтаксис, 362 ключа RU/EN/UA, режим Laravel, блокировки Redis, авторизация/read API |
-| Frontend build | успешно |
-| check:secrets текущего дерева | успешно |
-| Общий precheck | НЕ пройден: аудит зависимостей; дополнительно check:history обнаруживает старые дампы |
-
-Новые сценарии проверяют дедлайн/noon/18:00, отсутствие перезапуска 48 часов,
-отмену только конфликтов, откат транзакции, отсутствие двойного подтверждения,
-дедупликацию/stale notifications, версию условий, платежи/аудит, точные цены,
-конфликт устаревшего редактора, границы месяцев и полосы пересечений.
-
-## Остаточные риски / выпуск
-
-Аудит зависимостей: Composer 5 advisories в 4 пакетах; npm frontend 23 high,
-bot 8 high с транзитивными цепочками. Это вывод audit, не доказательство
-эксплуатируемости каждого предупреждения. Нельзя объявлять security gate зелёным.
-Нужно отдельно проверить применимость и доступные совместимые обновления.
-Историю Git с дампами не переписывали; это требует согласования и координации.
-
-Реальный Telegram smoke и Linux deployment-shell тест остаются до выпуска.
-Договор: доступны оригиналы RU/EN/UA страницы 1/2, второй страницы среди
-извлечённых материалов не обнаружено; не добавляли выдуманный текст.
-Произвольные 186 дней, shared-preset conflict, возврат фильтров покрыты кодом и
-автотестами; полноценный пользовательский smoke каждого сочетания ещё нужен.
-Новая миграция forward-only. Commit/push/deploy в этой работе не выполнялись.
+Final result: passed

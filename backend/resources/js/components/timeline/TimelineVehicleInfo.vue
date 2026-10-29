@@ -13,7 +13,9 @@ import { Button } from '@/components/ui/button';
 import { useLocale } from '@/composables/useLocale';
 import type { TimelineVehicle } from '@/types';
 
-defineProps<{ vehicle: TimelineVehicle }>();
+withDefaults(defineProps<{ vehicle: TimelineVehicle; zoom?: number }>(), {
+    zoom: 1,
+});
 const emit = defineEmits<{ 'update:open': [open: boolean] }>();
 const { t } = useLocale();
 </script>
@@ -25,13 +27,22 @@ const { t } = useLocale();
                 type="button"
                 variant="ghost"
                 size="icon"
-                class="size-10 shrink-0"
+                class="shrink-0"
+                :style="{
+                    width: `${Math.max(32, 32 * zoom)}px`,
+                    height: `${Math.max(32, 32 * zoom)}px`,
+                }"
                 :aria-label="
                     t('Details for :vehicle', { vehicle: vehicle.name })
                 "
                 :title="t('Vehicle details')"
             >
-                <Info class="size-4" />
+                <Info
+                    :style="{
+                        width: `${Math.max(14, 14 * zoom)}px`,
+                        height: `${Math.max(14, 14 * zoom)}px`,
+                    }"
+                />
             </Button>
         </PopoverTrigger>
         <PopoverPortal>

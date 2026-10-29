@@ -20,9 +20,11 @@ class PricingPresetPresenter
             'name' => (string) $preset->name,
             'vehicle_type' => $preset->getRawOriginal('vehicle_type'),
             'version' => (int) $preset->version,
+            'sort_order' => (int) $preset->sort_order,
             'linked_vehicles_count' => $preset->vehicles->count(),
             'linked_vehicle_ids' => $preset->vehicles->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all(),
             'prices' => $this->matrix($preset),
+            'calculation_settings' => $preset->calculation_settings,
             'created_at' => $preset->created_at?->toIso8601String(),
             'updated_at' => $preset->updated_at?->toIso8601String(),
         ];

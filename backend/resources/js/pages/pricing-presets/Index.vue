@@ -11,6 +11,9 @@ import {
     TriangleAlert,
 } from '@lucide/vue';
 import { computed, nextTick, onMounted, ref } from 'vue';
+import PricingRulesEditor from '@/components/pricing/PricingRulesEditor.vue';
+import PricingWorkbench from '@/components/pricing/PricingWorkbench.vue';
+import { defaultPricingSettings, linkedPricing } from '@/lib/pricingTools';
 import AdminSelect from '@/components/AdminSelect.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -29,6 +32,7 @@ import type {
     PricingPreset,
     PricingPresetPrices,
     PricingPresetVehicleType,
+    PricingCalculationSettings,
 } from '@/types';
 
 const props = defineProps<{ presets: PricingPreset[] }>();
@@ -62,6 +66,7 @@ type PresetDraft = {
     name: string;
     vehicle_type: PricingPresetVehicleType;
     prices: DraftPrices;
+    calculation_settings: PricingCalculationSettings | null;
 };
 
 const items = ref<PricingPreset[]>(props.presets.map(clonePreset));
@@ -108,7 +113,12 @@ function blankPrices(): DraftPrices {
 }
 
 function blankDraft(): PresetDraft {
-    return { name: '', vehicle_type: null, prices: blankPrices() };
+    return {
+        name: '',
+        vehicle_type: null,
+        prices: blankPrices(),
+        calculation_settings: defaultPricingSettings(),
+    };
 }
 
 function clonePrices(prices: PricingPresetPrices): DraftPrices {
@@ -149,6 +159,9 @@ function openEdit(preset: PricingPreset): void {
         name: preset.name,
         vehicle_type: preset.vehicle_type,
         prices: clonePrices(preset.prices),
+        calculation_settings: preset.calculation_settings
+            ? JSON.parse(JSON.stringify(preset.calculation_settings))
+            : null,
     };
     resetFeedback();
     editorOpen.value = true;
@@ -161,6 +174,9 @@ function openCopy(preset: PricingPreset): void {
         name: t(':name copy', { name: preset.name }),
         vehicle_type: preset.vehicle_type,
         prices: clonePrices(preset.prices),
+        calculation_settings: preset.calculation_settings
+            ? JSON.parse(JSON.stringify(preset.calculation_settings))
+            : null,
     };
     resetFeedback();
     editorOpen.value = true;
@@ -294,6 +310,7 @@ async function persist(): Promise<void> {
         name: draft.value.name.trim(),
         vehicle_type: draft.value.vehicle_type,
         prices: normalizedPrices(),
+        calculation_settings: draft.value.calculation_settings,
     };
 
     if (mode.value === 'copy' && current) {
@@ -424,6 +441,11 @@ function loadLatestPreset(): void {
                 : latestPreset.value.name,
         vehicle_type: latestPreset.value.vehicle_type,
         prices: clonePrices(latestPreset.value.prices),
+        calculation_settings: latestPreset.value.calculation_settings
+            ? JSON.parse(
+                  JSON.stringify(latestPreset.value.calculation_settings),
+              )
+            : null,
     };
     conflict.value = null;
     latestPreset.value = null;
@@ -433,6 +455,43 @@ function loadLatestPreset(): void {
 
 function formatPrice(value: number): string {
     return `${new Intl.NumberFormat(locale.value === 'ru' ? 'ru-RU' : 'en-US').format(value)} THB`;
+}
+
+function packageLabel(
+    tier: (typeof tiers)[number],
+    calculator: boolean,
+): string {
+    return t(tier.key === 'month' && calculator ? 'Month' : tier.label);
+}
+
+function recalculateLinked(): void {
+    if (
+        draft.value.calculation_settings &&
+        tiers.every((tier) => Number(draft.value.prices.high[tier.key]) > 0)
+    ) {
+        draft.value.prices = linkedPricing(
+            normalizedPrices(),
+            draft.value.calculation_settings,
+        );
+    }
+}
+
+function mergeSaved(saved: PricingPreset[]): void {
+    for (const preset of saved) {
+        const index = items.value.findIndex((item) => item.id === preset.id);
+
+        if (index < 0) {
+            items.value.push(preset);
+        } else {
+            items.value[index] = preset;
+        }
+    }
+
+    items.value.sort(
+        (a, b) =>
+            (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
+            a.name.localeCompare(b.name),
+    );
 }
 
 onMounted(() => {
@@ -463,7 +522,7 @@ onMounted(() => {
                 <p class="mt-2 text-sm text-muted-foreground">
                     {{
                         t(
-                            'Reuse one exact 3 × 5 price matrix across multiple vehicles. Preset totals are stored as whole THB without rounding or a 50 THB step.',
+                            'Manage package prices, calculation rules and assignments to your real fleet. Save a preset before checking its daily matrix or rental quote.',
                         )
                     }}
                 </p>
@@ -480,12 +539,12 @@ onMounted(() => {
                 <TriangleAlert class="mt-0.5 size-4 shrink-0" />
                 <div class="space-y-1">
                     <p class="font-semibold">
-                        {{ t('Booking rounding is unchanged') }}
+                        {{ t('Calculator rules are enabled explicitly') }}
                     </p>
                     <p>
                         {{
                             t(
-                                'Preset package totals stay exact. The final booking quote still follows the existing 100 THB rounding rule.',
+                                'New presets use interpolation and their own rounding rules. Existing vehicles keep the legacy calculation until you explicitly assign or update a calculator preset.',
                             )
                         }}
                     </p>
@@ -500,6 +559,14 @@ onMounted(() => {
             </div>
         </div>
 
+        <PricingWorkbench
+            :presets="items"
+            @saved="mergeSaved"
+            @edit="openEdit"
+            @copy="openCopy"
+            @removed="items = items.filter((p) => p.id !== $event)"
+        />
+
         <div
             v-if="successMessage"
             class="mt-5 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
@@ -508,139 +575,156 @@ onMounted(() => {
             {{ successMessage }}
         </div>
 
-        <section
-            v-if="items.length"
-            class="mt-6 grid min-w-0 gap-4 min-[1900px]:grid-cols-2"
-        >
-            <article
-                v-for="preset in items"
-                :key="preset.id"
-                class="max-w-full min-w-0 rounded-xl border bg-card p-4 shadow-sm transition-[border-color,box-shadow] duration-[350ms] ease-out hover:border-foreground/20 hover:shadow-md motion-reduce:transition-none sm:p-5"
+        <details class="mt-6 rounded-lg border p-4">
+            <summary class="cursor-pointer font-semibold">
+                {{ t('Preset details') }}
+            </summary>
+            <section
+                v-if="items.length"
+                class="mt-6 grid min-w-0 gap-4 min-[1900px]:grid-cols-2"
             >
-                <div
-                    class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+                <article
+                    v-for="preset in items"
+                    :key="preset.id"
+                    class="max-w-full min-w-0 rounded-xl border bg-card p-4 shadow-sm transition-[border-color,box-shadow] duration-[350ms] ease-out hover:border-foreground/20 hover:shadow-md motion-reduce:transition-none sm:p-5"
                 >
-                    <div class="min-w-0">
-                        <h2 class="truncate text-lg font-semibold">
-                            {{ preset.name }}
-                        </h2>
-                        <div
-                            class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
-                        >
-                            <span>{{
-                                t(preset.vehicle_type ?? 'All vehicle types')
-                            }}</span>
-                            <span>{{
-                                t('Version :version', {
-                                    version: preset.version,
-                                })
-                            }}</span>
-                            <span class="inline-flex items-center gap-1">
-                                <Link2 class="size-3" />
-                                {{
-                                    t(':count linked vehicles', {
-                                        count: preset.linked_vehicles_count,
+                    <div
+                        class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+                    >
+                        <div class="min-w-0">
+                            <h2 class="truncate text-lg font-semibold">
+                                {{ preset.name }}
+                            </h2>
+                            <div
+                                class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
+                            >
+                                <span>{{
+                                    t(
+                                        preset.vehicle_type ??
+                                            'All vehicle types',
+                                    )
+                                }}</span>
+                                <span>{{
+                                    t('Version :version', {
+                                        version: preset.version,
                                     })
-                                }}
-                            </span>
+                                }}</span>
+                                <span class="inline-flex items-center gap-1">
+                                    <Link2 class="size-3" />
+                                    {{
+                                        t(':count linked vehicles', {
+                                            count: preset.linked_vehicles_count,
+                                        })
+                                    }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                @click="openCopy(preset)"
+                            >
+                                <Copy />{{ t('Copy') }}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                @click="openEdit(preset)"
+                            >
+                                <Pencil />{{ t('Edit') }}
+                            </Button>
                         </div>
                     </div>
-                    <div class="flex shrink-0 gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            @click="openCopy(preset)"
-                        >
-                            <Copy />{{ t('Copy') }}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            @click="openEdit(preset)"
-                        >
-                            <Pencil />{{ t('Edit') }}
-                        </Button>
+
+                    <div
+                        class="mt-4 max-w-full min-w-0 overflow-x-auto rounded-lg border"
+                    >
+                        <table class="w-full min-w-[620px] text-sm">
+                            <thead
+                                class="border-b bg-muted/35 text-xs text-muted-foreground"
+                            >
+                                <tr>
+                                    <th class="px-3 py-2 text-left font-medium">
+                                        {{ t('Season') }}
+                                    </th>
+                                    <th
+                                        v-for="tier in tiers"
+                                        :key="tier.key"
+                                        class="px-3 py-2 text-right font-medium"
+                                    >
+                                        {{
+                                            packageLabel(
+                                                tier,
+                                                Boolean(
+                                                    preset.calculation_settings,
+                                                ),
+                                            )
+                                        }}
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr v-for="season in seasons" :key="season.key">
+                                    <th class="px-3 py-2 text-left font-medium">
+                                        {{ t(season.label) }}
+                                    </th>
+                                    <td
+                                        v-for="tier in tiers"
+                                        :key="tier.key"
+                                        class="px-3 py-2 text-right whitespace-nowrap tabular-nums"
+                                    >
+                                        {{
+                                            formatPrice(
+                                                preset.prices[season.key][
+                                                    tier.key
+                                                ],
+                                            )
+                                        }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                </div>
 
-                <div
-                    class="mt-4 max-w-full min-w-0 overflow-x-auto rounded-lg border"
-                >
-                    <table class="w-full min-w-[620px] text-sm">
-                        <thead
-                            class="border-b bg-muted/35 text-xs text-muted-foreground"
+                    <div
+                        v-if="preset.linked_vehicle_ids.length"
+                        class="mt-4 flex flex-wrap items-center gap-2 text-xs"
+                    >
+                        <span class="text-muted-foreground"
+                            >{{ t('Linked vehicles') }}:</span
                         >
-                            <tr>
-                                <th class="px-3 py-2 text-left font-medium">
-                                    {{ t('Season') }}
-                                </th>
-                                <th
-                                    v-for="tier in tiers"
-                                    :key="tier.key"
-                                    class="px-3 py-2 text-right font-medium"
-                                >
-                                    {{ t(tier.label) }}
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y">
-                            <tr v-for="season in seasons" :key="season.key">
-                                <th class="px-3 py-2 text-left font-medium">
-                                    {{ t(season.label) }}
-                                </th>
-                                <td
-                                    v-for="tier in tiers"
-                                    :key="tier.key"
-                                    class="px-3 py-2 text-right whitespace-nowrap tabular-nums"
-                                >
-                                    {{
-                                        formatPrice(
-                                            preset.prices[season.key][tier.key],
-                                        )
-                                    }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                        <Link
+                            v-for="vehicleId in preset.linked_vehicle_ids"
+                            :key="vehicleId"
+                            :href="`/vehicles/${vehicleId}/edit#pricing`"
+                            class="inline-flex items-center gap-1 rounded-md border px-2 py-1 font-medium transition-colors duration-[350ms] hover:bg-muted motion-reduce:transition-none"
+                        >
+                            #{{ vehicleId }}<ArrowRight class="size-3" />
+                        </Link>
+                    </div>
+                </article>
+            </section>
 
-                <div
-                    v-if="preset.linked_vehicle_ids.length"
-                    class="mt-4 flex flex-wrap items-center gap-2 text-xs"
-                >
-                    <span class="text-muted-foreground"
-                        >{{ t('Linked vehicles') }}:</span
-                    >
-                    <Link
-                        v-for="vehicleId in preset.linked_vehicle_ids"
-                        :key="vehicleId"
-                        :href="`/vehicles/${vehicleId}/edit#pricing`"
-                        class="inline-flex items-center gap-1 rounded-md border px-2 py-1 font-medium transition-colors duration-[350ms] hover:bg-muted motion-reduce:transition-none"
-                    >
-                        #{{ vehicleId }}<ArrowRight class="size-3" />
-                    </Link>
-                </div>
-            </article>
-        </section>
-
-        <section
-            v-else
-            class="mt-8 rounded-xl border border-dashed p-10 text-center"
-        >
-            <h2 class="font-semibold">{{ t('No pricing presets yet') }}</h2>
-            <p class="mt-2 text-sm text-muted-foreground">
-                {{
-                    t(
-                        'Create a preset manually, then assign it from a vehicle price section.',
-                    )
-                }}
-            </p>
-            <Button class="mt-5" type="button" @click="openCreate">
-                <Plus />{{ t('Create preset') }}
-            </Button>
-        </section>
+            <section
+                v-else
+                class="mt-8 rounded-xl border border-dashed p-10 text-center"
+            >
+                <h2 class="font-semibold">{{ t('No pricing presets yet') }}</h2>
+                <p class="mt-2 text-sm text-muted-foreground">
+                    {{
+                        t(
+                            'Create a preset manually, then assign it from a vehicle price section.',
+                        )
+                    }}
+                </p>
+                <Button class="mt-5" type="button" @click="openCreate">
+                    <Plus />{{ t('Create preset') }}
+                </Button>
+            </section>
+        </details>
     </main>
 
     <Dialog v-model:open="editorOpen">
@@ -712,7 +796,7 @@ onMounted(() => {
                 >
                     {{
                         t(
-                            'Enter exact positive whole THB totals. Presets do not round and do not require multiples of 50.',
+                            'Enter exact positive whole THB package totals. Intermediate days and linked seasonal prices follow the saved rounding rules.',
                         )
                     }}
                 </div>
@@ -733,7 +817,12 @@ onMounted(() => {
                                     :key="tier.key"
                                     class="px-3 py-3 font-medium"
                                 >
-                                    {{ t(tier.label) }}
+                                    {{
+                                        packageLabel(
+                                            tier,
+                                            Boolean(draft.calculation_settings),
+                                        )
+                                    }}
                                 </th>
                             </tr>
                         </thead>
@@ -758,9 +847,20 @@ onMounted(() => {
                                         inputmode="numeric"
                                         class="tabular-nums"
                                         :disabled="
-                                            processing || mode === 'copy'
+                                            processing ||
+                                            mode === 'copy' ||
+                                            (season.key === 'middle' &&
+                                                Boolean(
+                                                    draft.calculation_settings
+                                                        ?.prefs.linkMiddle,
+                                                )) ||
+                                            (season.key === 'low' &&
+                                                Boolean(
+                                                    draft.calculation_settings
+                                                        ?.prefs.linkLow,
+                                                ))
                                         "
-                                        :aria-label="`${t(season.label)}, ${t(tier.label)}, THB`"
+                                        :aria-label="`${t(season.label)}, ${packageLabel(tier, Boolean(draft.calculation_settings))}, THB`"
                                         :aria-invalid="
                                             Boolean(
                                                 fieldErrors[
@@ -772,6 +872,10 @@ onMounted(() => {
                                             )
                                         "
                                         :aria-describedby="`preset_${season.key}_${tier.key}_error`"
+                                        @change="
+                                            season.key === 'high' &&
+                                            recalculateLinked()
+                                        "
                                     />
                                     <InputError
                                         :id="`preset_${season.key}_${tier.key}_error`"
@@ -787,6 +891,41 @@ onMounted(() => {
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <div v-if="mode !== 'copy'" class="space-y-3">
+                    <label class="flex items-center gap-2 text-sm"
+                        ><input
+                            type="checkbox"
+                            :checked="draft.calculation_settings !== null"
+                            :disabled="processing"
+                            @change="
+                                draft.calculation_settings = (
+                                    $event.target as HTMLInputElement
+                                ).checked
+                                    ? defaultPricingSettings()
+                                    : null
+                            "
+                        />{{
+                            t('Use calculator rules for future quotes')
+                        }}</label
+                    >
+                    <p
+                        v-if="!draft.calculation_settings"
+                        class="text-sm text-muted-foreground"
+                    >
+                        {{
+                            t(
+                                'Legacy mode: seasonal day splitting and final rounding to 100 THB. No change to existing bookings.',
+                            )
+                        }}
+                    </p>
+                    <PricingRulesEditor
+                        v-if="draft.calculation_settings"
+                        v-model="draft.calculation_settings"
+                        :disabled="processing"
+                        @recalculate="recalculateLinked"
+                    />
                 </div>
 
                 <div
@@ -858,7 +997,7 @@ onMounted(() => {
             >
                 {{
                     t(
-                        'Existing bookings are not recalculated. Final booking rounding remains unchanged.',
+                        'Existing bookings are not recalculated. Future quotes use the saved calculation rules.',
                     )
                 }}
             </div>
@@ -881,3 +1020,29 @@ onMounted(() => {
         </DialogContent>
     </Dialog>
 </template>
+
+<style scoped>
+@supports (interpolate-size: allow-keywords) {
+    details {
+        interpolate-size: allow-keywords;
+    }
+    details::details-content {
+        block-size: 0;
+        opacity: 0;
+        overflow: clip;
+        transition:
+            block-size 350ms ease,
+            opacity 350ms ease,
+            content-visibility 350ms allow-discrete;
+    }
+    details[open]::details-content {
+        block-size: auto;
+        opacity: 1;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    details::details-content {
+        transition: none;
+    }
+}
+</style>

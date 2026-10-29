@@ -14,6 +14,7 @@ use App\Http\Controllers\Customers\CustomerController;
 use App\Http\Controllers\Customers\CustomerDocumentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PricingPresets\PricingPresetController;
+use App\Http\Controllers\PricingPresets\PricingToolsController;
 use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\Vehicles\CategoryController;
 use App\Http\Controllers\Vehicles\RentalPolicyController;
@@ -31,6 +32,15 @@ Route::middleware(['auth', 'admin.active', 'verified'])->group(function () {
     Route::get('timeline', TimelineController::class)->name('timeline.index');
 
     Route::get('pricing-presets', [PricingPresetController::class, 'index'])->name('pricing-presets.index');
+    Route::get('pricing-presets/fleet', [PricingToolsController::class, 'fleet'])->name('pricing-presets.fleet');
+    Route::get('pricing-presets/export', [PricingToolsController::class, 'export'])->name('pricing-presets.export');
+    Route::post('pricing-presets/import-preview', [PricingToolsController::class, 'preview'])->name('pricing-presets.import-preview');
+    Route::post('pricing-presets/import-commit', [PricingToolsController::class, 'commit'])->name('pricing-presets.import-commit');
+    Route::post('pricing-presets/assignments', [PricingToolsController::class, 'assign'])->name('pricing-presets.assignments');
+    Route::patch('pricing-presets/bulk', [PricingToolsController::class, 'bulkUpdate'])->name('pricing-presets.bulk');
+    Route::post('pricing-presets/reorder', [PricingToolsController::class, 'reorder'])->name('pricing-presets.reorder');
+    Route::delete('pricing-presets/{pricingPreset}', [PricingToolsController::class, 'destroy'])->name('pricing-presets.destroy');
+    Route::get('pricing-presets/{pricingPreset}/calculate', [PricingToolsController::class, 'calculate'])->name('pricing-presets.calculate');
     Route::post('pricing-presets', [PricingPresetController::class, 'store'])->name('pricing-presets.store');
     Route::post('pricing-presets/{pricingPreset}/copy', [PricingPresetController::class, 'copy'])->name('pricing-presets.copy');
     Route::patch('pricing-presets/{pricingPreset}', [PricingPresetController::class, 'update'])->name('pricing-presets.update');

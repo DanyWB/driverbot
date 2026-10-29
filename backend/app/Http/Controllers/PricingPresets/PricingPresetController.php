@@ -28,7 +28,7 @@ class PricingPresetController extends Controller
     {
         $presets = PricingPreset::query()
             ->with(['prices.season', 'vehicles:id,pricing_preset_id'])
-            ->orderBy('name')
+            ->orderBy('sort_order')->orderBy('name')
             ->get()
             ->map(fn (PricingPreset $preset): array => $presenter->present($preset))
             ->values()
