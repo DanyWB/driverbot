@@ -53,7 +53,11 @@ class PriceReleaseEvidenceTest extends TestCase
         if (PHP_OS_FAMILY !== 'Linux' || ! function_exists('posix_geteuid')) {
             $this->markTestSkipped('Real POSIX ownership/mode/symlink fixture runs on Linux CI only.');
         }
-        $parent = sys_get_temp_dir().'/price-release-evidence-'.bin2hex(random_bytes(8));
+        $temporaryRoot = realpath(sys_get_temp_dir());
+        if ($temporaryRoot === false) {
+            throw new RuntimeException('Existing isolated temporary root required.');
+        }
+        $parent = $temporaryRoot.'/price-release-evidence-'.bin2hex(random_bytes(8));
         $backup = $parent.'/20261031T120000Z';
         mkdir($backup, 0700, true);
         $names = ['database.dump', 'persistent-files.tar.gz', 'manifest.env', 'SHA256SUMS'];
