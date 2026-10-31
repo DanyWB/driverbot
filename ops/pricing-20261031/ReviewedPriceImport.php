@@ -72,7 +72,7 @@ final class ReviewedPriceImport
      * @param  array<string,mixed>  $reference
      * @return array{presets:array<string,array<string,mixed>>,assignments:array<string,string>}
      */
-    private function input(array $payload, array $manifest, array $reference): array
+    public function input(array $payload, array $manifest, array $reference): array
     {
         $preview = app(PricingSettingsImport::class)->preview($payload);
         $mapping = $manifest['assignments'];

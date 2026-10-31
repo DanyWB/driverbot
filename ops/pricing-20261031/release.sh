@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # NEW release only. Exact-SHA CI and root execution GO required before invocation.
-# Never retry after an import-started checkpoint or create a second backup blindly.
+# Never retry after a repair-started checkpoint or create a second backup blindly.
 set -Eeuo pipefail
 umask 0077
 fail() { printf 'PRICE RELEASE REFUSED: %s\n' "$1" >&2; exit 1; }
@@ -17,7 +17,7 @@ source_ref="$(git -C "$source" symbolic-ref --quiet --short HEAD || printf detac
 git -C "$source" merge-base --is-ancestor 6792e28929cfe20b1cf3c9678929e27bfaf61e80 "$revision" || fail 'Wrong clean-history parent.'
 while IFS= read -r changed; do
     case "$changed" in
-        .github/workflows/backend-tests.yml|backend/app/Domain/Pricing/Services/PricingSettings.php|backend/tests/Feature/PricingCalculatorToolsTest.php|backend/tests/Feature/ReviewedPriceImportTest.php|backend/tests/Feature/PostgresReviewedPriceImportTest.php|backend/tests/Unit/PriceReleaseEvidenceTest.php|backend/tests/Unit/BotRuntimeTreeTest.php|backend/tests/Unit/BotRuntimeProcessGroupTest.php|bot/package.json|bot/package-lock.json|docs/PRICES_RELEASE_2026_10_31.md|ops/pricing-20261031/*) ;;
+        .github/workflows/backend-tests.yml|backend/app/Domain/Pricing/Services/PricingSettings.php|backend/tests/Feature/PricingCalculatorToolsTest.php|backend/tests/Feature/ReviewedPriceImportTest.php|backend/tests/Feature/PostgresReviewedPriceImportTest.php|backend/tests/Feature/ReviewedAnchorRepairTest.php|backend/tests/Feature/PostgresReviewedAnchorRepairTest.php|backend/tests/Unit/PriceReleaseEvidenceTest.php|backend/tests/Unit/BotRuntimeTreeTest.php|backend/tests/Unit/BotRuntimeProcessGroupTest.php|bot/package.json|bot/package-lock.json|docs/PRICES_RELEASE_2026_10_31.md|ops/pricing-20261031/*) ;;
         *) fail 'Unrelated change in proposed pricing release.' ;;
     esac
 done < <(git -C "$source" diff --name-only 6792e28929cfe20b1cf3c9678929e27bfaf61e80 "$revision")
@@ -89,7 +89,7 @@ php "$helpers/compare-copy.php" "$previous" "$release" "$source" "$runtime_proof
 cmp -s "$operation/copy-before.json" "$operation/copy-prepared.json" || fail 'Old release changed during dependency preparation.'
 health
 runtime() { sudo -u drive-phangan env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/srv/drive-phangan APP_ENV=production /usr/bin/php "$@"; }
-runtime "$release/ops/pricing-20261031/run.php" inspect "$release/backend" "$operation/inputs" >"$operation/preview.json"
+runtime "$release/ops/pricing-20261031/repair.php" inspect "$release/backend" "$operation/inputs" >"$operation/preview.json"
 # Verify append ownership WITHOUT creating/truncating any shared log as root.
 log_directory="$root/shared/backend/storage/logs"
 for day in "$(TZ=Asia/Bangkok date +%F)" "$(TZ=Asia/Bangkok date -d tomorrow +%F)"; do
@@ -105,7 +105,7 @@ runtime "$previous/backend/artisan" down --retry=30
 systemctl stop "${units[@]}"
 for unit in "${units[@]}"; do [[ "$(systemctl is-active "$unit" || true)" == inactive ]] || fail 'Writer did not stop.'; done
 phase 'writers-stopped; failure now needs reviewed availability recovery'
-runtime "$release/ops/pricing-20261031/run.php" fingerprint "$previous/backend" "$operation/inputs" >"$operation/baseline.tmp"
+runtime "$release/ops/pricing-20261031/repair.php" fingerprint "$previous/backend" "$operation/inputs" >"$operation/baseline.tmp"
 install -o drive-phangan -g drive-phangan -m 0600 "$operation/baseline.tmp" "$operation/baseline.json"
 export APP_ROOT="$root" CURRENT="$root/current" SHARED="$root/shared" BACKUP_ROOT="$root/backups" ENABLE_BACKUP_PRUNE=false BACKUP_RETENTION_DAYS=14
 phase 'backup-started; inspect retained backups before any manual recovery, never retry'
@@ -122,9 +122,9 @@ install -o drive-phangan -g drive-phangan -m 0600 "$operation/receipt.tmp" "$ope
 phase backup-verified
 proof="$(sha256sum "$operation/verified-backup.json" | awk '{print $1}')"
 [[ "$(free_bytes)" -ge 805306368 ]] || fail '768MiB immediate pre-import gate failed; no database mutation.'
-phase 'import-started; NEVER automatically resume legacy code or restore DB'
-sudo -u drive-phangan env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/srv/drive-phangan APP_ENV=production FINAL_PRICES_EXECUTION_GO=304a31270256c2d36e08b3c90128dc91bca31b215ea4750df2bc9b0b4707bfc2 FINAL_PRICES_BACKUP_VERIFIED="$proof" /usr/bin/php "$release/ops/pricing-20261031/run.php" apply "$release/backend" "$operation/inputs" "$admin_id" >"$operation/import.json"
-phase 'import-committed; forward-only reviewed recovery'
+phase 'repair-started; NEVER automatically resume legacy code or restore DB'
+sudo -u drive-phangan env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/srv/drive-phangan APP_ENV=production FINAL_PRICES_EXECUTION_GO=304a31270256c2d36e08b3c90128dc91bca31b215ea4750df2bc9b0b4707bfc2 FINAL_PRICES_BACKUP_VERIFIED="$proof" /usr/bin/php "$release/ops/pricing-20261031/repair.php" apply "$release/backend" "$operation/inputs" "$admin_id" >"$operation/repair.json"
+phase 'repair-committed; forward-only reviewed recovery'
 [[ "$(readlink -f "$root/current")" == "$previous" ]] || fail 'Current changed before cutover.'
 [[ "$(free_bytes)" -ge 805306368 ]] || fail '768MiB immediate cutover gate failed AFTER import; stay in maintenance for reviewed forward recovery, never legacy rollback.'
 temporary="$root/.current-price-$id"
@@ -132,8 +132,9 @@ temporary="$root/.current-price-$id"
 ln -s "$release" "$temporary"
 mv -Tf "$temporary" "$root/current"
 systemctl reload php8.3-fpm
-runtime "$release/ops/pricing-20261031/run.php" inspect "$release/backend" "$operation/inputs" >"$operation/final-pricing.json"
-php -r '$a=json_decode(file_get_contents($argv[1]),true,32,JSON_THROW_ON_ERROR);$b=json_decode(file_get_contents($argv[2]),true,32,JSON_THROW_ON_ERROR)["fingerprint"];foreach(["bookings","booking_price_snapshots","pricing_seasons","pricing_season_months","rental_policies","categories","vehicle_photos"]as$t){if($a[$t]!==$b[$t])exit(1);}' "$operation/baseline.json" "$operation/final-pricing.json" || fail 'Historical/reference baseline changed before reopening.'
+runtime "$release/ops/pricing-20261031/repair.php" inspect "$release/backend" "$operation/inputs" >"$operation/final-pricing.json"
+php -r '$r=json_decode(file_get_contents($argv[1]),true,32,JSON_THROW_ON_ERROR);if(($r["state"]??null)!=="already-correct")exit(1);' "$operation/final-pricing.json" || fail 'Final pricing is not fully source-correct; stay in maintenance.'
+php -r '$a=json_decode(file_get_contents($argv[1]),true,32,JSON_THROW_ON_ERROR);$b=json_decode(file_get_contents($argv[2]),true,32,JSON_THROW_ON_ERROR)["fingerprint"];foreach(["bookings","booking_price_snapshots","pricing_seasons","pricing_season_months","rental_policies","categories","vehicle_photos","admin_users"]as$t){if($a[$t]!==$b[$t])exit(1);}' "$operation/baseline.json" "$operation/final-pricing.json" || fail 'Historical/reference baseline changed before reopening.'
 runtime "$release/backend/artisan" up
 systemctl start "${units[@]}"
 health

@@ -22,6 +22,10 @@ try {
     require $backend.'/vendor/autoload.php';
     require __DIR__.'/ReviewedPriceImport.php';
     require __DIR__.'/PriceReleaseEvidence.php';
+    $repairOnly = realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __DIR__.'/repair.php';
+    if ($repairOnly) {
+        require __DIR__.'/ReviewedAnchorRepair.php';
+    }
     $read = static function (string $name, string $sha) use ($inputs): array {
         $file = $inputs.'/'.$name;
         if (realpath($file) !== $file || is_link($file) || ! is_file($file) || filesize($file) > 2_000_000) {
@@ -47,7 +51,7 @@ try {
         || realpath(storage_path()) !== '/srv/drive-phangan/shared/backend/storage') {
         throw new RuntimeException('Actual production runtime identity mismatch.');
     }
-    $runner = new ReviewedPriceImport;
+    $runner = $repairOnly ? new ReviewedAnchorRepair : new ReviewedPriceImport;
     if ($mode !== 'apply') {
         $db->beginTransaction();
         try {
