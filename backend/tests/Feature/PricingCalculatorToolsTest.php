@@ -58,6 +58,55 @@ class PricingCalculatorToolsTest extends TestCase
         }
     }
 
+    public function test_original_twenty_anchor_matrices_and_settings_survive_save_and_native_import(): void
+    {
+        $imported = app(PricingSettingsImport::class)->preview($this->payload());
+        $native = [];
+        foreach ($imported['presets'] as $name => $data) {
+            $preset = app(PricingPresetService::class)->create($data, $this->admin->id);
+            for ($save = 0; $save < 2; $save++) {
+                $this->assertSame($data['prices'], app(PricingPresetService::class)->matrix($preset), $name);
+                $this->assertSame($data['calculation_settings'], $preset->calculation_settings, $name);
+                $preset = app(PricingPresetService::class)->update($preset, [
+                    ...$data, 'version' => $preset->version, 'expected_linked_vehicles_count' => 0,
+                ], $this->admin->id, 'en');
+            }
+            $this->assertSame($data['prices'], app(PricingPresetService::class)->matrix($preset), $name);
+            $native[] = ['id' => $preset->id, 'name' => $name, 'vehicle_type' => null, ...$data];
+        }
+        $reimported = app(PricingSettingsImport::class)->preview([
+            'format' => 'drive-pricing-presets', 'version' => 1, 'presets' => $native, 'assignments' => [],
+        ]);
+        foreach ($imported['presets'] as $name => $data) {
+            $this->assertSame($data['prices'], $reimported['presets'][$name]['prices'], $name);
+            $this->assertSame($data['calculation_settings'], $reimported['presets'][$name]['calculation_settings'], $name);
+        }
+        $hrv = PricingPreset::query()->where('name', 'HR-V 2020')->firstOrFail();
+        $this->assertSame(15000, app(PricingPresetService::class)->matrix($hrv)['low']['21d']);
+    }
+
+    public function test_linked_prices_match_javascript_below_at_above_half_and_validated_bounds(): void
+    {
+        $source = app(PricingSettingsImport::class)->preview($this->payload())['presets']['HR-V 2020'];
+        $settings = $source['calculation_settings'];
+        $settings['prefs']['linkLow'] = false;
+        $prices = $source['prices'];
+        $prices['high'] = array_fill_keys(PricingCalculator::TIERS, 1000);
+        foreach ([[75.00000000000001, 200], [75, 300], [74.99999999999999, 300]] as [$discount, $expected]) {
+            $settings['prefs']['discounts']['middle'] = array_fill(0, 5, $discount);
+            $settings['prefs']['roundSteps']['middle'] = array_fill(0, 5, 100);
+            $linked = app(PricingSettings::class)->linkedPrices($prices, $settings);
+            $this->assertSame(array_fill_keys(PricingCalculator::TIERS, $expected), $linked['middle']);
+            $this->assertSame($prices['high'], $linked['high']);
+            $this->assertSame($prices['low'], $linked['low']);
+        }
+        $prices['high'] = array_fill_keys(PricingCalculator::TIERS, 100000000);
+        $settings['prefs']['discounts']['middle'] = array_fill(0, 5, 0);
+        $settings['prefs']['roundSteps']['middle'] = array_fill(0, 5, 1);
+        $this->assertSame($prices['high'], app(PricingSettings::class)->linkedPrices($prices, $settings)['middle']);
+        $this->assertSame($prices, app(PricingSettings::class)->linkedPrices($prices, null));
+    }
+
     public function test_27_28_29_days_and_preliminary_long_periods_preserve_customer_boundary(): void
     {
         $data = $this->data();
