@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Domain\Bookings\Services\BookingStatusMutationGuard;
+use App\Domain\Website\WebsitePreviewGuard;
 use App\Http\Responses\BotApiResponse;
 use App\Models\ServiceApiClient;
 use App\Models\User;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(BookingStatusMutationGuard::class);
+        $this->app->singleton(WebsitePreviewGuard::class);
     }
 
     /**
@@ -34,6 +37,12 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        if (config('website.preview.enabled') || config('website.block_outbound') || (config('website.demo') && app()->environment(['local', 'testing']))) {
+            Http::preventStrayRequests();
+        }
+
+        RateLimiter::for('website-read', fn (Request $request) => Limit::perMinute(60)->by('website-read:'.$request->ip()));
+        RateLimiter::for('website-submit', fn (Request $request) => Limit::perMinute(8)->by('website-submit:'.$request->ip()));
     }
 
     /**

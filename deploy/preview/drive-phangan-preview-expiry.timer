@@ -1,0 +1,10 @@
+[Unit]
+Description=One-minute request expiry for the isolated test preview
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=drive-phangan-preview-expiry.service
+
+[Install]
+WantedBy=timers.target

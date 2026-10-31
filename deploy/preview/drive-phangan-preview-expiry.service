@@ -1,0 +1,24 @@
+[Unit]
+Description=Expire due test requests in the isolated website preview only
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=drive-phangan-preview
+Group=drive-phangan-preview
+WorkingDirectory=/srv/drive-phangan-preview/current/backend
+EnvironmentFile=/srv/drive-phangan-preview/shared/private/backend.env
+ExecStart=/usr/bin/php artisan website:preview-expire
+TimeoutStartSec=45
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+InaccessiblePaths=/srv/drive-phangan
+ReadWritePaths=/srv/drive-phangan-preview/shared/storage /srv/drive-phangan-preview/shared/logs
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=192M
+CPUQuota=20%

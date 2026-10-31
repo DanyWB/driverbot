@@ -27,6 +27,7 @@ class AdminVehiclePresenter
             'type' => (string) $vehicle->getRawOriginal('type'),
             'inventory_code' => $this->nullableString($vehicle->inventory_code),
             'year' => is_numeric($vehicle->year) ? (int) $vehicle->year : null,
+            ...$vehicle->only(['brand', 'model', 'engine_cc', 'color', 'abs', 'seats', 'transmission']),
             'category' => $vehicle->category === null ? null : [
                 'id' => (int) $vehicle->category->id,
                 'name' => (string) $vehicle->category->name,

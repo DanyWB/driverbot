@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import {
     Bike,
     CalendarRange,
@@ -7,7 +7,9 @@ import {
     Coins,
     LayoutDashboard,
     Users,
+    Globe,
 } from '@lucide/vue';
+import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -22,6 +24,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
+import { useWebsiteCms } from '@/composables/useWebsiteCms';
 
 const mainNavItems: NavItem[] = [
     {
@@ -55,6 +58,16 @@ const mainNavItems: NavItem[] = [
         icon: Users,
     },
 ];
+const page = usePage();
+const { ct } = useWebsiteCms();
+const websiteCms = computed(
+    () =>
+        (page.props.websiteCms as { can_manage?: boolean } | undefined)
+            ?.can_manage === true,
+);
+const websiteNav = computed<NavItem[]>(() => [
+    { title: ct('Website'), href: '/website/cards', icon: Globe },
+]);
 </script>
 
 <template>
@@ -73,6 +86,11 @@ const mainNavItems: NavItem[] = [
 
         <SidebarContent>
             <NavMain :items="mainNavItems" />
+            <NavMain
+                v-if="websiteCms"
+                :items="websiteNav"
+                :label="ct('Website')"
+            />
         </SidebarContent>
 
         <SidebarFooter>

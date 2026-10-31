@@ -97,6 +97,9 @@ class VehicleCatalogService
             'name' => $name,
             'inventory_code' => $this->nullableString($attributes['inventory_code'] ?? null),
             'year' => $attributes['year'] ?? null,
+            ...collect(['brand', 'model', 'engine_cc', 'color', 'abs', 'seats', 'transmission'])->mapWithKeys(
+                fn (string $field): array => [$field => array_key_exists($field, $attributes) ? $attributes[$field] : $vehicle?->getAttribute($field)],
+            )->all(),
             'description' => $this->nullableString($attributes['description'] ?? null),
             'description_ru' => $this->nullableString(array_key_exists('description_ru', $attributes) ? $attributes['description_ru'] : $vehicle?->description_ru),
             'description_ua' => $this->nullableString(array_key_exists('description_ua', $attributes) ? $attributes['description_ua'] : $vehicle?->description_ua),

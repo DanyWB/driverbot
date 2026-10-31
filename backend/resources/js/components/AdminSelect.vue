@@ -149,6 +149,16 @@ async function handleContentTab(event: KeyboardEvent): Promise<void> {
     focusTabTargetIfSafe(destination, closingPopup);
 }
 
+function handleTriggerTab(event: KeyboardEvent): void {
+    if (!open.value) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    void handleContentTab(event);
+}
+
 function handleCloseAutoFocus(event: Event): void {
     if (pendingTabDirection === null) {
         return;
@@ -195,6 +205,7 @@ function updateValue(encoded: unknown): void {
     >
         <SelectTrigger
             ref="trigger"
+            @keydown.tab.capture="handleTriggerTab"
             v-bind="$attrs"
             :class="
                 cn(

@@ -1,0 +1,27 @@
+[Unit]
+Description=Isolated Drive Phangan website test preview PHP-FPM
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+RuntimeDirectory=drive-phangan-preview
+RuntimeDirectoryMode=0755
+ExecStartPre=/usr/sbin/php-fpm8.3 --test --fpm-config /etc/drive-phangan-preview/php-fpm.conf
+ExecStart=/usr/sbin/php-fpm8.3 --nodaemonize --fpm-config /etc/drive-phangan-preview/php-fpm.conf
+Restart=on-failure
+RestartSec=15
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+InaccessiblePaths=/srv/drive-phangan
+ReadWritePaths=/srv/drive-phangan-preview/shared/storage /srv/drive-phangan-preview/shared/logs
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=384M
+CPUQuota=40%
+
+[Install]
+WantedBy=multi-user.target

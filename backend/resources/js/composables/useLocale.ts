@@ -6,6 +6,23 @@ const STORAGE_KEY = 'admin_locale';
 const COOKIE_KEY = 'admin_locale';
 
 const russianMessages: Record<string, string> = {
+    'Website card saved.': 'Карточка сайта сохранена.',
+    'Website page saved.': 'Страница сайта сохранена.',
+    'Website settings saved.': 'Настройки сайта сохранены.',
+    'Vehicle specifications': 'Характеристики техники',
+    'Used in website filters. Leave unknown details empty.':
+        'Используются в фильтрах сайта. Неизвестные данные оставьте пустыми.',
+    Brand: 'Марка',
+    Colour: 'Цвет',
+    'Engine capacity (cc)': 'Объём двигателя (куб. см)',
+    'Not specified': 'Не указано',
+    Yes: 'Да',
+    No: 'Нет',
+    Seats: 'Количество мест',
+    Transmission: 'Коробка передач',
+    'Automatic transmission': 'Автоматическая',
+    'Manual transmission': 'Механическая',
+    'Semi-automatic transmission': 'Полуавтоматическая',
     'Compact vehicle column': 'Узкая колонка техники',
     'Restore vehicle column width': 'Обычная ширина колонки',
     'All models': 'Все модели',

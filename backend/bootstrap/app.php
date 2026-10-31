@@ -12,6 +12,8 @@ use App\Http\Middleware\EnsureAdminSessionVersion;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ResolveTelegramCustomer;
+use App\Http\Middleware\WebsiteAdminAccess;
+use App\Http\Middleware\WebsitePreviewAccess;
 use App\Http\Responses\BotApiExceptionRenderer;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -21,6 +23,7 @@ use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\ValidationException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -35,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(AssignRequestId::class);
         $middleware->append(AddSecurityHeaders::class);
+        $middleware->append(WebsitePreviewAccess::class);
         $middleware->trustHosts(subdomains: false);
 
         $middleware->alias([
@@ -57,6 +61,25 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (ValidationException $exception, Request $request): null {
+            if ($request->routeIs('admin.website.*') && ! $request->expectsJson()) {
+                // Image/preview GETs and another browser tab can update the shared
+                // session previous URL. Preserve privacy/no-referrer while always
+                // returning CMS validation to its owning editor, with normal old
+                // input/errors handled by Laravel; never redirect to binary media.
+                $exception->redirectTo(WebsiteAdminAccess::validationEditor($request));
+            } elseif ($request->routeIs('website.booking.store') && ! $request->expectsJson()) {
+                // Quote/media GETs also replace a guest session's previous URL.
+                // Keep submitted dates/contact only in normal flashed old input,
+                // never in the deterministic owning form's redirect URL.
+                $exception->redirectTo(route('website.booking', [
+                    'locale' => $request->route('locale'),
+                    'vehicle' => $request->route('vehicle'),
+                ]));
+            }
+
+            return null;
+        });
         $exceptions->dontReportWhen(fn (Throwable $exception): bool => match (true) {
             $exception instanceof BotApiException => $exception->httpStatus < 500,
             $exception instanceof BookingException => $exception->httpStatus < 500,

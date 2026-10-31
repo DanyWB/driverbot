@@ -31,6 +31,16 @@ test('custom admin select closes and advances focus when Tab is pressed', () => 
     assert.match(adminSelect, /pendingTabPopup = null/);
 });
 
+test('Tab also closes a just-opened select before focus reaches the popup', () => {
+    assert.match(adminSelect, /@keydown\.tab\.capture="handleTriggerTab"/);
+    assert.match(
+        adminSelect,
+        /function handleTriggerTab\(event: KeyboardEvent\)/,
+    );
+    assert.match(adminSelect, /if \(!open\.value\)/);
+    assert.match(adminSelect, /void handleContentTab\(event\)/);
+});
+
 test('tab target lookup excludes focus guards and unavailable controls', () => {
     assert.match(adminSelect, /data-reka-focus-guard/);
     assert.match(adminSelect, /element\.tabIndex >= 0/);

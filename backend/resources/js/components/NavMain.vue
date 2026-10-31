@@ -13,6 +13,7 @@ import type { NavItem } from '@/types';
 
 defineProps<{
     items: NavItem[];
+    label?: string;
 }>();
 
 const { isCurrentUrl } = useCurrentUrl();
@@ -21,7 +22,7 @@ const { t } = useLocale();
 
 <template>
     <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>{{ t('Platform') }}</SidebarGroupLabel>
+        <SidebarGroupLabel>{{ t(label ?? 'Platform') }}</SidebarGroupLabel>
         <SidebarMenu>
             <SidebarMenuItem v-for="item in items" :key="item.title">
                 <SidebarMenuButton
