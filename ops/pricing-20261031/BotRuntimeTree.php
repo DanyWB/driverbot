@@ -24,7 +24,11 @@ final class BotRuntimeTree
         $oldInodes = [];
         foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($oldModules, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST) as $item) {
             if (! $item->isLink()) {
-                $oldInodes[$item->getDev().':'.$item->getInode()] = true;
+                $oldStat = lstat($item->getPathname());
+                if ($oldStat === false) {
+                    throw new RuntimeException('Old module inode unreadable.');
+                }
+                $oldInodes[$oldStat['dev'].':'.$oldStat['ino']] = true;
             }
         }
         $entries = [];
