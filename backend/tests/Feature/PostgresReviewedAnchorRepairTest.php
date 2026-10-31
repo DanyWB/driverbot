@@ -23,6 +23,8 @@ class PostgresReviewedAnchorRepairTest extends ReviewedAnchorRepairTest
         $before = $repair->fingerprint();
         $config = DB::connection()->getConfig();
         $other = new PDO('pgsql:host='.$config['host'].';port='.$config['port'].';dbname='.$config['database'], $config['username'], $config['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $other->exec("SET lock_timeout='5000ms'");
+        $other->exec("SET statement_timeout='10000ms'");
         $other->beginTransaction();
         try {
             $other->exec('LOCK TABLE vehicle_photos IN ROW EXCLUSIVE MODE');

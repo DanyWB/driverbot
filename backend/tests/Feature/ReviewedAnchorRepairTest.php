@@ -8,13 +8,13 @@ use App\Domain\Pricing\Services\PricingPresetService;
 use App\Domain\Pricing\Services\PricingService;
 use App\Domain\Pricing\Services\PricingSettingsImport;
 use App\Domain\Pricing\ValueObjects\RentalPeriod;
+use App\Domain\Shared\Services\AdminAuditService;
 use App\Models\Booking;
 use App\Models\PricingPreset;
 use App\Models\Vehicle;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use ReviewedAnchorRepair;
-use ReviewedPriceImport;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -44,8 +44,22 @@ class ReviewedAnchorRepairTest extends ReviewedPriceImportTest
 
     protected function prepareExistingImport(): ReviewedAnchorRepair
     {
-        $import = new ReviewedPriceImport;
-        $import->apply($this->payload, $this->mapping, $this->reference, $this->admin->id, $import->fingerprint());
+        // Reproduce the real UI import, not a deployment apply: PostgreSQL table
+        // locks from a nested deployment transaction would survive until this
+        // test's outer RefreshDatabase rollback and deadlock the second PDO.
+        $import = app(PricingSettingsImport::class);
+        $preview = $import->preview($this->payload);
+        $preview['preset_revisions'] = [];
+        $preview['vehicle_revisions'] = Vehicle::query()->get()->mapWithKeys(fn (Vehicle $vehicle): array => [$vehicle->id => ['version' => (int) $vehicle->pricing_version, 'preset_id' => null]])->all();
+        $targets = [];
+        foreach (array_keys($preview['presets']) as $name) {
+            if (! is_string($name)) {
+                throw new RuntimeException('Named synthetic presets required.');
+            }
+            $targets[$name] = null;
+        }
+        $import->commit($preview, $targets, $this->mapping['assignments'], $this->admin->id, 'en');
+        app(AdminAuditService::class)->record($this->admin, PricingPreset::query()->findOrFail(17), 'pricing_preset.imported', null, ['fixture' => 'SYNTHETIC EXISTING UI IMPORT']);
         DB::table('pricing_presets')->update(['version' => 7]);
         foreach ([17 => 17, 18 => 19, 19 => 18, 20 => 16] as $id => $position) {
             DB::table('pricing_presets')->where('id', $id)->update(['sort_order' => $position]);
