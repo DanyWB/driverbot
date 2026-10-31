@@ -16,9 +16,11 @@ class PriceReleaseEvidenceTest extends TestCase
         if (PHP_OS_FAMILY !== 'Linux') {
             $this->markTestSkipped('Linux bash syntax is checked by the existing Linux CI suite.');
         }
-        $process = new Process(['bash', '-n', dirname(__DIR__, 3).'/ops/pricing-20261031/release.sh']);
-        $process->run();
-        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        foreach (['release.sh', 'install-bot-runtime.sh', 'npm-process-group.sh'] as $script) {
+            $process = new Process(['bash', '-n', dirname(__DIR__, 3).'/ops/pricing-20261031/'.$script]);
+            $process->run();
+            $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        }
     }
 
     public function test_receipt_binds_exact_bytes_baseline_revision_and_fixed_backup_root(): void

@@ -17,7 +17,7 @@ source_ref="$(git -C "$source" symbolic-ref --quiet --short HEAD || printf detac
 git -C "$source" merge-base --is-ancestor 6792e28929cfe20b1cf3c9678929e27bfaf61e80 "$revision" || fail 'Wrong clean-history parent.'
 while IFS= read -r changed; do
     case "$changed" in
-        backend/app/Domain/Pricing/Services/PricingSettings.php|backend/tests/Feature/PricingCalculatorToolsTest.php|backend/tests/Feature/ReviewedPriceImportTest.php|backend/tests/Feature/PostgresReviewedPriceImportTest.php|backend/tests/Unit/PriceReleaseEvidenceTest.php|docs/PRICES_RELEASE_2026_10_31.md|ops/pricing-20261031/*) ;;
+        .github/workflows/backend-tests.yml|backend/app/Domain/Pricing/Services/PricingSettings.php|backend/tests/Feature/PricingCalculatorToolsTest.php|backend/tests/Feature/ReviewedPriceImportTest.php|backend/tests/Feature/PostgresReviewedPriceImportTest.php|backend/tests/Unit/PriceReleaseEvidenceTest.php|backend/tests/Unit/BotRuntimeTreeTest.php|backend/tests/Unit/BotRuntimeProcessGroupTest.php|bot/package.json|bot/package-lock.json|docs/PRICES_RELEASE_2026_10_31.md|ops/pricing-20261031/*) ;;
         *) fail 'Unrelated change in proposed pricing release.' ;;
     esac
 done < <(git -C "$source" diff --name-only 6792e28929cfe20b1cf3c9678929e27bfaf61e80 "$revision")
@@ -42,7 +42,7 @@ free_bytes() { df -B1 --output=avail "$root" | tail -n 1 | tr -d ' '; }
 [[ "$(free_bytes)" -ge 2147483648 ]] || fail 'Established2048MiB pre-preparation gate failed.'
 release_bytes="$(du -sB1 "$previous" | awk '{print $1}')"
 #384MiB backup reserve exceeds measured257MiB old backup and291MiB persistent tree.
-[[ "$(free_bytes)" -ge "$((805306368+release_bytes+402653184+33554432))" ]] || fail 'Conservative independent-copy/backup/32MiB budget cannot retain768MiB.'
+[[ "$(free_bytes)" -ge "$((805306368+release_bytes+335544320+134217728+402653184+33554432))" ]] || fail 'Conservative copy/new-modules/cache/backup budget cannot retain768MiB.'
 units=(drive-phangan-bot drive-phangan-worker-default drive-phangan-worker-notifications drive-phangan-scheduler)
 health() {
     for unit in nginx php8.3-fpm "${units[@]}"; do
@@ -74,10 +74,20 @@ cp -a --reflink=never "$previous" "$release"
 install -o root -g root -m 0444 "$source/backend/app/Domain/Pricing/Services/PricingSettings.php" "$release/backend/app/Domain/Pricing/Services/PricingSettings.php"
 install -d -o root -g root -m 0755 "$release/ops/pricing-20261031"
 for file in "$helpers"/*.php "$helpers"/*.sh; do install -o root -g root -m 0444 "$file" "$release/ops/pricing-20261031/"; done
-printf 'FORMAT_VERSION=1\nRELEASE_ID=%s\nCREATED_AT=%s\nSOURCE_REVISION=%s\nSOURCE_REF=%s\nSOURCE_DIRTY=false\nBUILD_KIND=independent-copy-php-only\nINHERITED_BASE_RELEASE=%s\n' "$id" "$(date -u +%FT%TZ)" "$revision" "$source_ref" "$previous" >"$release/release-manifest.env"
+printf 'FORMAT_VERSION=1\nRELEASE_ID=%s\nCREATED_AT=%s\nSOURCE_REVISION=%s\nSOURCE_REF=%s\nSOURCE_DIRTY=false\nBUILD_KIND=independent-copy-php-and-scoped-bot-dependency\nINHERITED_BASE_RELEASE=%s\n' "$id" "$(date -u +%FT%TZ)" "$revision" "$source_ref" "$previous" >"$release/release-manifest.env"
 chmod 0444 "$release/release-manifest.env"
 php "$helpers/compare-copy.php" "$previous" "$release" "$source" >"$operation/copy-before.json"
-[[ "$(free_bytes)" -ge "$((805306368+402653184+33554432))" ]] || fail 'Measured copy leaves insufficient backup reserve.'
+[[ "$(free_bytes)" -ge "$((805306368+335544320+134217728+402653184+33554432))" ]] || fail 'Measured copy leaves insufficient module/cache/backup reserve.'
+for unit in nginx php8.3-fpm "${units[@]}"; do systemctl show "$unit" -p Id -p MainPID -p NRestarts -p ActiveState -p SubState; done >"$operation/units-before-preparation"
+bash "$helpers/install-bot-runtime.sh" "$release/bot" "$operation" "$source" >"$operation/bot-runtime-install.log" 2>&1
+runtime_proof="$operation/bot-runtime-tree.json"
+runtime_sha="$(sha256sum "$runtime_proof" | awk '{print $1}')"
+for unit in nginx php8.3-fpm "${units[@]}"; do systemctl show "$unit" -p Id -p MainPID -p NRestarts -p ActiveState -p SubState; done >"$operation/units-after-preparation"
+cmp -s "$operation/units-before-preparation" "$operation/units-after-preparation" || fail 'Existing services changed during candidate preparation.'
+[[ "$(readlink -f "$root/current")" == "$previous" ]] || fail 'Current changed during online preparation.'
+php "$helpers/compare-copy.php" "$previous" "$release" "$source" "$runtime_proof" "$runtime_sha" >"$operation/copy-prepared.json"
+cmp -s "$operation/copy-before.json" "$operation/copy-prepared.json" || fail 'Old release changed during dependency preparation.'
+health
 runtime() { sudo -u drive-phangan env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/srv/drive-phangan APP_ENV=production /usr/bin/php "$@"; }
 runtime "$release/ops/pricing-20261031/run.php" inspect "$release/backend" "$operation/inputs" >"$operation/preview.json"
 # Verify append ownership WITHOUT creating/truncating any shared log as root.
@@ -128,7 +138,7 @@ runtime "$release/backend/artisan" up
 systemctl start "${units[@]}"
 health
 [[ "$(readlink -f "$root/current")" == "$release" && "$(free_bytes)" -ge 805306368 ]] || fail 'Final current/space gate failed.'
-php "$helpers/compare-copy.php" "$previous" "$release" "$source" >"$operation/copy-after.json"
+php "$helpers/compare-copy.php" "$previous" "$release" "$source" "$runtime_proof" "$runtime_sha" >"$operation/copy-after.json"
 cmp -s "$operation/copy-before.json" "$operation/copy-after.json" || fail 'Old release changed during operation.'
 phase complete
 printf 'NARROW_PRICE_RELEASE_PASS revision=%s operation=%s backup=%s\n' "$revision" "$operation" "$backup"

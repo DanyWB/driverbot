@@ -91,3 +91,18 @@ jobs:
           for app_timezone in UTC Europe/Moscow Asia/Bangkok; do
             APP_TIMEZONE="$app_timezone" php artisan test --filter=PendingRequestPolicyTest
           done
+
+      - name: Verify real locked Linux production bot dependency tree
+        run: |
+          npm_home="$(mktemp -d)"
+          : >"$npm_home/user.npmrc"
+          : >"$npm_home/global.npmrc"
+          run_npm() {
+            env -i PATH="$PATH" HOME="$npm_home" NODE_ENV=production npm --prefix ../bot \
+              --cache "$npm_home/cache" --userconfig="$npm_home/user.npmrc" --globalconfig="$npm_home/global.npmrc" \
+              --registry=https://registry.npmjs.org --fund=false --update-notifier=false "$@"
+          }
+          run_npm ci --omit=dev --ignore-scripts --no-audit
+          run_npm audit --omit=dev
+          run_npm ls --omit=dev --all
+          php ../ops/pricing-20261031/check-bot-runtime.php
