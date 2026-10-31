@@ -151,7 +151,12 @@ class PricingSettings
             }
             foreach (PricingCalculator::TIERS as $index => $tier) {
                 $step = $settings['prefs']['roundSteps'][$season][$index];
-                $amount = (int) (round($prices['high'][$tier] * (1 - $settings['prefs']['discounts'][$season][$index] / 100) / $step, 0, PHP_ROUND_HALF_UP) * $step);
+                $scaled = $prices['high'][$tier] * (1 - $settings['prefs']['discounts'][$season][$index] / 100) / $step;
+                $lower = floor($scaled);
+                // Match the customer's Math.round for nonnegative IEEE-754 values.
+                // PHP round compensates near decimal ties: 150.49999999999997 -> 151,
+                // while JavaScript keeps this just-below-half value at 150.
+                $amount = (int) (($scaled - $lower < 0.5 ? $lower : $lower + 1) * $step);
                 if ($amount < 1 || $amount > 100000000) {
                     throw ValidationException::withMessages(['calculation_settings' => 'Linked discounts must produce positive package totals within 100,000,000 THB.']);
                 }
