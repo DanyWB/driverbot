@@ -9,6 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLocale } from '@/composables/useLocale';
+import {
+    vehicleSpecificationFields,
+    vehicleSpecificationPayload,
+} from '@/lib/vehicleSpecifications';
 import type { CategoryOption, VehicleDetail } from '@/types';
 
 const props = defineProps<{
@@ -21,6 +25,7 @@ const props = defineProps<{
 const editing = computed(() => props.vehicle !== undefined);
 const { t } = useLocale();
 const form = useForm({
+    ...vehicleSpecificationFields(props.vehicle),
     external_code: props.vehicle?.external_code ?? '',
     type: props.vehicle?.type ?? 'scooter',
     category_id: props.vehicle?.category?.id ?? (null as number | null),
@@ -90,6 +95,11 @@ watch(
 );
 
 function submit(): void {
+    form.transform((data) => ({
+        ...data,
+        ...vehicleSpecificationPayload(data),
+    }));
+
     if (props.vehicle) {
         form.patch(`/vehicles/${props.vehicle.id}`, {
             preserveScroll: true,
@@ -222,6 +232,7 @@ function submit(): void {
                 hide-publication
             />
         </section>
+
         <section class="grid gap-5 px-4 py-6 sm:px-6 lg:grid-cols-2 lg:px-8">
             <div class="lg:col-span-2">
                 <h2 class="font-semibold">{{ t('Catalog details') }}</h2>
@@ -380,6 +391,149 @@ function submit(): void {
                     }}
                 </p>
                 <InputError class="mt-1" :message="form.errors.emoji" />
+            </div>
+        </section>
+
+        <section
+            class="grid gap-5 px-4 py-6 sm:px-6 lg:grid-cols-2 lg:px-8"
+            aria-labelledby="vehicle-specifications-title"
+        >
+            <div class="lg:col-span-2">
+                <h2 id="vehicle-specifications-title" class="font-semibold">
+                    {{ t('Vehicle specifications') }}
+                </h2>
+                <p
+                    id="vehicle-specifications-help"
+                    class="mt-1 text-sm text-muted-foreground"
+                >
+                    {{
+                        t(
+                            'Used in website filters. Leave unknown details empty.',
+                        )
+                    }}
+                </p>
+            </div>
+            <div
+                v-for="field in ['brand', 'model', 'color'] as const"
+                :key="field"
+            >
+                <Label :for="`vehicle_${field}`">{{
+                    t(
+                        { brand: 'Brand', model: 'Model', color: 'Colour' }[
+                            field
+                        ],
+                    )
+                }}</Label>
+                <Input
+                    :id="`vehicle_${field}`"
+                    v-model="form[field]"
+                    maxlength="100"
+                    autocomplete="off"
+                    class="mt-2 transition-[color,background-color,border-color,box-shadow] duration-[350ms] ease-out motion-reduce:transition-none"
+                    :aria-describedby="`vehicle-specifications-help vehicle_${field}_error`"
+                    :aria-invalid="!!form.errors[field]"
+                />
+                <InputError
+                    :id="`vehicle_${field}_error`"
+                    class="mt-1"
+                    aria-live="polite"
+                    :message="form.errors[field]"
+                />
+            </div>
+            <div>
+                <Label for="vehicle_engine_cc">{{
+                    t('Engine capacity (cc)')
+                }}</Label>
+                <Input
+                    id="vehicle_engine_cc"
+                    v-model.number="form.engine_cc"
+                    type="number"
+                    inputmode="numeric"
+                    min="1"
+                    max="10000"
+                    step="1"
+                    class="mt-2 transition-[color,background-color,border-color,box-shadow] duration-[350ms] ease-out motion-reduce:transition-none"
+                    aria-describedby="vehicle-specifications-help vehicle_engine_cc_error"
+                    :aria-invalid="!!form.errors.engine_cc"
+                />
+                <InputError
+                    id="vehicle_engine_cc_error"
+                    class="mt-1"
+                    aria-live="polite"
+                    :message="form.errors.engine_cc"
+                />
+            </div>
+            <div>
+                <Label for="vehicle_abs">ABS</Label>
+                <AdminSelect
+                    id="vehicle_abs"
+                    v-model="form.abs"
+                    class="mt-2"
+                    :aria-invalid="!!form.errors.abs"
+                    aria-describedby="vehicle-specifications-help vehicle_abs_error"
+                    :options="[
+                        { value: null, label: t('Not specified') },
+                        { value: 1, label: t('Yes') },
+                        { value: 0, label: t('No') },
+                    ]"
+                />
+                <InputError
+                    id="vehicle_abs_error"
+                    class="mt-1"
+                    aria-live="polite"
+                    :message="form.errors.abs"
+                />
+            </div>
+            <div>
+                <Label for="vehicle_seats">{{ t('Seats') }}</Label>
+                <Input
+                    id="vehicle_seats"
+                    v-model.number="form.seats"
+                    type="number"
+                    inputmode="numeric"
+                    min="1"
+                    max="100"
+                    step="1"
+                    class="mt-2 transition-[color,background-color,border-color,box-shadow] duration-[350ms] ease-out motion-reduce:transition-none"
+                    aria-describedby="vehicle-specifications-help vehicle_seats_error"
+                    :aria-invalid="!!form.errors.seats"
+                />
+                <InputError
+                    id="vehicle_seats_error"
+                    class="mt-1"
+                    aria-live="polite"
+                    :message="form.errors.seats"
+                />
+            </div>
+            <div>
+                <Label for="vehicle_transmission">{{
+                    t('Transmission')
+                }}</Label>
+                <AdminSelect
+                    id="vehicle_transmission"
+                    v-model="form.transmission"
+                    class="mt-2"
+                    :aria-invalid="!!form.errors.transmission"
+                    aria-describedby="vehicle-specifications-help vehicle_transmission_error"
+                    :options="[
+                        { value: null, label: t('Not specified') },
+                        {
+                            value: 'automatic',
+                            label: t('Automatic transmission'),
+                        },
+                        { value: 'manual', label: t('Manual transmission') },
+                        {
+                            value: 'semi_automatic',
+                            label: t('Semi-automatic transmission'),
+                        },
+                    ]"
+                />
+                <InputError
+                    id="vehicle_transmission_error"
+                    class="mt-1"
+                    aria-live="polite"
+                    :message="form.errors.transmission"
+                />
             </div>
         </section>
 

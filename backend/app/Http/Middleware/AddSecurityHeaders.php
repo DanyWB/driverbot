@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\Website\WebsiteSettings;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Vite;
@@ -23,7 +24,35 @@ class AddSecurityHeaders
             $response->headers->set('Cache-Control', 'no-store, private');
             $response->headers->set('X-Robots-Tag', 'noindex, nofollow');
         }
+        if ($request->is('website', 'website/*')) {
+            $response->headers->set('Cache-Control', 'no-store, private');
+            $response->headers->set('X-Robots-Tag', 'noindex, nofollow');
+            $response->headers->set('Referrer-Policy', 'no-referrer');
+        }
+        if ($request->is('website-media/*')) {
+            $response->headers->set('Cache-Control', 'no-store, private');
+            if (! WebsiteSettings::indexable() || $response->getStatusCode() >= 400) {
+                $response->headers->set('X-Robots-Tag', 'noindex, nofollow');
+            }
+        }
+        // Apply these outside the website route middleware as well, including rejected
+        // owner access, CSRF errors, validation failures and throttled submissions.
+        if ($request->routeIs('website.*')) {
+            $isPrivateWebsite = $request->routeIs('website.booking*', 'website.status', 'website.quote', 'website.availability');
+            if (! WebsiteSettings::indexable() || $isPrivateWebsite || $request->query() !== []) {
+                $response->headers->set('X-Robots-Tag', 'noindex, nofollow');
+            }
+            if ($isPrivateWebsite) {
+                $response->headers->set('Cache-Control', 'no-store, private');
+                $response->headers->set('Referrer-Policy', 'no-referrer');
+            }
+        }
         $response->headers->set('Permissions-Policy', 'camera=(), geolocation=(), microphone=()');
+        if (config('website.preview.enabled')) {
+            $response->headers->set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+            $response->headers->set('Cache-Control', 'no-store, private');
+            $response->headers->set('Referrer-Policy', 'no-referrer');
+        }
 
         if (is_string($nonce)) {
             $response->headers->set('Content-Security-Policy', $this->contentSecurityPolicy($nonce));

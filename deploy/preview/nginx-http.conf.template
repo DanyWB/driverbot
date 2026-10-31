@@ -1,0 +1,11 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __PREVIEW_HOST__;
+    add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+    location ^~ /.well-known/acme-challenge/ {
+        root /srv/drive-phangan-preview/acme;
+        try_files $uri =404;
+    }
+    location / { return 404; }
+}

@@ -43,8 +43,13 @@ jobs:
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.3'
+          extensions: gd, exif, fileinfo, pdo_pgsql
           tools: composer:v2
           coverage: none
+
+      - name: Assert Linux CMS media capabilities
+        run: |
+          php -r 'if (PHP_OS_FAMILY !== "Linux") { exit(1); } foreach (["gd", "exif", "fileinfo", "pdo_pgsql"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Missing CMS extension: ".$extension.PHP_EOL); exit(1); } } $gd = gd_info(); foreach (["JPEG Support", "PNG Support", "WebP Support"] as $feature) { if (empty($gd[$feature])) { fwrite(STDERR, "Missing GD feature: ".$feature.PHP_EOL); exit(1); } } echo "Linux CMS capabilities: gd/jpeg/png/webp, exif, fileinfo, pdo_pgsql".PHP_EOL;'
 
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -75,6 +80,9 @@ jobs:
 
       - name: Run CI checks
         run: composer ci:check
+
+      - name: Assert Linux shared-root CMS media boundary is not skipped
+        run: php artisan test --filter='WebsitePresentationFoundationTest::test_trusted_shared_storage_symlink_is_allowed_but_child_symlink_is_rejected' --fail-on-skipped
 
       - name: Run PostgreSQL constraints, concurrency, and timezone tests
         env:

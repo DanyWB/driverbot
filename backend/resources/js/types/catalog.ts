@@ -1,3 +1,4 @@
+import type { VehicleSpecifications } from '@/lib/vehicleSpecifications';
 import type { PaginationLink } from './bookings';
 
 export type VehiclePhoto = {
@@ -118,18 +119,19 @@ export type PricingFleetVehicle = {
     >;
 };
 
-export type VehicleDetail = VehicleListItem & {
-    description: string | null;
-    description_ru: string | null;
-    description_ua: string | null;
-    characteristics_text: string | null;
-    emoji: string | null;
-    pricing_profile: string | null;
-    pricing_preset: PricingPresetSummary | null;
-    pricing_revision: number;
-    photos: VehiclePhoto[];
-    pricing: Record<string, Record<string, VehiclePriceCell>>;
-};
+export type VehicleDetail = VehicleListItem &
+    Partial<VehicleSpecifications> & {
+        description: string | null;
+        description_ru: string | null;
+        description_ua: string | null;
+        characteristics_text: string | null;
+        emoji: string | null;
+        pricing_profile: string | null;
+        pricing_preset: PricingPresetSummary | null;
+        pricing_revision: number;
+        photos: VehiclePhoto[];
+        pricing: Record<string, Record<string, VehiclePriceCell>>;
+    };
 
 export type CategoryItem = {
     id: number;

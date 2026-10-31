@@ -15,7 +15,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $archived_at Lifecycle timestamp, intentionally excluded from mass assignment.
  * @property array<string, mixed>|null $calculation_settings
  */
-#[Fillable(['external_code', 'type', 'category_id', 'name', 'inventory_code', 'year', 'description', 'description_ru', 'description_ua', 'characteristics_text', 'emoji', 'is_active', 'is_visible_for_booking', 'sort_order', 'pricing_profile', 'source_sheet', 'source_row', 'source_import_run_id', 'imported_at'])]
+#[Fillable(['external_code', 'type', 'category_id', 'name', 'inventory_code', 'year', 'brand', 'model', 'engine_cc', 'color', 'abs', 'seats', 'transmission', 'description', 'description_ru', 'description_ua', 'characteristics_text', 'emoji', 'is_active', 'is_visible_for_booking', 'sort_order', 'pricing_profile', 'source_sheet', 'source_row', 'source_import_run_id', 'imported_at'])]
 class Vehicle extends Model
 {
     /** @use HasFactory<VehicleFactory> */
@@ -68,6 +68,9 @@ class Vehicle extends Model
     {
         return [
             'type' => VehicleType::class,
+            'abs' => 'boolean',
+            'engine_cc' => 'integer',
+            'seats' => 'integer',
             'is_active' => 'boolean',
             'is_visible_for_booking' => 'boolean',
             'pricing_version' => 'integer',

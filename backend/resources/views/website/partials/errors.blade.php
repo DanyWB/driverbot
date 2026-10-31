@@ -1,0 +1,1 @@
+@if($errors->any())<div class="error-summary" role="alert" tabindex="-1" data-error-summary><h2>{{ $t('errors_title') }}</h2><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif

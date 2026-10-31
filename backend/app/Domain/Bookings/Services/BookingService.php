@@ -56,7 +56,7 @@ class BookingService
 
         $this->assertCustomerOwnership($actor, $data->customerId);
 
-        if ($data->source === BookingSource::Telegram
+        if (in_array($data->source, [BookingSource::Telegram, BookingSource::Website], true)
             && $actor->type !== ActorType::Admin
             && ($data->termsAcceptedAt === null || trim((string) $data->termsVersion) === '')) {
             throw new BookingException('terms_acceptance_required', 'Current rental terms must be accepted.', 422);
