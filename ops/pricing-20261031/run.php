@@ -80,7 +80,7 @@ try {
         }
         $adminId = filter_var($argv[4] ?? '', FILTER_VALIDATE_INT);
         if ($adminId === false || $adminId < 1 || getenv('FINAL_PRICES_EXECUTION_GO') !== ReviewedPriceImport::SOURCE_SHA
-            || ! is_file(storage_path('framework/down'))) {
+            || ! $app->isDownForMaintenance()) {
             throw new RuntimeException('Exact execution GO, verified backup or maintenance boundary missing.');
         }
         if (! function_exists('posix_geteuid') || posix_geteuid() === 0) {

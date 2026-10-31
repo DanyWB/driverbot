@@ -1,6 +1,18 @@
 # Production final-price release: review plan
 
-Status: local preparation only. No release execution GO. User approved shared production admin/bot prices, without a website release, and exactly ONE new protected backup for this release. Previous backup approvals are not reused. Apply established PRODUCTION gates:2048MiB before preparation;768MiB after preparation/backup and at cutover. The separate preview's all-times2048 rule does not apply. Root explicitly corrected this architectural point before any production mutation. No pruning/deletions.
+Status: production price operation COMPLETE on31October2026. Active release `/srv/drive-phangan/releases/20261031T133503Z`, exact source `9ce63c8f6ee25af1fe33619acab996825023e882`. Website/CMS changes were excluded. The historical preparation plan below is retained as evidence, not permission to rerun a completed one-shot operation.
+
+## Completion and maintenance-guard correction
+
+The owner-authorized one protected backup was created ONCE at `/srv/drive-phangan/backups/20261031T133556Z`; hashes, pg_restore list and persistent-file tar list passed. Backup count21→22; automation remains disabled/inactive, no pruning/deletion. Initial2048MiB and subsequent768MiB production gates passed. Final free space1,239,556,096B, all six services active/NRestarts0, four strictHTTPS200, anonymousBotAPI401 and zero recent service-error entries.
+
+The initial runner stopped BEFORE repair because production uses cache maintenance but the entrypoint checked only a file. Read-only diagnostics proved maintenance active, both15100cells unchanged, revisions7/2 and exact frozen backup baseline. No retry of preparation/npm/backup or fake framework/down marker was used. Root reviewed the separate operational cache-aware recovery (PHP SHA88ef5679f019a78c3d56d241ec4f372107975e82b9805657909af60c935e9e7f; shell SHA95768ffe6a9662d8d852a30608357e45bd665d79f6d8a1c7261f8a0149dd4ce8), with independent review and3tests/18assertions. It reused the SAME prepared candidate/backup, canonical Laravel maintenance API, immutable helpers, locks and full invariants. Recovery completed successfully; immutable application/release files were not edited.
+
+Independent production READONLY verification13:50:54–13:51:25UTC: all20preset settings/300anchors/31links/31vehicle settings/465vehicle anchors match the original source and reviewed mapping, zero mismatches.2160preset and3348vehicle quote comparisons pass, including zero re-link rounding drift and vehicle15 Nov2–Dec1=6500THB/29days. Only preset17/version7→8 and vehicle31/version2→3 plus anchor254/449 low21d15100→15000/daily714.285714 changed; order17, all other rows and excluded24 were preserved. Two explicit deployment audit rows were added under existing active full_adminID2. Actual PricingSettings SHAdbffa4572235a6d389e917eab7680b30dc1d1c0770b702e470d90907cedc1299 is deployed.
+
+Historical fingerprints remained exact:21bookings SHA f5346a3e2c6a659e803cc768bb26a2d95bce72478f16447956cb8162134082f8;26snapshots SHA a84090cd7f0f46f14d36772f98993a022624d3ffcbea49a06364eb13f2406bed. Seasons/months/policy/categories/photos and the then-existing2admin rows were unchanged. A separate subsequent account operation is not part of this pricing baseline. Exact-source CI9ce63c8 passed: backend41205624333 (415total/377pass/38skip/4015assertions; realPG47pass/558assertions), bot41205624418; real Linux locked dependency tree8272entries/233070219logicalB/258363392allocatedB and strict audit0.
+
+Permanent repository-only follow-up changes the entrypoint to `$app->isDownForMaintenance()` and adds actual cache/file active/inactive regressions. It preserves all production/runtime/input/backup guards. This follow-up is NOT hot-edited into the immutable active9ce release and does not authorize another server operation or backup.
 
 ## Active revision: existing UI import, single-anchor repair ONLY
 

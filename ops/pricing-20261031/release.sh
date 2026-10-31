@@ -17,7 +17,7 @@ source_ref="$(git -C "$source" symbolic-ref --quiet --short HEAD || printf detac
 git -C "$source" merge-base --is-ancestor 6792e28929cfe20b1cf3c9678929e27bfaf61e80 "$revision" || fail 'Wrong clean-history parent.'
 while IFS= read -r changed; do
     case "$changed" in
-        .github/workflows/backend-tests.yml|backend/app/Domain/Pricing/Services/PricingSettings.php|backend/tests/Feature/PricingCalculatorToolsTest.php|backend/tests/Feature/ReviewedPriceImportTest.php|backend/tests/Feature/PostgresReviewedPriceImportTest.php|backend/tests/Feature/ReviewedAnchorRepairTest.php|backend/tests/Feature/PostgresReviewedAnchorRepairTest.php|backend/tests/Unit/PriceReleaseEvidenceTest.php|backend/tests/Unit/BotRuntimeTreeTest.php|backend/tests/Unit/BotRuntimeProcessGroupTest.php|bot/package.json|bot/package-lock.json|docs/PRICES_RELEASE_2026_10_31.md|ops/pricing-20261031/*) ;;
+        .github/workflows/backend-tests.yml|backend/app/Domain/Pricing/Services/PricingSettings.php|backend/tests/Feature/PricingCalculatorToolsTest.php|backend/tests/Feature/ReviewedPriceImportTest.php|backend/tests/Feature/PostgresReviewedPriceImportTest.php|backend/tests/Feature/ReviewedAnchorRepairTest.php|backend/tests/Feature/PostgresReviewedAnchorRepairTest.php|backend/tests/Unit/PriceReleaseEvidenceTest.php|backend/tests/Unit/PriceReleaseMaintenanceTest.php|backend/tests/Unit/BotRuntimeTreeTest.php|backend/tests/Unit/BotRuntimeProcessGroupTest.php|bot/package.json|bot/package-lock.json|docs/PRICES_RELEASE_2026_10_31.md|ops/pricing-20261031/*) ;;
         *) fail 'Unrelated change in proposed pricing release.' ;;
     esac
 done < <(git -C "$source" diff --name-only 6792e28929cfe20b1cf3c9678929e27bfaf61e80 "$revision")
