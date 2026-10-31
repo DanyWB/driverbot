@@ -53,6 +53,9 @@ const ru: Record<string, string> = {
     'SEO description': 'SEO-описание',
     'Image description': 'Описание изображения',
     'Website cover': 'Обложка сайта',
+    'Catalog preview cover': 'Превью для каталога',
+    'Used on catalog cards only. Vehicle details and gallery show real Fleet photos. Until a cover is published, catalog cards use the Fleet photo.':
+        'Используется только в карточках каталога. На странице техники и в галерее показываются реальные фото Fleet. Пока обложка не опубликована, карточка каталога использует фото Fleet.',
     'Use Fleet photo': 'Использовать фото Fleet',
     'Fleet photo will be used until a separate website cover is saved and published.':
         'Пока отдельная обложка сайта не сохранена и не опубликована, используется фото Fleet.',

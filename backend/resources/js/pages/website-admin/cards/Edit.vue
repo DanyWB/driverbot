@@ -239,11 +239,11 @@ function remove() {
             </form>
             <div class="space-y-6">
                 <section class="cms-panel space-y-4">
-                    <h2>{{ ct('Website cover') }}</h2>
+                    <h2>{{ ct('Catalog preview cover') }}</h2>
                     <p class="text-sm text-muted-foreground">
                         {{
                             ct(
-                                'Fleet photo will be used until a separate website cover is saved and published.',
+                                'Used on catalog cards only. Vehicle details and gallery show real Fleet photos. Until a cover is published, catalog cards use the Fleet photo.',
                             )
                         }}
                     </p>
