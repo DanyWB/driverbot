@@ -23,6 +23,25 @@ require_once dirname(__DIR__, 3).'/ops/pricing-20261031/ReviewedAnchorRepair.php
 /** Reuses the same explicitly synthetic isolated Fleet/source fixture. */
 class ReviewedAnchorRepairTest extends ReviewedPriceImportTest
 {
+    protected function afterRefreshingDatabase(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+        if (! app()->environment('testing') || ! preg_match('/test/i', DB::connection()->getDatabaseName()) || DB::transactionLevel() < 1) {
+            throw new RuntimeException('Exact-ID repair fixtures require a transacted isolated PostgreSQL test database.');
+        }
+        // PostgreSQL nextval is not rolled back by RefreshDatabase. This fixture
+        // intentionally reproduces reviewed IDs, including low-season ID3.
+        // RESTART is transactional (unlike setval); never reset populated tables.
+        foreach (['pricing_seasons', 'pricing_presets', 'pricing_preset_prices', 'vehicle_price_tiers'] as $table) {
+            if (DB::table($table)->exists()) {
+                throw new RuntimeException('Exact-ID repair fixture requires empty test pricing tables.');
+            }
+            DB::statement('ALTER SEQUENCE '.$table.'_id_seq RESTART WITH 1');
+        }
+    }
+
     protected function prepareExistingImport(): ReviewedAnchorRepair
     {
         $import = new ReviewedPriceImport;
