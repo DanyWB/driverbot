@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { Maximize2, Minimize2 } from '@lucide/vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PricingCalendar from '@/components/pricing/PricingCalendar.vue';
+import PricingSeasonMonths from '@/components/pricing/PricingSeasonMonths.vue';
 import AdminSelect from '@/components/AdminSelect.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,9 +25,14 @@ import {
 } from '@/lib/pricingTools';
 import type { PricingFleetVehicle, PricingPreset } from '@/types';
 
-const props = defineProps<{ presets: PricingPreset[] }>();
+type SeasonKey = (typeof pricingSeasons)[number];
+const props = defineProps<{
+    presets: PricingPreset[];
+    seasonCalendar: SeasonKey[];
+}>();
 const emit = defineEmits<{
     saved: [presets: PricingPreset[]];
+    calendarSaved: [calendar: SeasonKey[]];
     edit: [preset: PricingPreset];
     copy: [preset: PricingPreset];
     removed: [id: number];
@@ -94,6 +101,27 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const hovered = ref<{ row: string; column: string } | null>(null);
 let calculationGeneration = 0;
 const draggedPreset = ref<number | null>(null);
+const pricesOpen = ref(true);
+const pricesFullscreen = ref(false);
+
+function exitFullscreenOnEscape(event: KeyboardEvent): void {
+    // Dialogs (confirmations) handle Escape themselves.
+    if (
+        event.key === 'Escape' &&
+        pricesFullscreen.value &&
+        !confirmOpen.value
+    ) {
+        pricesFullscreen.value = false;
+    }
+}
+watch(pricesFullscreen, (on) => {
+    document.documentElement.style.overflow = on ? 'hidden' : '';
+});
+onMounted(() => window.addEventListener('keydown', exitFullscreenOnEscape));
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', exitFullscreenOnEscape);
+    document.documentElement.style.overflow = '';
+});
 const seasonOptions = computed(() =>
     pricingSeasons.map((s) => ({ value: s, label: t(pricingSeasonLabels[s]) })),
 );
@@ -246,6 +274,31 @@ function reorder(from: number, to: number): void {
         );
         emit('saved', result.data as PricingPreset[]);
     });
+}
+function applySeasonCalendar(calendar: SeasonKey[]): void {
+    ask(
+        t(
+            'Apply the new season calendar to all presets, linked vehicles and legacy quotes? Existing bookings are not recalculated.',
+        ),
+        async () => {
+            const result = await pricingRequest(
+                '/pricing-presets/season-calendar',
+                'PUT',
+                { confirmed: true, calendar },
+            );
+            emit('saved', result.presets as PricingPreset[]);
+            emit('calendarSaved', result.data as SeasonKey[]);
+            await loadFleet();
+            await calculate();
+            status.value = t(
+                'Season calendar saved: :presets presets and :vehicles vehicles updated.',
+                {
+                    presets: Number(result.updated_presets),
+                    vehicles: Number(result.updated_vehicles),
+                },
+            );
+        },
+    );
 }
 function removePreset(preset: PricingPreset): void {
     ask(t('Delete unused preset :name?', { name: preset.name }), async () => {
@@ -462,8 +515,34 @@ onMounted(() => {
         <p v-if="status" role="status" class="rounded-lg border p-3 text-sm">
             {{ status }}
         </p>
-        <details class="pricing-panel" open>
-            <summary>{{ t('Bike group price presets') }}</summary>
+        <details
+            class="pricing-panel prices-panel"
+            :class="{ 'is-fullscreen': pricesFullscreen }"
+            :open="pricesOpen || pricesFullscreen"
+            @toggle="pricesOpen = ($event.target as HTMLDetailsElement).open"
+        >
+            <summary>
+                {{ t('Bike group price presets') }}
+                <button
+                    type="button"
+                    class="fullscreen-toggle"
+                    :title="
+                        pricesFullscreen
+                            ? t('Exit full screen')
+                            : t('Full screen')
+                    "
+                    :aria-label="
+                        pricesFullscreen
+                            ? t('Exit full screen')
+                            : t('Full screen')
+                    "
+                    :aria-pressed="pricesFullscreen"
+                    @click.prevent.stop="pricesFullscreen = !pricesFullscreen"
+                >
+                    <Minimize2 v-if="pricesFullscreen" class="size-4" />
+                    <Maximize2 v-else class="size-4" />
+                </button>
+            </summary>
             <div class="flex flex-wrap items-center justify-between gap-3 py-4">
                 <label class="text-sm"
                     ><input
@@ -598,7 +677,9 @@ onMounted(() => {
                                 >
                                     <Input
                                         v-if="editing"
+                                        class="price-input"
                                         type="number"
+                                        inputmode="numeric"
                                         min="1"
                                         max="100000000"
                                         :model-value="
@@ -960,6 +1041,20 @@ onMounted(() => {
         </details>
 
         <details class="pricing-panel" open>
+            <summary>{{ t('Season calendar — months and seasons') }}</summary>
+            <PricingSeasonMonths
+                :calendar="seasonCalendar"
+                :disabled="busy || editing"
+                @apply="applySeasonCalendar"
+            />
+            <p v-if="editing" class="mt-2 text-sm text-muted-foreground">
+                {{
+                    t('Finish or discard table edits before changing seasons.')
+                }}
+            </p>
+        </details>
+
+        <details class="pricing-panel" open>
             <summary>{{ t('Current fleet and preset assignments') }}</summary>
             <p class="my-3 text-sm text-muted-foreground">
                 {{
@@ -1215,6 +1310,67 @@ onMounted(() => {
     font-size: 16px;
     font-weight: 650;
     padding: 4px;
+}
+.prices-panel > summary {
+    position: relative;
+    padding-right: 44px;
+}
+.fullscreen-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    transform: translateY(-50%);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--foreground);
+}
+.fullscreen-toggle:hover {
+    background: var(--muted);
+}
+.prices-panel.is-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    /* vw/vh: the layout viewport can be smaller (reserved scrollbar gutter). */
+    width: 100vw;
+    height: 100vh;
+    z-index: 40;
+    border-radius: 0;
+    overflow: auto;
+    padding: 16px 24px;
+}
+.prices-panel.is-fullscreen .pricing-scroll {
+    max-height: calc(100vh - 190px);
+}
+/* Edit inputs: wide enough for 7-digit prices, no browser spinner arrows. */
+/* Same footprint as read-only cells: 6-digit prices fit, no spinners. */
+.preset-price-table :deep(.price-input) {
+    width: 58px;
+    min-width: 58px;
+    height: 28px;
+    padding: 0 4px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 28px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    box-shadow: none;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+.preset-price-table :deep(.price-input::-webkit-outer-spin-button),
+.preset-price-table :deep(.price-input::-webkit-inner-spin-button) {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.preset-price-table td:has(.price-input) {
+    padding: 4px 3px;
 }
 .pricing-scroll {
     max-width: 100%;

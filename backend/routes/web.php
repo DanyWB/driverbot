@@ -14,6 +14,7 @@ use App\Http\Controllers\Customers\CustomerController;
 use App\Http\Controllers\Customers\CustomerDocumentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PricingPresets\PricingPresetController;
+use App\Http\Controllers\PricingPresets\PricingSeasonCalendarController;
 use App\Http\Controllers\PricingPresets\PricingToolsController;
 use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\Vehicles\CategoryController;
@@ -32,6 +33,8 @@ Route::middleware(['auth', 'admin.active', 'verified'])->group(function () {
     Route::get('timeline', TimelineController::class)->name('timeline.index');
 
     Route::get('pricing-presets', [PricingPresetController::class, 'index'])->name('pricing-presets.index');
+    Route::get('pricing-presets/season-calendar', [PricingSeasonCalendarController::class, 'show'])->name('pricing-presets.season-calendar.show');
+    Route::put('pricing-presets/season-calendar', [PricingSeasonCalendarController::class, 'update'])->name('pricing-presets.season-calendar.update');
     Route::get('pricing-presets/fleet', [PricingToolsController::class, 'fleet'])->name('pricing-presets.fleet');
     Route::get('pricing-presets/export', [PricingToolsController::class, 'export'])->name('pricing-presets.export');
     Route::post('pricing-presets/import-preview', [PricingToolsController::class, 'preview'])->name('pricing-presets.import-preview');

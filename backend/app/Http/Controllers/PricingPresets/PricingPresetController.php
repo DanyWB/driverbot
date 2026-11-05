@@ -5,6 +5,7 @@ namespace App\Http\Controllers\PricingPresets;
 use App\Domain\Pricing\Exceptions\PricingPresetConflictException;
 use App\Domain\Pricing\Presenters\PricingPresetPresenter;
 use App\Domain\Pricing\Services\PricingPresetService;
+use App\Domain\Pricing\Services\PricingSeasonCalendarService;
 use App\Domain\Shared\Services\AdminAuditService;
 use App\Http\Controllers\Concerns\HandlesAdminContext;
 use App\Http\Controllers\Controller;
@@ -24,7 +25,7 @@ class PricingPresetController extends Controller
 {
     use HandlesAdminContext;
 
-    public function index(Request $request, PricingPresetPresenter $presenter): Response|JsonResponse
+    public function index(Request $request, PricingPresetPresenter $presenter, PricingSeasonCalendarService $calendar): Response|JsonResponse
     {
         $presets = PricingPreset::query()
             ->with(['prices.season', 'vehicles:id,pricing_preset_id'])
@@ -38,7 +39,10 @@ class PricingPresetController extends Controller
             return response()->json(['data' => $presets]);
         }
 
-        return Inertia::render('pricing-presets/Index', ['presets' => $presets]);
+        return Inertia::render('pricing-presets/Index', [
+            'presets' => $presets,
+            'seasonCalendar' => $calendar->current(),
+        ]);
     }
 
     public function store(
