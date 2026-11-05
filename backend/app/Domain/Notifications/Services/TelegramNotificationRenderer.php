@@ -23,6 +23,9 @@ class TelegramNotificationRenderer
     public function render(NotificationOutbox $notification): RenderedTelegramMessage
     {
         $payload = $this->payload($notification);
+        if ($notification->event_type === 'google_calendar.sync_failed') {
+            return $this->renderGoogleCalendarFailure($notification, $payload);
+        }
         $publicId = trim((string) ($payload['booking_public_id'] ?? ''));
         $admin = $notification->channel === 'internal';
 
@@ -81,6 +84,26 @@ class TelegramNotificationRenderer
         $payload = $notification->getAttribute('payload');
 
         return is_array($payload) ? $payload : [];
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function renderGoogleCalendarFailure(NotificationOutbox $notification, array $payload): RenderedTelegramMessage
+    {
+        if ($notification->channel !== 'internal') {
+            throw NotificationDeliveryException::permanent('Google Calendar failure alerts are administrator-only.');
+        }
+
+        $recipient = $this->adminRecipients->resolve((string) $notification->recipient);
+        $escape = fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $text = Lang::get('notifications.admin.google_calendar_sync_failed', [
+            'booking' => $escape($payload['booking_public_id'] ?? 'unknown'),
+            'event_type' => $escape($payload['event_type'] ?? 'unknown'),
+            'operation' => $escape($payload['operation'] ?? 'unknown'),
+            'revision' => $escape($payload['revision'] ?? ''),
+            'attempts' => $escape($payload['attempts'] ?? ''),
+        ], $recipient->locale);
+
+        return new RenderedTelegramMessage($recipient->chatId, $this->telegramText($text));
     }
 
     private function template(NotificationOutbox $notification, bool $admin, ?string $reason): string

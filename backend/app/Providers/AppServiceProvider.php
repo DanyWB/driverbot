@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Domain\Bookings\Services\BookingStatusMutationGuard;
+use App\Domain\Integrations\GoogleCalendar\Contracts\GoogleCalendarOperationProcessor;
+use App\Domain\Integrations\GoogleCalendar\Services\LocalGoogleCalendarOperationProcessor;
 use App\Http\Responses\BotApiResponse;
 use App\Models\ServiceApiClient;
 use App\Models\User;
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(BookingStatusMutationGuard::class);
+        $this->app->bind(GoogleCalendarOperationProcessor::class, LocalGoogleCalendarOperationProcessor::class);
     }
 
     /**
