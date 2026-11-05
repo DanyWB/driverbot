@@ -71,6 +71,12 @@ class Booking extends Model
         return $this->hasMany(CustomerDocument::class);
     }
 
+    /** @return HasMany<GoogleCalendarEvent, $this> */
+    public function googleCalendarEvents(): HasMany
+    {
+        return $this->hasMany(GoogleCalendarEvent::class);
+    }
+
     /** @return BelongsTo<User, $this> */
     public function createdByAdmin(): BelongsTo
     {

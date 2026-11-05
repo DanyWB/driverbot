@@ -2,6 +2,7 @@
 
 namespace App\Domain\Vehicles\Services;
 
+use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarBookingSyncService;
 use App\Domain\Vehicles\Enums\VehicleType;
 use App\Domain\Vehicles\Exceptions\VehicleCatalogException;
 use App\Models\Category;
@@ -11,6 +12,8 @@ use Illuminate\Support\Str;
 
 class VehicleCatalogService
 {
+    public function __construct(private readonly GoogleCalendarBookingSyncService $calendarSync) {}
+
     /** @param array<string, mixed> $attributes */
     public function createVehicle(array $attributes): Vehicle
     {
@@ -25,13 +28,18 @@ class VehicleCatalogService
     }
 
     /** @param array<string, mixed> $attributes */
-    public function updateVehicle(Vehicle $vehicle, array $attributes): Vehicle
+    public function updateVehicle(Vehicle $vehicle, array $attributes, ?string $requestId = null): Vehicle
     {
-        return DB::transaction(function () use ($vehicle, $attributes): Vehicle {
+        return DB::transaction(function () use ($vehicle, $attributes, $requestId): Vehicle {
             $vehicle = Vehicle::query()->lockForUpdate()->findOrFail($vehicle->id);
+            $oldName = (string) $vehicle->name;
             $vehicle->fill($this->normalizeVehicleAttributes($attributes, $vehicle));
             $this->enforceVehicleInvariants($vehicle);
             $vehicle->save();
+
+            if ($oldName !== (string) $vehicle->name) {
+                $this->calendarSync->recordVehicleNameChange($vehicle, $requestId);
+            }
 
             return $vehicle->refresh();
         });

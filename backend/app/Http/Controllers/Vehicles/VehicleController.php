@@ -153,7 +153,7 @@ class VehicleController extends Controller
 
         try {
             DB::transaction(function () use ($request, $vehicle, $catalog, $audit, $oldValues): void {
-                $updated = $catalog->updateVehicle($vehicle, $request->validated());
+                $updated = $catalog->updateVehicle($vehicle, $request->validated(), $this->requestId($request));
                 $audit->record(
                     $this->admin($request),
                     $updated,

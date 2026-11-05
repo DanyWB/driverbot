@@ -4,6 +4,7 @@ namespace App\Domain\Bookings\Services;
 
 use App\Domain\Bookings\Data\BookingActor;
 use App\Domain\Bookings\Enums\BookingStatus;
+use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarBookingSyncService;
 use App\Domain\Notifications\Services\NotificationOutboxService;
 use App\Domain\Shared\Enums\ActorType;
 use App\Models\AuditLog;
@@ -13,7 +14,10 @@ use App\Models\BookingStatusHistory;
 
 class BookingEventRecorder
 {
-    public function __construct(private readonly NotificationOutboxService $outbox) {}
+    public function __construct(
+        private readonly NotificationOutboxService $outbox,
+        private readonly GoogleCalendarBookingSyncService $calendarSync,
+    ) {}
 
     /** @param array<string, mixed> $context */
     public function recordInitialStatus(
@@ -60,6 +64,7 @@ class BookingEventRecorder
         ]);
 
         $this->enqueueStatusNotifications($booking, $history, $to, $actor, $reason);
+        $this->calendarSync->recordStatusChange($booking, $from, $to, $requestId);
     }
 
     /**
@@ -90,6 +95,7 @@ class BookingEventRecorder
             'final_total' => $snapshot instanceof BookingPriceSnapshot ? (int) $snapshot->final_total : null,
             'currency' => $snapshot instanceof BookingPriceSnapshot ? (string) $snapshot->currency : null,
         ]);
+        $this->calendarSync->recordDateChanges($booking, $oldValues, $newValues, $requestId);
 
         if ($booking->bookingStatus() === BookingStatus::Approved) {
             $this->outbox->schedulePickupReminders($booking);
