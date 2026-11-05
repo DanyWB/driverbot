@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { Maximize2, Minimize2 } from '@lucide/vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PricingCalendar from '@/components/pricing/PricingCalendar.vue';
 import PricingSeasonMonths from '@/components/pricing/PricingSeasonMonths.vue';
 import AdminSelect from '@/components/AdminSelect.vue';
@@ -100,6 +101,27 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const hovered = ref<{ row: string; column: string } | null>(null);
 let calculationGeneration = 0;
 const draggedPreset = ref<number | null>(null);
+const pricesOpen = ref(true);
+const pricesFullscreen = ref(false);
+
+function exitFullscreenOnEscape(event: KeyboardEvent): void {
+    // Dialogs (confirmations) handle Escape themselves.
+    if (
+        event.key === 'Escape' &&
+        pricesFullscreen.value &&
+        !confirmOpen.value
+    ) {
+        pricesFullscreen.value = false;
+    }
+}
+watch(pricesFullscreen, (on) => {
+    document.documentElement.style.overflow = on ? 'hidden' : '';
+});
+onMounted(() => window.addEventListener('keydown', exitFullscreenOnEscape));
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', exitFullscreenOnEscape);
+    document.documentElement.style.overflow = '';
+});
 const seasonOptions = computed(() =>
     pricingSeasons.map((s) => ({ value: s, label: t(pricingSeasonLabels[s]) })),
 );
@@ -493,8 +515,34 @@ onMounted(() => {
         <p v-if="status" role="status" class="rounded-lg border p-3 text-sm">
             {{ status }}
         </p>
-        <details class="pricing-panel" open>
-            <summary>{{ t('Bike group price presets') }}</summary>
+        <details
+            class="pricing-panel prices-panel"
+            :class="{ 'is-fullscreen': pricesFullscreen }"
+            :open="pricesOpen || pricesFullscreen"
+            @toggle="pricesOpen = ($event.target as HTMLDetailsElement).open"
+        >
+            <summary>
+                {{ t('Bike group price presets') }}
+                <button
+                    type="button"
+                    class="fullscreen-toggle"
+                    :title="
+                        pricesFullscreen
+                            ? t('Exit full screen')
+                            : t('Full screen')
+                    "
+                    :aria-label="
+                        pricesFullscreen
+                            ? t('Exit full screen')
+                            : t('Full screen')
+                    "
+                    :aria-pressed="pricesFullscreen"
+                    @click.prevent.stop="pricesFullscreen = !pricesFullscreen"
+                >
+                    <Minimize2 v-if="pricesFullscreen" class="size-4" />
+                    <Maximize2 v-else class="size-4" />
+                </button>
+            </summary>
             <div class="flex flex-wrap items-center justify-between gap-3 py-4">
                 <label class="text-sm"
                     ><input
@@ -629,7 +677,9 @@ onMounted(() => {
                                 >
                                     <Input
                                         v-if="editing"
+                                        class="price-input"
                                         type="number"
+                                        inputmode="numeric"
                                         min="1"
                                         max="100000000"
                                         :model-value="
@@ -1260,6 +1310,62 @@ onMounted(() => {
     font-size: 16px;
     font-weight: 650;
     padding: 4px;
+}
+.prices-panel > summary {
+    position: relative;
+    padding-right: 44px;
+}
+.fullscreen-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    transform: translateY(-50%);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--foreground);
+}
+.fullscreen-toggle:hover {
+    background: var(--muted);
+}
+.prices-panel.is-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    /* vw/vh: the layout viewport can be smaller (reserved scrollbar gutter). */
+    width: 100vw;
+    height: 100vh;
+    z-index: 40;
+    border-radius: 0;
+    overflow: auto;
+    padding: 16px 24px;
+}
+.prices-panel.is-fullscreen .pricing-scroll {
+    max-height: calc(100vh - 190px);
+}
+/* Edit inputs: wide enough for 7-digit prices, no browser spinner arrows. */
+.preset-price-table :deep(.price-input) {
+    width: 88px;
+    min-width: 88px;
+    height: 34px;
+    padding: 0 8px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+.preset-price-table :deep(.price-input::-webkit-outer-spin-button),
+.preset-price-table :deep(.price-input::-webkit-inner-spin-button) {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.preset-price-table td:has(.price-input) {
+    padding: 6px;
 }
 .pricing-scroll {
     max-width: 100%;

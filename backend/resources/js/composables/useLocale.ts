@@ -426,6 +426,8 @@ const russianMessages: Record<string, string> = {
     'Daily prices and rental period calculator': 'Цены по дням и расчёт аренды',
     'Season calendar — months and seasons':
         'Календарь сезонов: месяцы и сезоны',
+    'Full screen': 'Во весь экран',
+    'Exit full screen': 'Выйти из полноэкранного режима',
     'Choose which season applies to each month. Pick a season, then click months to assign it (right-click cycles). Applying updates every preset, every linked vehicle and legacy quotes. Existing bookings are not recalculated.':
         'Выберите сезон для каждого месяца: отметьте сезон, затем кликайте по месяцам (правый клик переключает по кругу). Применение обновит все пресеты, все связанные машины и прежний расчёт. Существующие бронирования не пересчитываются.',
     'Apply season calendar to all prices':
