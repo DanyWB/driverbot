@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import PricingCalendar from '@/components/pricing/PricingCalendar.vue';
+import PricingSeasonMonths from '@/components/pricing/PricingSeasonMonths.vue';
 import AdminSelect from '@/components/AdminSelect.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,9 +24,14 @@ import {
 } from '@/lib/pricingTools';
 import type { PricingFleetVehicle, PricingPreset } from '@/types';
 
-const props = defineProps<{ presets: PricingPreset[] }>();
+type SeasonKey = (typeof pricingSeasons)[number];
+const props = defineProps<{
+    presets: PricingPreset[];
+    seasonCalendar: SeasonKey[];
+}>();
 const emit = defineEmits<{
     saved: [presets: PricingPreset[]];
+    calendarSaved: [calendar: SeasonKey[]];
     edit: [preset: PricingPreset];
     copy: [preset: PricingPreset];
     removed: [id: number];
@@ -246,6 +252,31 @@ function reorder(from: number, to: number): void {
         );
         emit('saved', result.data as PricingPreset[]);
     });
+}
+function applySeasonCalendar(calendar: SeasonKey[]): void {
+    ask(
+        t(
+            'Apply the new season calendar to all presets, linked vehicles and legacy quotes? Existing bookings are not recalculated.',
+        ),
+        async () => {
+            const result = await pricingRequest(
+                '/pricing-presets/season-calendar',
+                'PUT',
+                { confirmed: true, calendar },
+            );
+            emit('saved', result.presets as PricingPreset[]);
+            emit('calendarSaved', result.data as SeasonKey[]);
+            await loadFleet();
+            await calculate();
+            status.value = t(
+                'Season calendar saved: :presets presets and :vehicles vehicles updated.',
+                {
+                    presets: Number(result.updated_presets),
+                    vehicles: Number(result.updated_vehicles),
+                },
+            );
+        },
+    );
 }
 function removePreset(preset: PricingPreset): void {
     ask(t('Delete unused preset :name?', { name: preset.name }), async () => {
@@ -957,6 +988,20 @@ onMounted(() => {
                     </p>
                 </div>
             </template>
+        </details>
+
+        <details class="pricing-panel" open>
+            <summary>{{ t('Season calendar — months and seasons') }}</summary>
+            <PricingSeasonMonths
+                :calendar="seasonCalendar"
+                :disabled="busy || editing"
+                @apply="applySeasonCalendar"
+            />
+            <p v-if="editing" class="mt-2 text-sm text-muted-foreground">
+                {{
+                    t('Finish or discard table edits before changing seasons.')
+                }}
+            </p>
         </details>
 
         <details class="pricing-panel" open>
