@@ -1349,13 +1349,18 @@ onMounted(() => {
     max-height: calc(100vh - 190px);
 }
 /* Edit inputs: wide enough for 7-digit prices, no browser spinner arrows. */
+/* Same footprint as read-only cells: 6-digit prices fit, no spinners. */
 .preset-price-table :deep(.price-input) {
-    width: 88px;
-    min-width: 88px;
-    height: 34px;
-    padding: 0 8px;
-    text-align: right;
+    width: 58px;
+    min-width: 58px;
+    height: 28px;
+    padding: 0 4px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 28px;
+    text-align: center;
     font-variant-numeric: tabular-nums;
+    box-shadow: none;
     -moz-appearance: textfield;
     appearance: textfield;
 }
@@ -1365,7 +1370,7 @@ onMounted(() => {
     margin: 0;
 }
 .preset-price-table td:has(.price-input) {
-    padding: 6px;
+    padding: 4px 3px;
 }
 .pricing-scroll {
     max-width: 100%;
