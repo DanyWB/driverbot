@@ -103,6 +103,13 @@ class GoogleCalendarReconciliationService
         } elseif ($leaseActive && $claimed !== null && $requested <= $claimed) {
             $row->requested_generation = $claimed + 1;
             $row->retry_count = 0;
+        } elseif (! $leaseActive) {
+            // A new trigger must expedite an already queued generation. This is
+            // important when a late remote result arrives after an uncertain
+            // operation's repair completed and a delayed convergence check was
+            // scheduled: the newly observed uncertainty should be repaired now.
+            $row->available_at = now();
+            $row->retry_count = 0;
         }
 
         $row->save();

@@ -173,7 +173,7 @@ class GoogleCalendarOutboxWorker
 
     public function processClaim(GoogleCalendarOutboxClaim $claim): bool
     {
-        $operationRequest = DB::transaction(function () use ($claim): GoogleCalendarOperationRequest|string|null {
+        $operationRequest = DB::transaction(function () use ($claim): GoogleCalendarOperationRequest|string|bool|null {
             $outbox = GoogleCalendarOutbox::query()->lockForUpdate()->find($claim->outboxId);
             if (! $this->ownsOutboxLease($outbox, $claim->leaseToken)) {
                 return null;
@@ -202,7 +202,7 @@ class GoogleCalendarOutboxWorker
             if (! $this->isAuthoritative($outbox, $mapping, $booking)) {
                 $this->markSuperseded($outbox, $mapping, $claim->leaseToken);
 
-                return null;
+                return true;
             }
 
             $operation = GoogleCalendarOperation::from((string) $outbox->operation);
@@ -210,7 +210,7 @@ class GoogleCalendarOutboxWorker
                 if ($mapping->sync_status === GoogleCalendarSyncStatus::Deleted->value) {
                     $this->markSuccess($outbox, $mapping, $claim->leaseToken);
 
-                    return null;
+                    return true;
                 }
                 if ($mapping->sync_status !== GoogleCalendarSyncStatus::DeletePending->value) {
                     return 'Deletion mapping is not tombstoned.';
@@ -244,8 +244,11 @@ class GoogleCalendarOutboxWorker
         if (is_string($operationRequest)) {
             return $this->recordFailure($claim, $operationRequest, false);
         }
-        if (! $operationRequest instanceof GoogleCalendarOperationRequest) {
+        if ($operationRequest === true) {
             return true;
+        }
+        if (! $operationRequest instanceof GoogleCalendarOperationRequest) {
+            return false;
         }
 
         $leaseSeconds = max(15, (int) config('google_calendar.outbox.lease_seconds', 120));

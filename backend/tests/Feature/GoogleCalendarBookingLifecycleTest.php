@@ -244,7 +244,8 @@ class GoogleCalendarBookingLifecycleTest extends TestCase
         $this->assertSame(BookingStatus::NoShow, $booking->fresh()->bookingStatus());
         $this->assertQueuedEvent($booking, GoogleCalendarEventType::Pickup, GoogleCalendarOperation::Upsert, 2);
         $this->assertQueuedEvent($booking, GoogleCalendarEventType::ReturnEvent, GoogleCalendarOperation::Upsert, 2);
-        $this->assertSame(2, GoogleCalendarOutbox::query()->where('booking_id', $booking->id)->count());
+        // Creation queued revision 1 for both events; NO SHOW queues revision 2 for both.
+        $this->assertSame(4, GoogleCalendarOutbox::query()->where('booking_id', $booking->id)->count());
     }
 
     public function test_completed_booking_keeps_both_events_without_deletion(): void

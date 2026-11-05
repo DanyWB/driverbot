@@ -16,6 +16,42 @@ final class GoogleCalendarPostgresTestGuard
         bool $configurationCached,
         ?string $resolvedAppEnvironment = null,
     ): void {
+        self::assertEnvironmentSafe($environment, $configurationCached, $resolvedAppEnvironment);
+
+        $connections = $databaseConfig['connections'] ?? null;
+        $pgsql = is_array($connections) ? ($connections['pgsql'] ?? null) : null;
+        if (($databaseConfig['default'] ?? null) !== 'pgsql' || ! is_array($pgsql) || ($pgsql['driver'] ?? null) !== 'pgsql') {
+            throw new RuntimeException('Effective Laravel database configuration is not PostgreSQL.');
+        }
+
+        if (($pgsql['url'] ?? null) !== null && ($pgsql['url'] ?? '') !== '') {
+            throw new RuntimeException('Effective Laravel PostgreSQL configuration contains a DB URL.');
+        }
+
+        $expectedValues = [
+            'driver' => 'pgsql',
+            'host' => '127.0.0.1',
+            'port' => '5432',
+            'database' => 'drive_phangan_gcal_test',
+            'username' => 'gcal_test',
+            'password' => $environment['DB_PASSWORD'],
+            'sslmode' => 'disable',
+        ];
+
+        foreach ($expectedValues as $configKey => $expected) {
+            $resolved = $pgsql[$configKey] ?? null;
+            if (! is_scalar($resolved) || (string) $resolved !== (string) $expected) {
+                throw new RuntimeException("Effective Laravel PostgreSQL {$configKey} does not match the approved local test target.");
+            }
+        }
+    }
+
+    /** Reject unsafe process values before application/provider bootstrap. */
+    private static function assertEnvironmentSafe(
+        array $environment,
+        bool $configurationCached,
+        ?string $resolvedAppEnvironment = null,
+    ): void {
         if ($configurationCached) {
             throw new RuntimeException('PostgreSQL race tests refuse cached Laravel configuration.');
         }
@@ -29,6 +65,7 @@ final class GoogleCalendarPostgresTestGuard
             'DB_PORT',
             'DB_DATABASE',
             'DB_USERNAME',
+            'DB_SSLMODE',
         ];
 
         foreach ($required as $name) {
@@ -58,47 +95,33 @@ final class GoogleCalendarPostgresTestGuard
             throw new RuntimeException('PostgreSQL race tests require DB_CONNECTION=pgsql.');
         }
 
-        if (! in_array($environment['DB_HOST'], ['127.0.0.1', 'localhost', '::1'], true)) {
-            throw new RuntimeException('PostgreSQL race tests require DB_HOST to be 127.0.0.1, localhost, or ::1.');
+        if ($environment['DB_HOST'] !== '127.0.0.1') {
+            throw new RuntimeException('PostgreSQL race tests require DB_HOST=127.0.0.1.');
         }
 
-        if (! ctype_digit($environment['DB_PORT']) || (int) $environment['DB_PORT'] < 1 || (int) $environment['DB_PORT'] > 65535) {
-            throw new RuntimeException('PostgreSQL race tests require an explicit valid DB_PORT.');
+        if ($environment['DB_PORT'] !== '5432') {
+            throw new RuntimeException('PostgreSQL race tests require DB_PORT=5432.');
         }
 
-        $database = $environment['DB_DATABASE'];
-        if (! str_ends_with($database, '_test')) {
-            throw new RuntimeException('PostgreSQL race test database name must end with the exact lowercase suffix _test.');
+        if ($environment['DB_DATABASE'] !== 'drive_phangan_gcal_test') {
+            throw new RuntimeException('PostgreSQL race tests require DB_DATABASE=drive_phangan_gcal_test.');
         }
 
-        if ($environment['GOOGLE_CALENDAR_PG_RACE_DATABASE'] !== $database) {
+        if ($environment['GOOGLE_CALENDAR_PG_RACE_DATABASE'] !== 'drive_phangan_gcal_test'
+            || $environment['GOOGLE_CALENDAR_PG_RACE_DATABASE'] !== $environment['DB_DATABASE']) {
             throw new RuntimeException('PostgreSQL race test database does not match GOOGLE_CALENDAR_PG_RACE_DATABASE.');
         }
 
-        $connections = $databaseConfig['connections'] ?? null;
-        $pgsql = is_array($connections) ? ($connections['pgsql'] ?? null) : null;
-        if (($databaseConfig['default'] ?? null) !== 'pgsql' || ! is_array($pgsql) || ($pgsql['driver'] ?? null) !== 'pgsql') {
-            throw new RuntimeException('Effective Laravel database configuration is not PostgreSQL.');
+        if ($environment['DB_USERNAME'] !== 'gcal_test') {
+            throw new RuntimeException('PostgreSQL race tests require DB_USERNAME=gcal_test.');
         }
 
-        if (($pgsql['url'] ?? null) !== null && ($pgsql['url'] ?? '') !== '') {
-            throw new RuntimeException('Effective Laravel PostgreSQL configuration contains a DB URL.');
-        }
-
-        if (($pgsql['driver'] ?? null) !== 'pgsql') {
-            throw new RuntimeException('Effective Laravel PostgreSQL connection has an unexpected driver.');
-        }
-
-        foreach (['host' => 'DB_HOST', 'port' => 'DB_PORT', 'database' => 'DB_DATABASE', 'username' => 'DB_USERNAME', 'password' => 'DB_PASSWORD'] as $configKey => $environmentKey) {
-            $resolved = $pgsql[$configKey] ?? null;
-            $expected = $environment[$environmentKey];
-            if (! is_scalar($resolved) || (string) $resolved !== $expected) {
-                throw new RuntimeException("Effective Laravel PostgreSQL {$configKey} does not match {$environmentKey}.");
-            }
+        if ($environment['DB_SSLMODE'] !== 'disable') {
+            throw new RuntimeException('PostgreSQL race tests require DB_SSLMODE=disable.');
         }
     }
 
-    /** Resolve the checked-in Laravel config files without booting the application or loading .env. */
+    /** Validate inputs, then resolve the uncached Laravel DB config with an initialized Application. */
     public static function assertProcessIsSafe(string $basePath): void
     {
         $environment = self::processEnvironment();
@@ -107,8 +130,16 @@ final class GoogleCalendarPostgresTestGuard
             throw new RuntimeException('PostgreSQL race tests refuse cached Laravel configuration.');
         }
 
-        // config/database.php only reads environment values; requiring it here verifies the same
-        // effective values Laravel will use, while avoiding application/provider/database boot.
+        self::assertEnvironmentSafe($environment, false, 'testing');
+
+        // database.php evaluates database_path() even for a connection whose DB is not selected.
+        // Initialize Laravel first so those helpers resolve against an Application, not Container.
+        $app = require $basePath.'/bootstrap/app.php';
+        $app->useEnvironmentPath($basePath.'/tests/Support/no-environment-files');
+        if ($app->configurationIsCached()) {
+            throw new RuntimeException('PostgreSQL race tests refuse cached Laravel configuration.');
+        }
+
         $databaseConfig = require $basePath.'/config/database.php';
         $appConfig = require $basePath.'/config/app.php';
         self::assertSafe($environment, $databaseConfig, false, (string) ($appConfig['env'] ?? ''));
@@ -119,7 +150,7 @@ final class GoogleCalendarPostgresTestGuard
     {
         $names = [
             'APP_ENV', 'GOOGLE_CALENDAR_PG_RACE_TESTING', 'GOOGLE_CALENDAR_PG_RACE_DATABASE',
-            'DB_CONNECTION', 'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'DB_URL',
+            'DB_CONNECTION', 'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'DB_URL', 'DB_SSLMODE',
         ];
         $environment = [];
 

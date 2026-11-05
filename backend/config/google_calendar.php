@@ -1,10 +1,20 @@
 <?php
 
 return [
+    // "local" simulates success without contacting Google; "google" calls the real Calendar API.
+    'driver' => env('GOOGLE_CALENDAR_DRIVER', 'local'),
     'calendars' => [
         'pickup' => env('GOOGLE_CALENDAR_PICKUP_ID'),
         'return' => env('GOOGLE_CALENDAR_RETURN_ID'),
     ],
+    'service_account' => [
+        // Path to the service-account JSON key (absolute, or relative to the backend directory).
+        'credentials_path' => env('GOOGLE_CALENDAR_CREDENTIALS_PATH'),
+        // Alternative to the path: the JSON key itself (raw or base64-encoded).
+        'credentials_json' => env('GOOGLE_CALENDAR_CREDENTIALS_JSON'),
+    ],
+    'api_base_url' => env('GOOGLE_CALENDAR_API_BASE_URL', 'https://www.googleapis.com/calendar/v3'),
+    'token_url' => env('GOOGLE_CALENDAR_TOKEN_URL', 'https://oauth2.googleapis.com/token'),
     'event_duration_minutes' => 60,
     'outbox' => [
         'batch_size' => 50,

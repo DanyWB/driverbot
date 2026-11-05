@@ -10,9 +10,7 @@
         </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
-            <exclude>
-                <file>tests/Feature/GoogleCalendarPostgresConcurrencyTest.php</file>
-            </exclude>
+            <exclude>tests/Feature/GoogleCalendarPostgresConcurrencyTest.php</exclude>
         </testsuite>
     </testsuites>
     <source>

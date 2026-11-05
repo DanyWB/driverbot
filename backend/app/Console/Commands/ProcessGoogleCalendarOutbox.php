@@ -13,8 +13,8 @@ class ProcessGoogleCalendarOutbox extends Command
 
     public function handle(GoogleCalendarOutboxWorker $worker): int
     {
-        if (app()->isProduction()) {
-            $this->error('The local Google Calendar processor is disabled in production.');
+        if (app()->isProduction() && config('google_calendar.driver') !== 'google') {
+            $this->error('The local Google Calendar processor is disabled in production; set GOOGLE_CALENDAR_DRIVER=google.');
 
             return self::FAILURE;
         }

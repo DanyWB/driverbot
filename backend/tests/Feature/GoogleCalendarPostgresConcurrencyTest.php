@@ -70,7 +70,7 @@ class GoogleCalendarPostgresConcurrencyTest extends TestCase
      * Check raw/effective file config before boot, then check the booted config before returning
      * the application to Laravel's trait setup.
      */
-    protected function createApplication()
+    public function createApplication()
     {
         $basePath = dirname(__DIR__, 2);
         GoogleCalendarPostgresTestGuard::assertProcessIsSafe($basePath);

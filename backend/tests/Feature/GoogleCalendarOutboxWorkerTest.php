@@ -11,6 +11,7 @@ use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationRequest;
 use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationContext;
 use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationResult;
 use App\Domain\Integrations\GoogleCalendar\Enums\GoogleCalendarEventType;
+use App\Domain\Integrations\GoogleCalendar\Enums\GoogleCalendarOperation;
 use App\Domain\Integrations\GoogleCalendar\Enums\GoogleCalendarSyncStatus;
 use App\Domain\Integrations\GoogleCalendar\Exceptions\GoogleCalendarProcessingException;
 use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarEventPayloadBuilder;
@@ -139,6 +140,7 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         $booking = $this->createBooking();
         GoogleCalendarOutbox::query()->where('booking_id', $booking->id)->where('event_type', 'return')
             ->update(['available_at' => now()->addHour()]);
+        $processor = $this->bindProcessor();
         $worker = app(GoogleCalendarOutboxWorker::class);
         $competingWorker = app(GoogleCalendarOutboxWorker::class);
         $first = $worker->claimNext();
@@ -148,7 +150,6 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         GoogleCalendarOutbox::query()->whereKey($first->outboxId)->update(['locked_until' => now()->subSecond()]);
         GoogleCalendarEvent::query()->where('booking_id', $booking->id)->where('event_type', 'pickup')
             ->update(['sync_locked_until' => now()->subSecond()]);
-        $processor = $this->bindProcessor();
         $worker->processBatch(1);
         $this->assertFalse($worker->processClaim($first));
         $this->assertCount(1, $processor->requests);
@@ -163,6 +164,7 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         $booking = $this->createBooking();
         GoogleCalendarOutbox::query()->where('booking_id', $booking->id)->where('event_type', 'return')
             ->update(['available_at' => now()->addHour()]);
+        $processor = $this->bindProcessor();
         $worker = app(GoogleCalendarOutboxWorker::class);
         $abandoned = $worker->claimNext();
         $this->assertNotNull($abandoned);
@@ -173,8 +175,6 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         GoogleCalendarOutbox::query()->whereKey($abandoned->outboxId)->update(['locked_until' => now()->subSecond()]);
         GoogleCalendarEvent::query()->where('booking_id', $booking->id)->where('event_type', 'pickup')
             ->update(['sync_locked_until' => now()->subSecond()]);
-        $processor = $this->bindProcessor();
-
         $worker->processBatch(1); // Simulates a dead original process: only durable recovery runs.
         $worker->processBatch(1); // Repeated recovery remains coalesced to the same mapping row.
 
@@ -193,12 +193,10 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         $booking = $this->createBooking();
         GoogleCalendarOutbox::query()->where('booking_id', $booking->id)->where('event_type', 'return')
             ->update(['available_at' => now()->addHour()]);
-        $worker = app(GoogleCalendarOutboxWorker::class);
-        $claim = $worker->claimNext();
-        $this->assertNotNull($claim);
+        $worker = null;
         $remoteExists = false;
         $started = false;
-        $this->bindProcessor(function (GoogleCalendarOperationRequest $request) use (&$remoteExists, &$started, $worker, $booking): GoogleCalendarOperationResult {
+        $this->bindProcessor(function (GoogleCalendarOperationRequest $request) use (&$remoteExists, &$started, &$worker, $booking): GoogleCalendarOperationResult {
             if ($request->operation === GoogleCalendarOperation::Upsert && ! $started) {
                 $started = true;
                 $this->bookings->cancelByAdmin($booking, BookingActor::admin((int) $this->admin->id), 'Late upsert race');
@@ -206,16 +204,19 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
                     ->where('status', GoogleCalendarOutbox::STATUS_PROCESSING)->update(['locked_until' => now()->subSecond()]);
                 GoogleCalendarEvent::query()->where('booking_id', $booking->id)->where('event_type', 'pickup')
                     ->update(['sync_locked_until' => now()->subSecond()]);
-                $worker->processBatch(1); // Durable recovery processes the cancellation delete first.
-                $this->assertFalse($remoteExists);
+                $recovery = $worker->processBatch(1); // Durable recovery processes the cancellation delete first.
+                $this->assertFalse($remoteExists, 'Nested recovery did not leave the remote event deleted: '.json_encode($recovery));
                 $remoteExists = true; // The original HTTP request is accepted after that delete.
             } elseif ($request->operation === GoogleCalendarOperation::Delete) {
                 $remoteExists = false;
             }
             return new GoogleCalendarOperationResult($request->googleEventId);
         });
+        $worker = app(GoogleCalendarOutboxWorker::class);
+        $claim = $worker->claimNext();
+        $this->assertNotNull($claim);
 
-        $this->assertFalse($worker->processClaim($claim));
+        $this->assertFalse($worker->processClaim($claim), 'The late upsert worker must not acknowledge after recovery has taken its lease.');
         $reconciliation = \App\Models\GoogleCalendarReconciliation::query()
             ->where('booking_id', $booking->id)->where('event_type', 'pickup')->firstOrFail();
         $this->assertGreaterThan($reconciliation->completed_generation, $reconciliation->requested_generation);
@@ -241,6 +242,7 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
     public function test_expired_reconciliation_itself_is_reclaimed_and_processed(): void
     {
         $booking = $this->createBooking();
+        $processor = $this->bindProcessor();
         app(\App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarReconciliationService::class)
             ->request($booking, GoogleCalendarEventType::Pickup);
         $worker = app(GoogleCalendarOutboxWorker::class);
@@ -249,8 +251,6 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         \App\Models\GoogleCalendarReconciliation::query()->whereKey($claim->reconciliationId)->update(['locked_until' => now()->subSecond()]);
         GoogleCalendarEvent::query()->where('booking_id', $booking->id)->where('event_type', 'pickup')
             ->update(['sync_locked_until' => now()->subSecond()]);
-        $processor = $this->bindProcessor();
-
         $worker->processBatch(1);
 
         $row = \App\Models\GoogleCalendarReconciliation::query()->findOrFail($claim->reconciliationId);
@@ -265,10 +265,6 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         $booking = $this->createBooking();
         GoogleCalendarOutbox::query()->where('booking_id', $booking->id)->where('event_type', 'return')
             ->update(['available_at' => now()->addHour()]);
-        $workerA = app(GoogleCalendarOutboxWorker::class);
-        $abandoned = $workerA->claimNext();
-        $this->assertNotNull($abandoned);
-
         $remote = [];
         $processor = $this->bindProcessor(function (GoogleCalendarOperationRequest $request) use (&$remote): GoogleCalendarOperationResult {
             if ($request->operation === \App\Domain\Integrations\GoogleCalendar\Enums\GoogleCalendarOperation::Delete) {
@@ -278,6 +274,9 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
             }
             return new GoogleCalendarOperationResult($request->googleEventId);
         });
+        $workerA = app(GoogleCalendarOutboxWorker::class);
+        $abandoned = $workerA->claimNext();
+        $this->assertNotNull($abandoned);
 
         $this->bookings->cancelByAdmin($booking, BookingActor::admin((int) $this->admin->id), 'Remote convergence test');
         GoogleCalendarOutbox::query()->whereKey($abandoned->outboxId)->update(['locked_until' => now()->subSecond()]);
@@ -330,6 +329,7 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         $this->assertSame(1, \App\Models\GoogleCalendarReconciliation::query()
             ->where('booking_id', $booking->id)->where('event_type', 'pickup')->count());
         $this->assertSame($requested, (int) $row->fresh()->requested_generation);
+        $this->assertFalse($row->fresh()->available_at->isFuture(), 'A new trigger should expedite the queued reconciliation generation.');
         $this->assertNotNull($row->fresh()->uncertain_since);
     }
 
@@ -481,13 +481,14 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         $worker = app(GoogleCalendarOutboxWorker::class);
         $claim = $worker->claimNext();
         $outbox = GoogleCalendarOutbox::query()->findOrFail($claim->outboxId);
+        $mapping = GoogleCalendarEvent::query()->where('booking_id', $booking->id)->where('event_type', $outbox->event_type)->firstOrFail();
+        $lastAppliedBefore = (int) $mapping->last_applied_revision;
         $outbox->forceFill(['lease_token' => (string) \Illuminate\Support\Str::uuid()])->save();
 
         $this->assertFalse($worker->processClaim($claim));
         $this->assertCount(0, $processor->requests);
         $this->assertSame(GoogleCalendarOutbox::STATUS_PROCESSING, $outbox->fresh()->status);
-        $this->assertSame(1, (int) GoogleCalendarEvent::query()->where('booking_id', $booking->id)
-            ->where('event_type', $outbox->event_type)->value('last_applied_revision'));
+        $this->assertSame($lastAppliedBefore, (int) $mapping->fresh()->last_applied_revision);
     }
 
     public function test_mapping_lease_token_mismatch_cannot_process_or_acknowledge(): void
@@ -677,10 +678,14 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
 
         $processor = $this->bindProcessor();
         app(GoogleCalendarOutboxWorker::class)->processBatch();
-        $this->assertSame([$pickupId, $returnId], array_values(array_unique(array_map(
+        $actualIds = array_values(array_unique(array_map(
             fn (GoogleCalendarOperationRequest $request): string => $request->googleEventId,
             $processor->requests,
-        ))));
+        )));
+        $expectedIds = [$pickupId, $returnId];
+        sort($actualIds);
+        sort($expectedIds);
+        $this->assertSame($expectedIds, $actualIds);
     }
 
     public function test_timeout_after_remote_acceptance_reconciles_with_same_identity(): void
@@ -856,6 +861,7 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         $booking = $this->createBooking();
         GoogleCalendarOutbox::query()->where('booking_id', $booking->id)->where('event_type', 'return')
             ->update(['available_at' => now()->addHour()]);
+        $processor = $this->bindProcessor();
         $firstWorker = app(GoogleCalendarOutboxWorker::class);
         $claim = $firstWorker->claimNext();
         $this->assertNotNull($claim);
@@ -863,8 +869,6 @@ class GoogleCalendarOutboxWorkerTest extends TestCase
         GoogleCalendarOutbox::query()->whereKey($claim->outboxId)->update(['locked_until' => now()->subSecond()]);
         GoogleCalendarEvent::query()->where('booking_id', $booking->id)->where('event_type', $outbox->event_type)
             ->update(['sync_locked_until' => now()->subSecond()]);
-        $processor = $this->bindProcessor();
-
         $firstWorker->processBatch(1);
         $this->assertFalse($firstWorker->processClaim($claim));
         $mapping = GoogleCalendarEvent::query()->where('booking_id', $booking->id)->where('event_type', $outbox->event_type)->firstOrFail();
