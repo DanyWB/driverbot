@@ -1,0 +1,644 @@
+<!doctype html>
+<!--
+  DRIVE PHANGAN — Rental terms page (developer handoff)
+  ----------------------------------------------------
+  Languages in this file: EN · RU · UK · TH (one <div class="tp" data-terms-lang="…"> block each).
+  Route on the site: /{en,ru,uk,th}/policies/terms  — render the block for the current locale.
+
+  How to integrate:
+  1. CSS: copy everything between "COPY FROM HERE" and "COPY TO HERE" into the site stylesheet.
+     All colours / fonts / radius are CSS variables on .tp (--tp-*). To restyle, change only those.
+  2. Fonts: Anton + Manrope + Noto Sans Thai (Google Fonts link below).
+  3. HTML: put each language block into its own Blade partial, e.g. website/policies/terms/{en,ru,uk,th}.blade.php,
+     and drop the data-terms-lang attribute + "is-active" class (they only drive the demo language switch).
+  4. Remove the demo-only parts: the .preview-langs buttons, the [data-terms-lang] display rule and the <script> at the end.
+  5. "View rental agreement" button points to #rental-agreement — replace with the real agreement URL/PDF.
+  6. Telegram / WhatsApp links: use the values from the site settings if they exist.
+  7. Thai: add "th" to config('website.locales') and the language switcher.
+  8. Bump WEBSITE_TERMS_VERSION when these terms go live.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rental terms | Drive Phangan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* preview-only page shell */
+body{margin:0;background:var(--tp-page-bg,#0A0E18)}
+.preview-langs{display:flex;justify-content:flex-end;gap:4px;max-width:1240px;margin:0 auto;padding:18px 32px 0;box-sizing:border-box}
+.preview-langs button{min-width:44px;min-height:36px;border:1px solid color-mix(in srgb,var(--tp-page-text,#C9CEDA) 25%,transparent);border-radius:999px;background:transparent;color:var(--tp-page-text,#C9CEDA);font:800 13px Manrope,sans-serif;letter-spacing:.06em;cursor:pointer}
+.preview-langs button[data-lang][aria-pressed=true]{background:var(--tp-page-text,#F4F1EA);color:var(--tp-page-bg,#0A0E18)}
+[data-terms-lang]{display:none}[data-terms-lang].is-active{display:block}
+
+/* ===================== COPY FROM HERE: terms styles ===================== */
+/* Theme tokens — every colour, font and radius on the page comes from these.
+   The design panel edits exactly these variables ("Copy CSS" exports them). */
+.tp{
+  --tp-bg:#0A0E18;--tp-band:#0D1220;--tp-card:#121828;
+  --tp-text:#F4F1EA;--tp-soft:#D9DCE6;--tp-muted:#A9B0C2;
+  --tp-orange:#FF7A1A;--tp-orange-hi:#FF9440;--tp-on-accent:#1A0C00;
+  --tp-font-display:Anton;--tp-display-weight:400;--tp-font-body:Manrope;
+  --tp-radius:20px;--tp-h1-size:72px;
+  /* derived — no need to edit */
+  --tp-line:color-mix(in srgb,var(--tp-text) 8%,transparent);
+  --tp-tint:color-mix(in srgb,var(--tp-orange) 16%,transparent);
+  --tp-accent-text:color-mix(in srgb,var(--tp-orange) 55%,var(--tp-text));
+  --tp-display:var(--tp-font-display),'Noto Sans Thai',Impact,sans-serif;
+  --tp-sans:var(--tp-font-body),'Noto Sans Thai',system-ui,sans-serif;
+  font-family:var(--tp-sans);color:var(--tp-text);background:var(--tp-bg);line-height:1.6}
+.tp *{box-sizing:border-box}
+.tp-wrap{max-width:1240px;margin:0 auto;padding:0 32px}
+.tp-kicker{margin:0;color:var(--tp-orange);font-weight:800;font-size:13px;letter-spacing:.14em;text-transform:uppercase}
+.tp-h1{margin:10px 0 0;font-family:var(--tp-display);font-weight:var(--tp-display-weight);font-size:var(--tp-h1-size);line-height:1.02;text-transform:uppercase;text-wrap:balance}
+.tp-h2{margin:10px 0 0;font-family:var(--tp-display);font-weight:var(--tp-display-weight);font-size:calc(var(--tp-h1-size) * .66);line-height:1.04;text-transform:uppercase;text-wrap:balance}
+.tp-lead{margin:16px 0 0;max-width:560px;color:var(--tp-muted);font-size:17px}
+
+/* hero + glance */
+.tp-hero{padding:64px 0 72px}
+.tp-glance{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:40px 0 0;padding:0;list-style:none}
+.tp-glance li{display:flex;gap:16px;align-items:flex-start;padding:22px;border-radius:var(--tp-radius);background:var(--tp-card);border:1px solid var(--tp-line);transition:transform .25s ease,border-color .25s ease}
+.tp-glance li:hover{transform:translateY(-4px);border-color:color-mix(in srgb,var(--tp-orange) 50%,transparent)}
+.tp-ico{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:calc(var(--tp-radius) * .7);background:var(--tp-tint);color:var(--tp-orange)}
+.tp-ico svg{width:24px;height:24px}
+.tp-glance b{display:block;font-weight:800;font-size:18px;line-height:1.3}
+.tp-glance div span{display:block;margin-top:4px;color:var(--tp-muted);font-size:15px;line-height:1.5}
+.tp-glance em{display:block;margin-top:6px;color:var(--tp-accent-text);font-style:normal;font-weight:700;font-size:14px}
+
+/* detailed sections */
+.tp-band{padding:88px 0;background:var(--tp-band);border-top:1px solid var(--tp-line);border-bottom:1px solid var(--tp-line)}
+.tp-band-grid{display:flex;flex-wrap:wrap;gap:48px;align-items:flex-start}
+.tp-band-head{flex:1 1 300px;min-width:0;position:sticky;top:32px}
+.tp-list{flex:2 1 600px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.tp-item{border-radius:var(--tp-radius);background:var(--tp-card);border:1px solid var(--tp-line);transition:border-color .25s ease}
+.tp-item[open],.tp-item:hover{border-color:color-mix(in srgb,var(--tp-orange) 45%,transparent)}
+.tp-item summary{display:flex;align-items:center;gap:18px;padding:22px 24px;cursor:pointer;list-style:none;font-weight:800;font-size:19px;line-height:1.3}
+.tp-item summary::-webkit-details-marker{display:none}
+.tp-item summary:focus-visible{outline:2px solid var(--tp-orange);outline-offset:3px;border-radius:var(--tp-radius)}
+.tp-num{flex:none;width:44px;font-family:var(--tp-display);font-weight:var(--tp-display-weight);font-size:32px;line-height:1;color:var(--tp-orange)}
+.tp-chev{flex:none;margin-left:auto;display:grid;place-items:center;width:36px;height:36px;border-radius:999px;background:color-mix(in srgb,var(--tp-text) 7%,transparent);color:var(--tp-soft);transition:transform .3s cubic-bezier(.2,.8,.2,1),background .25s ease}
+.tp-item[open] .tp-chev{transform:rotate(180deg);background:var(--tp-orange);color:var(--tp-on-accent)}
+.tp-body{padding:0 24px 24px 86px;color:var(--tp-soft)}
+.tp-body p{margin:0 0 12px}
+.tp-body ul{margin:0 0 12px;padding-left:18px}
+.tp-body li{margin-bottom:8px}
+.tp-body li::marker{color:var(--tp-orange)}
+.tp-body b{color:var(--tp-text)}
+.tp-sub{margin:14px 0 8px;font-weight:800;color:var(--tp-text)}
+.tp-actions{margin-top:18px}
+.tp-chips{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.tp-hint{display:block;margin-top:2px;color:var(--tp-muted);font-size:13px}
+.tp-note{margin:4px 0 0;padding:12px 16px;border-radius:calc(var(--tp-radius) * .6);background:color-mix(in srgb,var(--tp-orange) 8%,transparent);color:var(--tp-accent-text);font-size:15px}
+.tp-rows{margin:4px 0 14px;padding:0;list-style:none;border-radius:calc(var(--tp-radius) * .7);overflow:hidden;border:1px solid var(--tp-line)}
+.tp-rows li{display:flex;justify-content:space-between;align-items:center;gap:16px;margin:0;padding:12px 16px;background:color-mix(in srgb,var(--tp-bg) 45%,transparent)}
+.tp-rows li+li{border-top:1px solid var(--tp-line)}
+.tp-chip{flex:none;padding:6px 12px;border-radius:999px;background:color-mix(in srgb,var(--tp-orange) 18%,transparent);color:var(--tp-accent-text);font-weight:700;font-size:13px;white-space:nowrap}
+.tp-chip--free{background:var(--tp-orange);color:var(--tp-on-accent)}
+
+/* contact */
+.tp-cta{padding:96px 0}
+.tp-cta-card{display:flex;flex-wrap:wrap;align-items:center;gap:24px 40px;padding:48px;border-radius:calc(var(--tp-radius) * 1.5);background:var(--tp-card);border:1px solid var(--tp-line);box-shadow:0 40px 100px rgba(0,0,0,.35)}
+.tp-cta-card .tp-h2 span{color:var(--tp-orange)}
+.tp-cta-text{flex:1 1 380px;min-width:0}
+.tp-btns{display:flex;flex-wrap:wrap;gap:12px}
+.tp-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:50px;padding:0 26px;border-radius:999px;font:800 15px var(--tp-sans);text-decoration:none;border:0}
+.tp-btn svg{width:18px;height:18px}
+.tp-btn--primary{background:var(--tp-orange);color:var(--tp-on-accent)}.tp-btn--primary:hover{background:var(--tp-orange-hi);color:var(--tp-on-accent)}
+.tp-btn--ghost{background:color-mix(in srgb,var(--tp-text) 6%,transparent);color:var(--tp-text);border:1px solid color-mix(in srgb,var(--tp-text) 18%,transparent)}.tp-btn--ghost:hover{background:color-mix(in srgb,var(--tp-text) 12%,transparent);color:var(--tp-text)}
+
+@media (max-width:980px){.tp-glance{grid-template-columns:repeat(2,minmax(0,1fr))}.tp-band-head{position:static}}
+@media (max-width:640px){
+  .tp-wrap{padding:0 16px}
+  .tp-hero{padding:40px 0 48px}
+  .tp-h1{font-size:calc(var(--tp-h1-size) * .66)}.tp-h2{font-size:calc(var(--tp-h1-size) * .52)}
+  .tp-glance{grid-template-columns:1fr}
+  .tp-band{padding:56px 0}
+  .tp-item summary{padding:18px;gap:12px;font-size:17px}
+  .tp-num{width:auto;font-size:26px}
+  .tp-body{padding:0 18px 20px}
+  .tp-cta{padding:56px 0}
+  .tp-cta-card{padding:28px 20px}
+  .tp-btn{flex:1}
+  .tp-rows li:has(.tp-chips){flex-wrap:wrap}
+  .tp-chips{justify-content:flex-start}
+}
+/* Thai: the Latin/Cyrillic display faces have no Thai glyphs — Thai headings use Noto Sans Thai, with room for tone marks */
+.tp[lang=th] .tp-h1,.tp[lang=th] .tp-h2{font-family:'Noto Sans Thai',sans-serif;font-weight:800;line-height:1.25}
+/* ===================== COPY TO HERE ===================== */
+</style>
+</head>
+<body>
+<!-- DEMO ONLY: language switch. On the site each language lives at /{en,ru,uk,th}/policies/terms -->
+<div class="preview-langs" role="group" aria-label="Preview language">
+    <button type="button" data-lang="en" aria-pressed="true">EN</button>
+  <button type="button" data-lang="ru" aria-pressed="false">RU</button>
+  <button type="button" data-lang="uk" aria-pressed="false">UK</button>
+  <button type="button" data-lang="th" aria-pressed="false">TH</button>
+</div>
+
+<!--
+  Shared inline icons (24px stroke). Same SVGs are inlined in every language block.
+  id-card · wallet · card · pin · clock · wrench · chevron · send
+-->
+
+<!-- ===================== EN : /en/policies/terms ===================== -->
+<div class="tp is-active" data-terms-lang="en">
+  <section class="tp-hero"><div class="tp-wrap">
+    <p class="tp-kicker">Simple &amp; transparent</p>
+    <h1 class="tp-h1">Rental terms</h1>
+    <p class="tp-lead">Everything you need to know before you ride. No small print — the full agreement is signed at hand-over.</p>
+    <ul class="tp-glance">
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M5 16.5c.6-1.2 1.7-2 3-2s2.4.8 3 2M14 10h5M14 14h3"/></svg></span><div><b>Passport + licence</b><span>Age 18+, international permit recommended</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M17 13h.01"/></svg></span><div><b>Deposit</b><span>Passport or cash, the amount depends on the model</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg></span><div><b>Cash or online</b><span>Everything agreed upfront, no hidden fees</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span><div><b>Pick-up in Ban Tai</b><span>Free delivery within Ban Tai</span><em>Island-wide delivery available</em></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 6.3-6.3a4 4 0 0 0-5-5L9.7 5.3 12 3l2.7 3.3z"/><path d="M3 21l6-6"/></svg></span><div><b>Fair damage policy</b><span>Real cost of original parts and labour only</span><em>No hidden fees. No inflated charges</em></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div><b>Book at least 3 days ahead</b><span>Minimum rental — 5 days</span><em>We confirm within 48 h max, usually within a few hours</em></div></li>
+    </ul>
+  </div></section>
+
+  <section class="tp-band"><div class="tp-wrap tp-band-grid">
+    <div class="tp-band-head">
+      <p class="tp-kicker">The details</p>
+      <h2 class="tp-h2">How it works</h2>
+      <p class="tp-lead">Tap a section to open it.</p>
+    </div>
+    <div class="tp-list">
+      <details class="tp-item" open>
+        <summary><span class="tp-num">01</span>How booking works<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body"><ul>
+          <li>Book <b>at least 3 days</b> before your rental starts. The minimum rental period is <b>5 days</b>.</li>
+          <li>We confirm your request within <b>48 hours</b> at most — usually within a few hours.</li>
+          <li>Prepayment and deposit are agreed separately.</li>
+        </ul></div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">02</span>Documents<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p>Please bring on pick-up:</p>
+          <ul><li>Passport</li><li>Driving licence (an International Driving Permit is recommended)</li><li>You must be <b>18 or older</b></li></ul>
+          <p>Every rental comes with a <b>signed rental agreement</b>.</p>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">03</span>Deposit &amp; payment<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p><b>Deposit</b> — your passport or a cash deposit. The amount depends on the model:</p>
+          <ul class="tp-rows">
+            <li>Regular scooters (110–160cc)<span class="tp-chip">$100–300</span></li>
+            <li>Maxi scooters (300–350cc)<span class="tp-chip">from $400</span></li>
+            <li>Cars<span class="tp-chip">from $400</span></li>
+          </ul>
+          <p class="tp-sub">Payment</p>
+          <ul class="tp-rows">
+            <li><span><b>Booking prepayment</b><small class="tp-hint">Non-refundable</small></span><span class="tp-chip">from 1,500 ฿</span></li>
+            <li><span>We accept</span><span class="tp-chips"><span class="tp-chip">Cash</span><span class="tp-chip">Visa / Mastercard</span><span class="tp-chip">Bank transfer</span><span class="tp-chip">USDT</span></span></li>
+          </ul>
+          <p>All prices are agreed in advance, with no hidden fees.</p>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">04</span>Returning early<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p>If you return the vehicle early, the following applies:</p>
+          <ul>
+            <li><b>Daily rental:</b> returning less than 3 days before the end of the agreement — the unused days are not refunded.</li>
+            <li><b>Monthly rental:</b> returning less than 7 days before the end of the agreement — the rental price is not recalculated.</li>
+            <li><b>In all other cases:</b> the price is recalculated at the standard rate for the actual period of use.</li>
+          </ul>
+          <ul class="tp-rows">
+            <li><span><b>Early return service fee</b><small class="tp-hint">Covers processing the early return and the lost chance to pre-book the vehicle online for the freed-up period.</small></span><span class="tp-chip">300 ฿</span></li>
+          </ul>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">05</span>Extending your rental<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul>
+            <li>Tell us about an extension <b>well in advance</b> — in high season vehicles are often booked for the very next day.</li>
+            <li><b>Half-day extension</b> (e.g. afternoon to evening) is possible by arrangement, usually about <b>50% of the daily price</b>.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">06</span>Damage &amp; responsibility<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul>
+            <li>Before the rental we take <b>photos and a video</b> of the scooter together with you.</li>
+            <li>Damage is paid at the <b>real cost of original parts and labour</b>. In rare cases, downtime during repairs may also be charged.</li>
+            <li>In most cases the deposit is enough to cover it.</li>
+          </ul>
+          <p class="tp-sub">The renter is responsible for:</p>
+          <ul class="tp-rows">
+            <li><span><b>Fines and damage to third parties</b> — any fine or damage must be covered by the renter</span><span class="tp-chip">in full</span></li>
+            <li><span><b>Flat tyre</b> — fixed by the renter at the nearest repair shop</span><span class="tp-chip">~100–200 ฿</span></li>
+            <li><span><b>Dead battery from lights left on</b> — service fee, depends on location</span><span class="tp-chip">100–400 ฿</span></li>
+          </ul>
+          <div class="tp-actions"><a class="tp-btn tp-btn--ghost" href="#rental-agreement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>View rental agreement</a></div>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">07</span>Pick-up &amp; delivery<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul class="tp-rows">
+            <li>Our office in Ban Tai<span class="tp-chip tp-chip--free">Free</span></li>
+            <li>Delivery within Ban Tai<span class="tp-chip tp-chip--free">Free</span></li>
+            <li><span>Thong Sala pier</span><span class="tp-chips"><span class="tp-chip">one way · 200 ฿</span><span class="tp-chip">round trip · 300 ฿</span></span></li>
+            <li><span>Around the island<small class="tp-hint">Depends on the distance</small></span><span class="tp-chip">one way · 100–400 ฿</span></li>
+          </ul>
+        </div>
+      </details>
+    </div>
+  </div></section>
+
+  <section class="tp-cta"><div class="tp-wrap"><div class="tp-cta-card">
+    <div class="tp-cta-text">
+      <h2 class="tp-h2">Still have a question?<br><span>Just say hi</span></h2>
+      <p class="tp-lead">Send us your dates — we'll reply with the right ride and the price for your season.</p>
+    </div>
+    <div class="tp-btns">
+      <a class="tp-btn tp-btn--primary" href="https://t.me/KohPhanganDrive" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>Telegram</a>
+      <a class="tp-btn tp-btn--ghost" href="https://wa.me/66971819946" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+  </div></div></section>
+</div>
+
+<!-- ===================== RU : /ru/policies/terms ===================== -->
+<div class="tp" data-terms-lang="ru">
+  <section class="tp-hero"><div class="tp-wrap">
+    <p class="tp-kicker">Просто и прозрачно</p>
+    <h1 class="tp-h1">Условия аренды</h1>
+    <p class="tp-lead">Всё, что нужно знать перед арендой. Без мелкого шрифта — полный договор подписывается при выдаче.</p>
+    <ul class="tp-glance">
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M5 16.5c.6-1.2 1.7-2 3-2s2.4.8 3 2M14 10h5M14 14h3"/></svg></span><div><b>Паспорт + права</b><span>Возраст от 18 лет, желательно международные права</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M17 13h.01"/></svg></span><div><b>Депозит</b><span>Паспорт или деньги, сумма зависит от модели</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg></span><div><b>Наличные или онлайн</b><span>Всё обсуждаем заранее, без скрытых платежей</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span><div><b>Выдача на Бантае</b><span>Доставка по Бантаю бесплатно</span><em>Есть возможность доставки по острову</em></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 6.3-6.3a4 4 0 0 0-5-5L9.7 5.3 12 3l2.7 3.3z"/><path d="M3 21l6-6"/></svg></span><div><b>Честно о повреждениях</b><span>Только реальная стоимость запчастей и работы</span><em>Без скрытых платежей и завышенных цен</em></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div><b>Бронирование минимум за 3 суток</b><span>Минимальный срок аренды — 5 дней</span><em>Подтверждаем максимум за 48 часов, обычно — в течение нескольких часов</em></div></li>
+    </ul>
+  </div></section>
+
+  <section class="tp-band"><div class="tp-wrap tp-band-grid">
+    <div class="tp-band-head">
+      <p class="tp-kicker">Подробности</p>
+      <h2 class="tp-h2">Как всё устроено</h2>
+      <p class="tp-lead">Нажмите на раздел, чтобы раскрыть его.</p>
+    </div>
+    <div class="tp-list">
+      <details class="tp-item" open>
+        <summary><span class="tp-num">01</span>Как проходит бронирование<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body"><ul>
+          <li>Бронируйте <b>минимум за 3 суток</b> до начала аренды. Минимальный срок аренды — <b>5 дней</b>.</li>
+          <li>Подтверждаем заявку максимум в течение <b>48 часов</b> — обычно в течение нескольких часов.</li>
+          <li>Предоплата и депозит согласуются отдельно.</li>
+        </ul></div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">02</span>Документы<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p>При получении техники нужны:</p>
+          <ul><li>Паспорт</li><li>Водительские права (желательно международные)</li><li>Возраст <b>от 18 лет</b></li></ul>
+          <p>Каждая аренда оформляется <b>договором</b>, который подписывается при выдаче.</p>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">03</span>Депозит и оплата<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p><b>Депозит</b> — паспорт или денежный залог. Сумма зависит от модели:</p>
+          <ul class="tp-rows">
+            <li>Обычные скутеры (110–160cc)<span class="tp-chip">100–300$</span></li>
+            <li>Макси-скутеры (300–350cc)<span class="tp-chip">от 400$</span></li>
+            <li>Авто<span class="tp-chip">от 400$</span></li>
+          </ul>
+          <p class="tp-sub">Оплата</p>
+          <ul class="tp-rows">
+            <li><span><b>Предоплата за бронирование</b><small class="tp-hint">Не возвращается</small></span><span class="tp-chip">от 1 500 ฿</span></li>
+            <li><span>Принимаем</span><span class="tp-chips"><span class="tp-chip">Наличные</span><span class="tp-chip">Visa / Mastercard</span><span class="tp-chip">Банковский перевод</span><span class="tp-chip">USDT</span></span></li>
+          </ul>
+          <p>Все условия согласуем заранее, никаких скрытых платежей.</p>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">04</span>Досрочный возврат<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p>При досрочном возврате транспортного средства применяются следующие условия:</p>
+          <ul>
+            <li><b>Посуточная аренда:</b> при возврате менее чем за 3 дня до окончания договора неиспользованные дни не компенсируются.</li>
+            <li><b>Помесячная аренда:</b> при возврате менее чем за 7 дней до окончания договора перерасчёт стоимости аренды не производится.</li>
+            <li><b>В остальных случаях:</b> стоимость аренды пересчитывается по стандартному тарифу за фактический период использования транспортного средства.</li>
+          </ul>
+          <ul class="tp-rows">
+            <li><span><b>Сервисный сбор за досрочный возврат</b><small class="tp-hint">Учитывает обработку досрочного возврата и потерю возможности предварительного онлайн-бронирования транспорта на освобождаемый период.</small></span><span class="tp-chip">300 ฿</span></li>
+          </ul>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">05</span>Продление аренды<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul>
+            <li>Предупреждайте о продлении <b>заблаговременно</b> — в высокий сезон технику часто бронируют день в день.</li>
+            <li><b>Продление на полдня</b> (например, с обеда до вечера) — по договорённости, обычно около <b>50% стоимости дня</b>.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">06</span>Повреждения и ответственность<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul>
+            <li>Перед арендой вместе с вами делаем <b>фото и видео</b> байка.</li>
+            <li>Повреждения оплачиваются по <b>реальной стоимости оригинальных запчастей и работы</b>. В редких случаях может учитываться простой на время ремонта.</li>
+            <li>В большинстве случаев достаточно депозита.</li>
+          </ul>
+          <p class="tp-sub">Арендатор несёт ответственность за:</p>
+          <ul class="tp-rows">
+            <li><span><b>Штрафы и ущерб третьим лицам</b> — арендатор возмещает любой штраф или ущерб</span><span class="tp-chip">полностью</span></li>
+            <li><span><b>Пробитое колесо</b> — арендатор ремонтирует сам в ближайшей мастерской</span><span class="tp-chip">~100–200 ฿</span></li>
+            <li><span><b>Сел аккумулятор из-за включённых фар</b> — сервисный сбор, зависит от локации</span><span class="tp-chip">100–400 ฿</span></li>
+          </ul>
+          <div class="tp-actions"><a class="tp-btn tp-btn--ghost" href="#rental-agreement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>Посмотреть договор аренды</a></div>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">07</span>Получение и доставка<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul class="tp-rows">
+            <li>Наш офис на Бантае<span class="tp-chip tp-chip--free">Бесплатно</span></li>
+            <li>Доставка по Бантаю<span class="tp-chip tp-chip--free">Бесплатно</span></li>
+            <li><span>Пирс Тонгсала</span><span class="tp-chips"><span class="tp-chip">в одну сторону · 200 ฿</span><span class="tp-chip">в обе стороны · 300 ฿</span></span></li>
+            <li><span>По острову<small class="tp-hint">Зависит от расстояния</small></span><span class="tp-chip">в одну сторону · 100–400 ฿</span></li>
+          </ul>
+        </div>
+      </details>
+    </div>
+  </div></section>
+
+  <section class="tp-cta"><div class="tp-wrap"><div class="tp-cta-card">
+    <div class="tp-cta-text">
+      <h2 class="tp-h2">Остались вопросы?<br><span>Просто напишите</span></h2>
+      <p class="tp-lead">Пришлите даты — подберём транспорт и назовём цену на ваш сезон.</p>
+    </div>
+    <div class="tp-btns">
+      <a class="tp-btn tp-btn--primary" href="https://t.me/KohPhanganDrive" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>Telegram</a>
+      <a class="tp-btn tp-btn--ghost" href="https://wa.me/66971819946" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+  </div></div></section>
+</div>
+
+<!-- ===================== UK : /uk/policies/terms ===================== -->
+<div class="tp" data-terms-lang="uk">
+  <section class="tp-hero"><div class="tp-wrap">
+    <p class="tp-kicker">Просто й прозоро</p>
+    <h1 class="tp-h1">Умови оренди</h1>
+    <p class="tp-lead">Усе, що потрібно знати перед орендою. Без дрібного шрифту — повний договір підписується під час видачі.</p>
+    <ul class="tp-glance">
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M5 16.5c.6-1.2 1.7-2 3-2s2.4.8 3 2M14 10h5M14 14h3"/></svg></span><div><b>Паспорт + права</b><span>Вік від 18 років, бажано міжнародні права</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M17 13h.01"/></svg></span><div><b>Депозит</b><span>Паспорт або гроші, сума залежить від моделі</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg></span><div><b>Готівка або онлайн</b><span>Усе обговорюємо заздалегідь, без прихованих платежів</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span><div><b>Видача на Бантаї</b><span>Доставка по Бантаю безкоштовна</span><em>Є можливість доставки по острову</em></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 6.3-6.3a4 4 0 0 0-5-5L9.7 5.3 12 3l2.7 3.3z"/><path d="M3 21l6-6"/></svg></span><div><b>Чесно про пошкодження</b><span>Лише реальна вартість запчастин і роботи</span><em>Без прихованих платежів і завищених цін</em></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div><b>Бронювання щонайменше за 3 доби</b><span>Мінімальний термін оренди — 5 днів</span><em>Підтверджуємо максимум за 48 годин, зазвичай — протягом кількох годин</em></div></li>
+    </ul>
+  </div></section>
+
+  <section class="tp-band"><div class="tp-wrap tp-band-grid">
+    <div class="tp-band-head">
+      <p class="tp-kicker">Подробиці</p>
+      <h2 class="tp-h2">Як усе влаштовано</h2>
+      <p class="tp-lead">Натисніть на розділ, щоб розгорнути його.</p>
+    </div>
+    <div class="tp-list">
+      <details class="tp-item" open>
+        <summary><span class="tp-num">01</span>Як проходить бронювання<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body"><ul>
+          <li>Бронюйте <b>щонайменше за 3 доби</b> до початку оренди. Мінімальний термін оренди — <b>5 днів</b>.</li>
+          <li>Підтверджуємо заявку максимум протягом <b>48 годин</b> — зазвичай протягом кількох годин.</li>
+          <li>Передоплата й депозит погоджуються окремо.</li>
+        </ul></div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">02</span>Документи<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p>Під час отримання техніки потрібні:</p>
+          <ul><li>Паспорт</li><li>Водійське посвідчення (бажано міжнародне)</li><li>Вік <b>від 18 років</b></li></ul>
+          <p>Кожна оренда оформлюється <b>договором</b>, який підписується під час видачі.</p>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">03</span>Депозит і оплата<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p><b>Депозит</b> — паспорт або грошова застава. Сума залежить від моделі:</p>
+          <ul class="tp-rows">
+            <li>Звичайні скутери (110–160cc)<span class="tp-chip">100–300$</span></li>
+            <li>Максі-скутери (300–350cc)<span class="tp-chip">від 400$</span></li>
+            <li>Авто<span class="tp-chip">від 400$</span></li>
+          </ul>
+          <p class="tp-sub">Оплата</p>
+          <ul class="tp-rows">
+            <li><span><b>Передоплата за бронювання</b><small class="tp-hint">Не повертається</small></span><span class="tp-chip">від 1 500 ฿</span></li>
+            <li><span>Приймаємо</span><span class="tp-chips"><span class="tp-chip">Готівка</span><span class="tp-chip">Visa / Mastercard</span><span class="tp-chip">Банківський переказ</span><span class="tp-chip">USDT</span></span></li>
+          </ul>
+          <p>Усі умови погоджуємо заздалегідь, жодних прихованих платежів.</p>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">04</span>Дострокове повернення<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p>У разі дострокового повернення транспортного засобу діють такі умови:</p>
+          <ul>
+            <li><b>Подобова оренда:</b> у разі повернення менш ніж за 3 дні до закінчення договору невикористані дні не компенсуються.</li>
+            <li><b>Помісячна оренда:</b> у разі повернення менш ніж за 7 днів до закінчення договору перерахунок вартості оренди не здійснюється.</li>
+            <li><b>В інших випадках:</b> вартість оренди перераховується за стандартним тарифом за фактичний період використання транспортного засобу.</li>
+          </ul>
+          <ul class="tp-rows">
+            <li><span><b>Сервісний збір за дострокове повернення</b><small class="tp-hint">Враховує обробку дострокового повернення та втрату можливості попереднього онлайн-бронювання транспорту на період, що звільняється.</small></span><span class="tp-chip">300 ฿</span></li>
+          </ul>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">05</span>Продовження оренди<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul>
+            <li>Попереджайте про продовження <b>завчасно</b> — у високий сезон техніку часто бронюють день у день.</li>
+            <li><b>Продовження на пів дня</b> (наприклад, з обіду до вечора) — за домовленістю, зазвичай близько <b>50% вартості дня</b>.</li>
+          </ul>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">06</span>Пошкодження та відповідальність<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul>
+            <li>Перед орендою разом з вами робимо <b>фото й відео</b> байка.</li>
+            <li>Пошкодження оплачуються за <b>реальною вартістю оригінальних запчастин і роботи</b>. У рідкісних випадках може враховуватися простій на час ремонту.</li>
+            <li>У більшості випадків достатньо депозиту.</li>
+          </ul>
+          <p class="tp-sub">Орендар несе відповідальність за:</p>
+          <ul class="tp-rows">
+            <li><span><b>Штрафи та шкоду третім особам</b> — орендар відшкодовує будь-який штраф або шкоду</span><span class="tp-chip">повністю</span></li>
+            <li><span><b>Пробите колесо</b> — орендар ремонтує сам у найближчій майстерні</span><span class="tp-chip">~100–200 ฿</span></li>
+            <li><span><b>Сів акумулятор через увімкнені фари</b> — сервісний збір, залежить від локації</span><span class="tp-chip">100–400 ฿</span></li>
+          </ul>
+          <div class="tp-actions"><a class="tp-btn tp-btn--ghost" href="#rental-agreement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>Переглянути договір оренди</a></div>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">07</span>Отримання та доставка<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul class="tp-rows">
+            <li>Наш офіс на Бантаї<span class="tp-chip tp-chip--free">Безкоштовно</span></li>
+            <li>Доставка по Бантаю<span class="tp-chip tp-chip--free">Безкоштовно</span></li>
+            <li><span>Пірс Тонгсала</span><span class="tp-chips"><span class="tp-chip">в один бік · 200 ฿</span><span class="tp-chip">в обидва боки · 300 ฿</span></span></li>
+            <li><span>По острову<small class="tp-hint">Залежить від відстані</small></span><span class="tp-chip">в один бік · 100–400 ฿</span></li>
+          </ul>
+        </div>
+      </details>
+    </div>
+  </div></section>
+
+  <section class="tp-cta"><div class="tp-wrap"><div class="tp-cta-card">
+    <div class="tp-cta-text">
+      <h2 class="tp-h2">Залишилися питання?<br><span>Просто напишіть</span></h2>
+      <p class="tp-lead">Надішліть дати — підберемо транспорт і назвемо ціну на ваш сезон.</p>
+    </div>
+    <div class="tp-btns">
+      <a class="tp-btn tp-btn--primary" href="https://t.me/KohPhanganDrive" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>Telegram</a>
+      <a class="tp-btn tp-btn--ghost" href="https://wa.me/66971819946" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+  </div></div></section>
+</div>
+
+
+<!-- ===================== TH : /th/policies/terms ===================== -->
+<div class="tp" data-terms-lang="th" lang="th">
+  <section class="tp-hero"><div class="tp-wrap">
+    <p class="tp-kicker">ง่ายและโปร่งใส</p>
+    <h1 class="tp-h1">เงื่อนไขการเช่า</h1>
+    <p class="tp-lead">ทุกสิ่งที่ควรรู้ก่อนเช่ารถ ไม่มีข้อความแอบแฝง — สัญญาเช่าฉบับเต็มลงนามเมื่อรับรถ</p>
+    <ul class="tp-glance">
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M5 16.5c.6-1.2 1.7-2 3-2s2.4.8 3 2M14 10h5M14 14h3"/></svg></span><div><b>พาสปอร์ต + ใบขับขี่</b><span>อายุ 18 ปีขึ้นไป แนะนำใบขับขี่สากล</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M17 13h.01"/></svg></span><div><b>เงินมัดจำ</b><span>พาสปอร์ตหรือเงินสด จำนวนขึ้นอยู่กับรุ่นรถ</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg></span><div><b>เงินสดหรือออนไลน์</b><span>ตกลงทุกอย่างล่วงหน้า ไม่มีค่าใช้จ่ายแอบแฝง</span></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span><div><b>รับรถที่บ้านใต้</b><span>ส่งรถฟรีในบ้านใต้</span><em>มีบริการส่งรถทั่วเกาะ</em></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 6.3-6.3a4 4 0 0 0-5-5L9.7 5.3 12 3l2.7 3.3z"/><path d="M3 21l6-6"/></svg></span><div><b>ความเสียหายคิดตามจริง</b><span>คิดเฉพาะค่าอะไหล่และค่าแรงตามจริง</span><em>ไม่มีค่าใช้จ่ายแอบแฝง ไม่บวกราคาเพิ่ม</em></div></li>
+      <li><span class="tp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><div><b>จองล่วงหน้าอย่างน้อย 3 วัน</b><span>ระยะเวลาเช่าขั้นต่ำ 5 วัน</span><em>ยืนยันภายใน 48 ชั่วโมง ส่วนใหญ่ภายในไม่กี่ชั่วโมง</em></div></li>
+    </ul>
+  </div></section>
+
+  <section class="tp-band"><div class="tp-wrap tp-band-grid">
+    <div class="tp-band-head">
+      <p class="tp-kicker">รายละเอียด</p>
+      <h2 class="tp-h2">ขั้นตอนทั้งหมด</h2>
+      <p class="tp-lead">แตะที่หัวข้อเพื่อดูรายละเอียด</p>
+    </div>
+    <div class="tp-list">
+      <details class="tp-item" open>
+        <summary><span class="tp-num">01</span>ขั้นตอนการจอง<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body"><ul>
+          <li>จอง<b>ล่วงหน้าอย่างน้อย 3 วัน</b>ก่อนวันเริ่มเช่า ระยะเวลาเช่าขั้นต่ำ <b>5 วัน</b></li>
+          <li>เรายืนยันการจองภายใน <b>48 ชั่วโมง</b> — ส่วนใหญ่ภายในไม่กี่ชั่วโมง</li>
+          <li>เงินจองและเงินมัดจำตกลงแยกกัน</li>
+        </ul></div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">02</span>เอกสาร<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p>เอกสารที่ต้องใช้เมื่อรับรถ:</p>
+          <ul><li>พาสปอร์ต</li><li>ใบขับขี่ (แนะนำใบขับขี่สากล)</li><li>อายุ <b>18 ปีขึ้นไป</b></li></ul>
+          <p>การเช่าทุกครั้งทำ<b>สัญญาเช่า</b>และลงนามเมื่อรับรถ</p>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">03</span>เงินมัดจำและการชำระเงิน<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p><b>เงินมัดจำ</b> — พาสปอร์ตหรือเงินสด จำนวนขึ้นอยู่กับรุ่นรถ:</p>
+          <ul class="tp-rows">
+            <li>สกู๊ตเตอร์ทั่วไป (110–160cc)<span class="tp-chip">100–300$</span></li>
+            <li>แม็กซี่สกู๊ตเตอร์ (300–350cc)<span class="tp-chip">400$ ขึ้นไป</span></li>
+            <li>รถยนต์<span class="tp-chip">400$ ขึ้นไป</span></li>
+          </ul>
+          <p class="tp-sub">การชำระเงิน</p>
+          <ul class="tp-rows">
+            <li><span><b>เงินจองล่วงหน้า</b><small class="tp-hint">ไม่คืนเงิน</small></span><span class="tp-chip">1,500 ฿ ขึ้นไป</span></li>
+            <li><span>เรารับ</span><span class="tp-chips"><span class="tp-chip">เงินสด</span><span class="tp-chip">Visa / Mastercard</span><span class="tp-chip">โอนผ่านธนาคาร</span><span class="tp-chip">USDT</span></span></li>
+          </ul>
+          <p>ตกลงเงื่อนไขทั้งหมดล่วงหน้า ไม่มีค่าใช้จ่ายแอบแฝง</p>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">04</span>การคืนรถก่อนกำหนด<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <p>กรณีคืนรถก่อนกำหนด มีเงื่อนไขดังนี้:</p>
+          <ul>
+            <li><b>เช่ารายวัน:</b> หากคืนรถก่อนสิ้นสุดสัญญาน้อยกว่า 3 วัน จะไม่คืนเงินสำหรับวันที่ไม่ได้ใช้</li>
+            <li><b>เช่ารายเดือน:</b> หากคืนรถก่อนสิ้นสุดสัญญาน้อยกว่า 7 วัน จะไม่มีการคำนวณค่าเช่าใหม่</li>
+            <li><b>กรณีอื่น ๆ:</b> ค่าเช่าจะคำนวณใหม่ตามอัตรามาตรฐานสำหรับระยะเวลาที่ใช้รถจริง</li>
+          </ul>
+          <ul class="tp-rows">
+            <li><span><b>ค่าบริการคืนรถก่อนกำหนด</b><small class="tp-hint">ครอบคลุมการดำเนินการคืนรถก่อนกำหนด และการเสียโอกาสรับจองออนไลน์ล่วงหน้าสำหรับช่วงเวลาที่ว่างลง</small></span><span class="tp-chip">300 ฿</span></li>
+          </ul>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">05</span>การต่อสัญญาเช่า<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul>
+            <li>แจ้งต่อสัญญา<b>ล่วงหน้า</b> — ช่วงไฮซีซั่นรถมักถูกจองต่อทันที</li>
+            <li><b>ต่อครึ่งวัน</b> (เช่น จากบ่ายถึงเย็น) — ตามตกลง โดยทั่วไปประมาณ <b>50% ของค่าเช่ารายวัน</b></li>
+          </ul>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">06</span>ความเสียหายและความรับผิดชอบ<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul>
+            <li>ก่อนเช่า เราถ่าย<b>รูปและวิดีโอ</b>รถร่วมกับคุณ</li>
+            <li>ความเสียหายคิดตาม<b>ราคาจริงของอะไหล่แท้และค่าแรง</b> ในบางกรณีอาจคิดค่าเสียโอกาสระหว่างซ่อม</li>
+            <li>ส่วนใหญ่เงินมัดจำก็เพียงพอ</li>
+          </ul>
+          <p class="tp-sub">ผู้เช่ารับผิดชอบ:</p>
+          <ul class="tp-rows">
+            <li><span><b>ค่าปรับและความเสียหายต่อบุคคลที่สาม</b> — ผู้เช่าชดใช้ค่าปรับหรือความเสียหายทั้งหมด</span><span class="tp-chip">เต็มจำนวน</span></li>
+            <li><span><b>ยางรั่ว</b> — ผู้เช่าซ่อมเองที่ร้านใกล้ที่สุด</span><span class="tp-chip">~100–200 ฿</span></li>
+            <li><span><b>แบตเตอรี่หมดเพราะเปิดไฟทิ้งไว้</b> — ค่าบริการขึ้นอยู่กับสถานที่</span><span class="tp-chip">100–400 ฿</span></li>
+          </ul>
+          <div class="tp-actions"><a class="tp-btn tp-btn--ghost" href="#rental-agreement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>ดูสัญญาเช่า</a></div>
+        </div>
+      </details>
+      <details class="tp-item">
+        <summary><span class="tp-num">07</span>การรับและส่งรถ<span class="tp-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary>
+        <div class="tp-body">
+          <ul class="tp-rows">
+            <li>ออฟฟิศของเราที่บ้านใต้<span class="tp-chip tp-chip--free">ฟรี</span></li>
+            <li>ส่งรถในบ้านใต้<span class="tp-chip tp-chip--free">ฟรี</span></li>
+            <li><span>ท่าเรือท้องศาลา</span><span class="tp-chips"><span class="tp-chip">เที่ยวเดียว · 200 ฿</span><span class="tp-chip">ไป-กลับ · 300 ฿</span></span></li>
+            <li><span>ทั่วเกาะ<small class="tp-hint">ขึ้นอยู่กับระยะทาง</small></span><span class="tp-chip">เที่ยวเดียว · 100–400 ฿</span></li>
+          </ul>
+        </div>
+      </details>
+    </div>
+  </div></section>
+
+  <section class="tp-cta"><div class="tp-wrap"><div class="tp-cta-card">
+    <div class="tp-cta-text">
+      <h2 class="tp-h2">มีคำถามเพิ่มเติม?<br><span>ทักหาเราได้เลย</span></h2>
+      <p class="tp-lead">ส่งวันที่ต้องการมา — เราจะแนะนำรถที่เหมาะและแจ้งราคาตามฤดูกาล</p>
+    </div>
+    <div class="tp-btns">
+      <a class="tp-btn tp-btn--primary" href="https://t.me/KohPhanganDrive" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>Telegram</a>
+      <a class="tp-btn tp-btn--ghost" href="https://wa.me/66971819946" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+  </div></div></section>
+</div>
+
+<script>
+/* preview only */
+document.querySelectorAll('.preview-langs button[data-lang]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.preview-langs button[data-lang]').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  document.querySelectorAll('[data-terms-lang]').forEach(t=>t.classList.toggle('is-active',t.dataset.termsLang===b.dataset.lang));
+  document.documentElement.lang=b.dataset.lang;
+}));
+</script>
+
+</body>
+</html>
