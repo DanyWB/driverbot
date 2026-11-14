@@ -63,7 +63,7 @@ async function sendConditions(ctx, langOverride, options = {}) {
 
   return (options.renderer || botScreenRenderer).renderText(ctx, {
     screen: "conditions",
-    text: `${t(lang, "booking_request_policy")}\n\n${t(lang, "conditions_info")}`,
+    text: t(lang, "conditions_info"),
     parseMode: "HTML",
     replyMarkup: conditionsKeyboard(lang, accepted),
     returnContext: {termsOrigin: origin},
