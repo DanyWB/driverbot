@@ -148,6 +148,13 @@ class PostgresBookingConcurrencyTest extends TestCase
             AuditLog::query()->where('subject_type', Booking::class)->where('subject_id', $booking->public_id)->delete();
         }
 
+        // Calendar mappings deliberately restrict deletion of real bookings.
+        // Remove only this test's committed child rows before its fixture bookings.
+        $bookingIds = $bookings->modelKeys();
+        DB::table('google_calendar_reconciliations')->whereIn('booking_id', $bookingIds)->delete();
+        DB::table('google_calendar_outbox')->whereIn('booking_id', $bookingIds)->delete();
+        DB::table('google_calendar_events')->whereIn('booking_id', $bookingIds)->delete();
+
         Booking::query()->where('vehicle_id', $vehicle->id)->delete();
         VehiclePriceTier::query()->where('vehicle_id', $vehicle->id)->delete();
         $vehicle->delete();
