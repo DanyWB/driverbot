@@ -1,0 +1,4 @@
+# Minimal OpenSSL config so PHP can generate test RSA keys on Windows.
+[req]
+distinguished_name = dn
+[dn]

@@ -35,7 +35,16 @@ import type {
     PricingCalculationSettings,
 } from '@/types';
 
-const props = defineProps<{ presets: PricingPreset[] }>();
+type SeasonKey = 'high' | 'middle' | 'low';
+const props = defineProps<{
+    presets: PricingPreset[];
+    seasonCalendar?: SeasonKey[];
+}>();
+const seasonCalendar = ref<SeasonKey[]>(
+    props.seasonCalendar?.length === 12
+        ? [...props.seasonCalendar]
+        : [...defaultPricingSettings().prefs.seasonCalendar],
+);
 
 defineOptions({
     layout: {
@@ -113,11 +122,15 @@ function blankPrices(): DraftPrices {
 }
 
 function blankDraft(): PresetDraft {
+    const settings = defaultPricingSettings();
+    // New presets start from the global season calendar.
+    settings.prefs.seasonCalendar = [...seasonCalendar.value];
+
     return {
         name: '',
         vehicle_type: null,
         prices: blankPrices(),
-        calculation_settings: defaultPricingSettings(),
+        calculation_settings: settings,
     };
 }
 
@@ -561,7 +574,9 @@ onMounted(() => {
 
         <PricingWorkbench
             :presets="items"
+            :season-calendar="seasonCalendar"
             @saved="mergeSaved"
+            @calendar-saved="seasonCalendar = $event"
             @edit="openEdit"
             @copy="openCopy"
             @removed="items = items.filter((p) => p.id !== $event)"

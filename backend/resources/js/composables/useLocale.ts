@@ -424,6 +424,22 @@ const russianMessages: Record<string, string> = {
         'Предпросмотр действует 20 минут. При обновлении существующего пресета сохраняется ограничение типа техники и обновляются все связанные машины. Проверьте каждое сопоставление.',
     'Confirm import': 'Подтвердить импорт',
     'Daily prices and rental period calculator': 'Цены по дням и расчёт аренды',
+    'Season calendar — months and seasons':
+        'Календарь сезонов: месяцы и сезоны',
+    'Full screen': 'Во весь экран',
+    'Exit full screen': 'Выйти из полноэкранного режима',
+    'Choose which season applies to each month. Pick a season, then click months to assign it (right-click cycles). Applying updates every preset, every linked vehicle and legacy quotes. Existing bookings are not recalculated.':
+        'Выберите сезон для каждого месяца: отметьте сезон, затем кликайте по месяцам (правый клик переключает по кругу). Применение обновит все пресеты, все связанные машины и прежний расчёт. Существующие бронирования не пересчитываются.',
+    'Apply season calendar to all prices':
+        'Применить календарь сезонов ко всем ценам',
+    'Reset changes': 'Сбросить изменения',
+    'Unsaved season changes': 'Есть несохранённые изменения сезонов',
+    'Finish or discard table edits before changing seasons.':
+        'Сохраните или отмените правки таблицы перед изменением сезонов.',
+    'Apply the new season calendar to all presets, linked vehicles and legacy quotes? Existing bookings are not recalculated.':
+        'Применить новый календарь сезонов ко всем пресетам, связанным машинам и прежнему расчёту? Существующие бронирования не пересчитываются.',
+    'Season calendar saved: :presets presets and :vehicles vehicles updated.':
+        'Календарь сезонов сохранён: обновлено пресетов: :presets, машин: :vehicles.',
     'Price preset': 'Пресет цен',
     'This preset uses legacy calculation. Enable calculator rules in Edit to use the matrix and preview. Existing vehicles are not switched automatically.':
         'Этот пресет использует прежний расчёт. Включите правила калькулятора в редакторе для матрицы и предпросмотра. Автоматического переключения машин нет.',

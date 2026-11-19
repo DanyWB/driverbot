@@ -14,6 +14,7 @@ return [
         'reminder_pickup_one_hour' => "<b>Your rental :booking starts in one hour</b>\nVehicle: :vehicle\nPickup: :period",
     ],
     'admin' => [
+        'google_calendar_sync_failed' => "<b>Google Calendar synchronization failed</b>\nBooking: #:booking\nEvent: :event_type\nOperation: :operation\nRevision: :revision\nAttempts: :attempts",
         'pending_reminder' => "<b>Request :booking needs a decision</b>\nCustomer: :customer\nVehicle: :vehicle\nRental period: :period\nRental days: :days\nTotal: :price",
         'pending' => "<b>New request :booking</b>\nCustomer: :customer\nPhone: :phone\nTelegram: :telegram\nVehicle: :vehicle\nRental period: :period\nRental days: :days\nTotal: :price\nHelmets: :helmets\nDelivery: :delivery\nAddress: :address\nComment: :comment",
         'cancelled_by_client' => "<b>Customer cancelled booking :booking</b>\nCustomer: :customer\nPhone: :phone\nTelegram: :telegram\nVehicle: :vehicle\nRental period: :period",

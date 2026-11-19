@@ -3,6 +3,7 @@
 namespace App\Domain\Bookings\Services;
 
 use App\Domain\Availability\Services\BookingAvailabilityService;
+use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarBookingSyncService;
 use App\Domain\Shared\Services\AdminAuditService;
 use App\Models\Booking;
 use App\Models\User;
@@ -12,7 +13,11 @@ use Illuminate\Validation\ValidationException;
 
 class BookingDetailsService
 {
-    public function __construct(private readonly BookingAvailabilityService $availability, private readonly AdminAuditService $audit) {}
+    public function __construct(
+        private readonly BookingAvailabilityService $availability,
+        private readonly AdminAuditService $audit,
+        private readonly GoogleCalendarBookingSyncService $calendarSync,
+    ) {}
 
     /** @param array<string, mixed> $data */
     public function update(Booking $booking, array $data, User $admin, ?string $requestId = null): Booking
@@ -49,6 +54,9 @@ class BookingDetailsService
             }
             $locked->forceFill(['details_version' => (int) $locked->details_version + 1])->save();
             $this->audit->record($admin, $locked, 'booking.details_updated', $old, $locked->only(array_keys($values)), $requestId);
+            if ((string) ($old['contact_name'] ?? '') !== $values['contact_name']) {
+                $this->calendarSync->recordBookingContactNameChange($locked, $requestId);
+            }
 
             return $locked;
         }, 3);

@@ -4,6 +4,7 @@ namespace App\Domain\Integrations\Bot\Services;
 
 use App\Domain\Customers\Enums\ContactType;
 use App\Domain\Customers\Enums\IdentityProvider;
+use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarBookingSyncService;
 use App\Models\Customer;
 use App\Models\CustomerContact;
 use App\Models\CustomerIdentity;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 
 class TelegramCustomerService
 {
+    public function __construct(private readonly GoogleCalendarBookingSyncService $calendarSync) {}
+
     /** @param array<string, mixed> $attributes */
     public function sync(array $attributes): Customer
     {
@@ -61,11 +64,12 @@ class TelegramCustomerService
     }
 
     /** @param array<string, mixed> $attributes */
-    public function update(Customer $customer, array $attributes): Customer
+    public function update(Customer $customer, array $attributes, ?string $requestId = null): Customer
     {
-        return DB::transaction(function () use ($customer, $attributes): Customer {
+        return DB::transaction(function () use ($customer, $attributes, $requestId): Customer {
             $customer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
             $private = $customer->privateData();
+            $oldName = (string) $customer->name;
 
             if (array_key_exists('name', $attributes)) {
                 $customer->name = trim((string) $attributes['name']);
@@ -89,6 +93,10 @@ class TelegramCustomerService
 
             $customer->replacePrivateData($private);
             $customer->save();
+
+            if (array_key_exists('name', $attributes) && $oldName !== (string) $customer->name) {
+                $this->calendarSync->recordCustomerNameChange($customer, $requestId);
+            }
 
             if (array_key_exists('phone', $attributes)) {
                 $this->syncContact($customer, ContactType::Phone, $attributes['phone']);

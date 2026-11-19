@@ -43,5 +43,10 @@
   },
   "_moduleAliases": {
     "@": "./src"
+  },
+  "overrides": {
+    "googleapis-common": {
+      "gaxios": "^7.3.1"
+    }
   }
 }

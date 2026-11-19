@@ -35,6 +35,12 @@ Schedule::command('notifications:dispatch-outbox')
     ->withoutOverlapping()
     ->onOneServer();
 
+Schedule::command('google-calendar:process-outbox')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->when(fn (): bool => ! app()->isProduction() || config('google_calendar.driver') === 'google');
+
 Schedule::command('notifications:monitor')
     ->everyFiveMinutes()
     ->withoutOverlapping()
