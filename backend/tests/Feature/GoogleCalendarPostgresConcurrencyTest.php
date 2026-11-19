@@ -23,6 +23,7 @@ use App\Models\PricingSeason;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehiclePriceTier;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -229,7 +230,7 @@ class GoogleCalendarPostgresConcurrencyTest extends TestCase
         try {
             $oldWorker->start();
             $this->waitForFile($paths['started']);
-            Booking::query()->whereKey($booking->id)->update(['starts_on' => '2026-08-11']);
+            Booking::query()->whereKey($booking->id)->update(['starts_on' => $booking->starts_on->addDay()->toDateString()]);
             app(GoogleCalendarOutboxService::class)->upsert(
                 $booking->fresh(), GoogleCalendarEventType::Pickup, 'synthetic-pickup-calendar', 'concurrent-newer-revision',
             );
@@ -300,11 +301,13 @@ class GoogleCalendarPostgresConcurrencyTest extends TestCase
             'min_days' => 1, 'max_days' => 6, 'anchor_days' => 1, 'package_total' => 300,
             'daily_rate' => '300.000000', 'currency' => 'THB', 'is_active' => true,
         ]);
+        // Keep the low-season fixture future-dated in every real worker process.
+        $startsOn = CarbonImmutable::create(CarbonImmutable::now('Asia/Bangkok')->year + 1, 8, 10);
         $booking = $this->bookingService->create(new CreateBookingData(
             customerId: (int) $customer->id,
             vehicleId: (int) $vehicle->id,
-            startsOn: '2026-08-10',
-            endsOn: '2026-08-12',
+            startsOn: $startsOn->toDateString(),
+            endsOn: $startsOn->addDays(2)->toDateString(),
             source: BookingSource::AdminManual,
             initialStatus: BookingStatus::Pending,
             pickupTime: '10:00',
