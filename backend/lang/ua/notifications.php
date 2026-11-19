@@ -14,6 +14,7 @@ return [
         'reminder_pickup_one_hour' => "<b>До початку оренди :booking залишилася одна година</b>\nТранспорт: :vehicle\nЧас видачі: :period",
     ],
     'admin' => [
+        'google_calendar_sync_failed' => "<b>Помилка синхронізації Google Calendar</b>\nБронювання: #:booking\nПодія: :event_type\nОперація: :operation\nРевізія: :revision\nСпроб: :attempts",
         'pending_reminder' => "<b>Заявка :booking очікує рішення</b>\nКлієнт: :customer\nТранспорт: :vehicle\nПеріод: :period\nДнів оренди: :days\nСума: :price",
         'pending' => "<b>Нова заявка :booking</b>\nКлієнт: :customer\nТелефон: :phone\nTelegram: :telegram\nТранспорт: :vehicle\nПеріод: :period\nДнів оренди: :days\nСума: :price\nШоломи: :helmets\nДоставка: :delivery\nАдреса: :address\nКоментар: :comment",
         'cancelled_by_client' => "<b>Клієнт скасував бронювання :booking</b>\nКлієнт: :customer\nТелефон: :phone\nTelegram: :telegram\nТранспорт: :vehicle\nПеріод: :period",

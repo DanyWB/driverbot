@@ -73,7 +73,7 @@ class CustomerController extends Controller
             $before = $this->auditProfile($customer->load(['contacts', 'identities', 'documents']));
 
             $updated = DB::transaction(function () use ($request, $customers, $audit, $data, $customer, $before) {
-                $updated = $customers->update($customer, $data);
+                $updated = $customers->update($customer, $data, $this->requestId($request));
                 $audit->record(
                     $this->serviceClient($request),
                     $updated,

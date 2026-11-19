@@ -78,16 +78,22 @@ jobs:
 
       - name: Run PostgreSQL constraints, concurrency, and timezone tests
         env:
+          APP_ENV: testing
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_DATABASE: phangan_test
           DB_USERNAME: phangan
           DB_PASSWORD: phangan_test
+          DB_URL: ''
           DB_SSLMODE: disable
+          GOOGLE_CALENDAR_PG_RACE_TESTING: '1'
+          GOOGLE_CALENDAR_PG_RACE_DATABASE: phangan_test
         run: |
+          php tests/Support/google_calendar_postgres_bootstrap.php
           php artisan migrate --force
           php artisan test --filter='Postgres|PricingPresetReadSnapshotTest|VehicleQuoteReadSnapshotTest'
+          vendor/bin/phpunit --configuration=phpunit-google-calendar-postgres.xml
           for app_timezone in UTC Europe/Moscow Asia/Bangkok; do
             APP_TIMEZONE="$app_timezone" php artisan test --filter=PendingRequestPolicyTest
           done

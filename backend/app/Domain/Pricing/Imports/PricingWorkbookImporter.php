@@ -3,6 +3,7 @@
 namespace App\Domain\Pricing\Imports;
 
 use App\Domain\Imports\Enums\ImportRunStatus;
+use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarBookingSyncService;
 use App\Domain\Pricing\Imports\Data\ImportedVehicle;
 use App\Domain\Pricing\Imports\Data\PricingImportReport;
 use App\Domain\Pricing\Imports\Data\PricingWorkbookData;
@@ -21,6 +22,8 @@ use Throwable;
 
 class PricingWorkbookImporter
 {
+    public function __construct(private readonly GoogleCalendarBookingSyncService $calendarSync) {}
+
     public function preview(PricingWorkbookData $data): PricingImportReport
     {
         $importedCodes = array_map(fn (ImportedVehicle $vehicle): string => $vehicle->externalCode, $data->vehicles);
@@ -90,6 +93,7 @@ class PricingWorkbookImporter
                         ->where('external_code', $importedVehicle->externalCode)
                         ->lockForUpdate()
                         ->first();
+                    $previousName = $vehicle instanceof Vehicle ? (string) $vehicle->name : null;
 
                     if ($vehicle instanceof Vehicle && $vehicle->pricing_preset_id !== null) {
                         throw new RuntimeException("Workbook import cannot overwrite vehicle {$vehicle->external_code} while it is linked to a pricing preset.");
@@ -125,6 +129,9 @@ class PricingWorkbookImporter
                     }
 
                     $vehicle->fill($attributes)->save();
+                    if ($previousName !== null && $previousName !== (string) $vehicle->name) {
+                        $this->calendarSync->recordVehicleNameChange($vehicle, "pricing-workbook-import:{$run->id}");
+                    }
                     $priceIds = [];
 
                     foreach ($importedVehicle->prices as $importedPrice) {
