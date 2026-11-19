@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\GoogleCalendarReconciliation;
+use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 
 /** Read-only operational view of uncertain Google Calendar mappings. */
@@ -44,14 +45,14 @@ class ReportGoogleCalendarConvergence extends Command
         $this->table(
             ['Booking', 'Event', 'State', 'Uncertain since', 'Uncertain age', 'Requested/Done', 'Next check', 'Last verified', 'Checks', 'Failures', 'Last error', 'Unexpected ID', 'Manual review', 'Warning'],
             $rows->map(fn (GoogleCalendarReconciliation $row): array => [
-                $row->booking?->public_id ?? '(missing)',
+                $row->booking->public_id ?? '(missing)',
                 $row->event_type,
                 $this->state($row),
                 $row->uncertain_since?->toDateTimeString() ?? '',
-                $row->uncertain_since?->diffForHumans(now(), true) ?? '',
+                $row->uncertain_since?->diffForHumans(now(), CarbonInterface::DIFF_ABSOLUTE) ?? '',
                 $row->requested_generation.'/'.$row->completed_generation,
                 $row->available_at?->toDateTimeString() ?? '(unset)',
-                $row->booking?->googleCalendarEvents->firstWhere('event_type', $row->event_type)?->last_remote_verified_at?->toDateTimeString() ?? 'never',
+                $row->booking->googleCalendarEvents->firstWhere('event_type', $row->event_type)?->last_remote_verified_at?->toDateTimeString() ?? 'never',
                 $row->convergence_checks,
                 $row->convergence_failures,
                 $this->safeErrorSummary($row->last_error),
@@ -61,14 +62,15 @@ class ReportGoogleCalendarConvergence extends Command
             ])->all(),
         );
         $this->line('Rows shown: '.$rows->count().'; overdue: '.$rows->filter(fn ($row): bool => $this->state($row) === 'overdue')->count());
+
         return self::SUCCESS;
     }
 
     private function state(GoogleCalendarReconciliation $row): string
     {
-        $mapping = $row->booking?->googleCalendarEvents->firstWhere('event_type', $row->event_type);
+        $mapping = $row->booking->googleCalendarEvents->firstWhere('event_type', $row->event_type);
         if (($row->lease_token !== null && $row->locked_until?->isFuture())
-            || ($mapping?->sync_lease_token !== null && $mapping?->sync_locked_until?->isFuture())) {
+            || ($mapping?->sync_lease_token !== null && $mapping->sync_locked_until?->isFuture())) {
             return 'processing';
         }
         if ((int) $row->requested_generation <= (int) $row->completed_generation) {

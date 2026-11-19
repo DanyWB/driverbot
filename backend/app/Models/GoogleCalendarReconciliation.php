@@ -21,7 +21,7 @@ class GoogleCalendarReconciliation extends Model
         return $this->belongsTo(Booking::class);
     }
 
-    /** @return array<string, string> */
+    /** @return array{requested_generation: 'integer', completed_generation: 'integer', claimed_generation: 'integer', retry_count: 'integer', available_at: 'immutable_datetime', locked_until: 'immutable_datetime', uncertain_since: 'immutable_datetime', last_convergence_at: 'immutable_datetime', convergence_checks: 'integer', convergence_failures: 'integer', manual_review_required: 'boolean'} */
     protected function casts(): array
     {
         return [

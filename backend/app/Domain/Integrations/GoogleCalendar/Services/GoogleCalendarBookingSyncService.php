@@ -35,6 +35,9 @@ class GoogleCalendarBookingSyncService
         BookingStatus $to,
         ?string $requestId = null,
     ): void {
+        if (! app(GoogleCalendarConfiguration::class)->ready()) {
+            return;
+        }
         if (in_array($to, [BookingStatus::Pending, BookingStatus::Approved], true)) {
             $this->upsertBoth($booking, $requestId);
 
@@ -57,7 +60,10 @@ class GoogleCalendarBookingSyncService
         }
     }
 
-    /** @param array<string, string|null> $oldValues @param array<string, string|null> $newValues */
+    /**
+     * @param  array<string, string|null>  $oldValues
+     * @param  array<string, string|null>  $newValues
+     */
     public function recordDateChanges(
         Booking $booking,
         array $oldValues,
@@ -110,7 +116,7 @@ class GoogleCalendarBookingSyncService
     {
         foreach (GoogleCalendarEventType::cases() as $eventType) {
             $mapping = $this->mapping($booking, $eventType);
-            $calendarId = $mapping?->calendar_id ?? $this->calendarId($eventType);
+            $calendarId = $mapping === null ? $this->calendarId($eventType) : $mapping->calendar_id;
             $this->upsert($booking, $eventType, (string) $calendarId, $requestId);
         }
     }
@@ -127,6 +133,9 @@ class GoogleCalendarBookingSyncService
         GoogleCalendarEventType $eventType,
         ?string $requestId,
     ): void {
+        if (! app(GoogleCalendarConfiguration::class)->ready()) {
+            return;
+        }
         $mapping = $this->mapping($booking, $eventType);
 
         if (! $mapping instanceof GoogleCalendarEvent || in_array($mapping->sync_status, self::TOMBSTONE_STATUSES, true)) {
@@ -157,7 +166,7 @@ class GoogleCalendarBookingSyncService
     {
         foreach (GoogleCalendarEventType::cases() as $eventType) {
             $mapping = $this->mapping($booking, $eventType);
-            $calendarId = $mapping?->calendar_id ?? $this->calendarId($eventType);
+            $calendarId = $mapping === null ? $this->calendarId($eventType) : $mapping->calendar_id;
             $this->outbox->delete($booking, $eventType, (string) $calendarId, $requestId);
         }
     }

@@ -7,6 +7,7 @@ use App\Domain\Bookings\Data\ChangeBookingDatesData;
 use App\Domain\Bookings\Data\CreateBookingData;
 use App\Domain\Bookings\Enums\BookingSource;
 use App\Domain\Bookings\Enums\BookingStatus;
+use App\Domain\Bookings\Services\BookingDetailsService;
 use App\Domain\Bookings\Services\BookingService;
 use App\Domain\Integrations\Bot\Services\TelegramCustomerService;
 use App\Domain\Integrations\GoogleCalendar\Enums\GoogleCalendarEventType;
@@ -61,6 +62,17 @@ class GoogleCalendarBookingLifecycleTest extends TestCase
 
         $this->assertQueuedEvent($booking, GoogleCalendarEventType::Pickup, GoogleCalendarOperation::Upsert, 1);
         $this->assertQueuedEvent($booking, GoogleCalendarEventType::ReturnEvent, GoogleCalendarOperation::Upsert, 1);
+    }
+
+    public function test_unconfigured_optional_calendar_does_not_block_booking_creation(): void
+    {
+        config(['google_calendar.calendars.pickup' => null, 'google_calendar.calendars.return' => null]);
+
+        $booking = $this->createBooking();
+
+        $this->assertSame(BookingStatus::Pending, $booking->bookingStatus());
+        $this->assertDatabaseCount('google_calendar_events', 0);
+        $this->assertDatabaseCount('google_calendar_outbox', 0);
     }
 
     public function test_direct_approved_creation_queues_both_calendar_events(): void
@@ -125,7 +137,7 @@ class GoogleCalendarBookingLifecycleTest extends TestCase
     public function test_booking_contact_name_change_updates_both_mapped_events(): void
     {
         $booking = $this->createBooking();
-        app(\App\Domain\Bookings\Services\BookingDetailsService::class)->update(
+        app(BookingDetailsService::class)->update(
             $booking,
             $this->bookingDetails('Booking-specific name'),
             $this->admin,

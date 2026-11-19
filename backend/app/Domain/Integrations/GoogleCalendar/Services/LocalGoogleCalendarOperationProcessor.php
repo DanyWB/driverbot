@@ -3,8 +3,8 @@
 namespace App\Domain\Integrations\GoogleCalendar\Services;
 
 use App\Domain\Integrations\GoogleCalendar\Contracts\GoogleCalendarOperationProcessor;
-use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationRequest;
 use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationContext;
+use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationRequest;
 use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationResult;
 use App\Domain\Integrations\GoogleCalendar\Exceptions\GoogleCalendarProcessingException;
 use Illuminate\Support\Facades\Log;

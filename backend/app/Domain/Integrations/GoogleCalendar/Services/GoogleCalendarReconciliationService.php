@@ -15,8 +15,7 @@ class GoogleCalendarReconciliationService
         Booking $booking,
         GoogleCalendarEventType $eventType,
         bool $remoteOutcomeUnknown = false,
-    ): ?GoogleCalendarReconciliation
-    {
+    ): ?GoogleCalendarReconciliation {
         return DB::transaction(function () use ($booking, $eventType, $remoteOutcomeUnknown): ?GoogleCalendarReconciliation {
             $lockedBooking = Booking::query()->lockForUpdate()->find($booking->getKey());
             if (! $lockedBooking instanceof Booking) {
@@ -31,6 +30,7 @@ class GoogleCalendarReconciliationService
             if (! $mapping instanceof GoogleCalendarEvent) {
                 return null;
             }
+
             return $this->requestInTransaction(
                 $lockedBooking,
                 $mapping,
@@ -48,8 +48,7 @@ class GoogleCalendarReconciliationService
         ?string $lastError = null,
         ?string $unexpectedEventId = null,
         bool $remoteOutcomeUnknown = false,
-    ): GoogleCalendarReconciliation
-    {
+    ): GoogleCalendarReconciliation {
         $row = GoogleCalendarReconciliation::query()
             ->where('booking_id', $booking->getKey())
             ->where('event_type', $eventType->value)

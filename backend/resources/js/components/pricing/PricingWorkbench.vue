@@ -260,7 +260,7 @@ function reorder(from: number, to: number): void {
     const reordered = [...props.presets];
     const [moved] = reordered.splice(from, 1);
     reordered.splice(to, 0, moved);
-    ask(t('Save preset order?'), async () => {
+    void run(async () => {
         const result = await pricingRequest(
             '/pricing-presets/reorder',
             'POST',

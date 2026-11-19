@@ -4,9 +4,9 @@ namespace App\Domain\Integrations\GoogleCalendar\Services;
 
 use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Integrations\GoogleCalendar\Contracts\GoogleCalendarOperationProcessor;
-use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOutboxClaim;
 use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationContext;
 use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationRequest;
+use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOutboxClaim;
 use App\Domain\Integrations\GoogleCalendar\Enums\GoogleCalendarEventType;
 use App\Domain\Integrations\GoogleCalendar\Enums\GoogleCalendarOperation;
 use App\Domain\Integrations\GoogleCalendar\Enums\GoogleCalendarSyncStatus;
@@ -24,6 +24,7 @@ use Throwable;
 class GoogleCalendarOutboxWorker
 {
     private const MAX_ATTEMPTS = 10;
+
     private const DELETE_BOOKING_STATUSES = [
         BookingStatus::Cancelled->value,
         BookingStatus::CancelledByClient->value,
@@ -43,6 +44,9 @@ class GoogleCalendarOutboxWorker
     /** Claims one eligible operation; exposing this boundary also makes lease contention testable. */
     public function claimNext(): ?GoogleCalendarOutboxClaim
     {
+        if (! app(GoogleCalendarConfiguration::class)->ready()) {
+            return null;
+        }
         $driver = DB::getDriverName();
         $now = now();
         $maxAttempts = self::MAX_ATTEMPTS;
@@ -151,6 +155,9 @@ class GoogleCalendarOutboxWorker
     /** @return array{claimed: int, processed: int, failed: int} */
     public function processBatch(?int $limit = null): array
     {
+        if (! app(GoogleCalendarConfiguration::class)->ready()) {
+            return ['claimed' => 0, 'processed' => 0, 'failed' => 0];
+        }
         $limit = min(1000, max(1, $limit ?? (int) config('google_calendar.outbox.batch_size', 50)));
         $this->recoverExpiredProcessing($limit);
         $reconciled = $this->reconciliationWorker->processBatch($limit);
@@ -173,6 +180,9 @@ class GoogleCalendarOutboxWorker
 
     public function processClaim(GoogleCalendarOutboxClaim $claim): bool
     {
+        if (! app(GoogleCalendarConfiguration::class)->ready()) {
+            return false;
+        }
         $operationRequest = DB::transaction(function () use ($claim): GoogleCalendarOperationRequest|string|bool|null {
             $outbox = GoogleCalendarOutbox::query()->lockForUpdate()->find($claim->outboxId);
             if (! $this->ownsOutboxLease($outbox, $claim->leaseToken)) {
@@ -278,14 +288,17 @@ class GoogleCalendarOutboxWorker
             if (! $successful) {
                 $this->requestReconciliation($claim);
             }
+
             return $successful;
         } catch (GoogleCalendarProcessingException $exception) {
             if ($exception->remoteOutcomeUnknown) {
                 return $this->abandonWithReconciliation($claim, $exception->getMessage());
             }
+
             return $this->recordFailure($claim, $exception->getMessage(), $exception->retryable);
         } catch (Throwable $exception) {
             report($exception);
+
             return $this->abandonWithReconciliation($claim, 'Unclassified processing failure: '.class_basename($exception));
         }
     }
@@ -323,7 +336,6 @@ class GoogleCalendarOutboxWorker
                 'sync_lease_token' => null,
                 'sync_locked_until' => null,
             ])->save();
-
 
             $outbox->forceFill([
                 'status' => GoogleCalendarOutbox::STATUS_PROCESSED,
@@ -483,6 +495,7 @@ class GoogleCalendarOutboxWorker
                         'lease_token' => null,
                         'locked_until' => null,
                     ])->save();
+
                     return;
                 }
                 $eventType = GoogleCalendarEventType::tryFrom((string) $outbox->event_type);

@@ -42,7 +42,6 @@ class PricingSeasonCalendarService
      */
     public function apply(array $calendar, int $adminId): array
     {
-        $calendar = array_values($calendar);
 
         return DB::transaction(function () use ($calendar, $adminId): array {
             // Same lock order as preset writers: presets first, then vehicles.

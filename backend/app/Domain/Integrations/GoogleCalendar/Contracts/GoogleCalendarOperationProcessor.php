@@ -2,9 +2,9 @@
 
 namespace App\Domain\Integrations\GoogleCalendar\Contracts;
 
+use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationContext;
 use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationRequest;
 use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationResult;
-use App\Domain\Integrations\GoogleCalendar\Data\GoogleCalendarOperationContext;
 
 /**
  * Remote adapters must use request.googleEventId as the Google Event resource `id` on insert,

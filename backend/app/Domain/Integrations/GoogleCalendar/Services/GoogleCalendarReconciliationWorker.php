@@ -41,7 +41,11 @@ class GoogleCalendarReconciliationWorker
 
     public function claimNext(): ?GoogleCalendarReconciliationClaim
     {
+        if (! app(GoogleCalendarConfiguration::class)->ready()) {
+            return null;
+        }
         $driver = DB::getDriverName();
+
         return DB::transaction(function () use ($driver): ?GoogleCalendarReconciliationClaim {
             $now = now();
             $query = GoogleCalendarReconciliation::query()
@@ -134,11 +138,15 @@ class GoogleCalendarReconciliationWorker
             $counts['claimed']++;
             $counts[$this->processClaim($claim) ? 'processed' : 'failed']++;
         }
+
         return $counts;
     }
 
     public function processClaim(GoogleCalendarReconciliationClaim $claim): bool
     {
+        if (! app(GoogleCalendarConfiguration::class)->ready()) {
+            return false;
+        }
         $request = DB::transaction(function () use ($claim): GoogleCalendarOperationRequest|string|null {
             $booking = Booking::query()->with(['customer', 'vehicle'])->lockForUpdate()->find($claim->bookingId);
             $mapping = GoogleCalendarEvent::query()->where('booking_id', $claim->bookingId)->where('event_type', $claim->eventType)->lockForUpdate()->first();
@@ -166,6 +174,7 @@ class GoogleCalendarReconciliationWorker
             }
             $mapping->save();
             $operation = $delete ? GoogleCalendarOperation::Delete : GoogleCalendarOperation::Upsert;
+
             return new GoogleCalendarOperationRequest(
                 (string) $booking->public_id,
                 $eventType,
@@ -198,11 +207,13 @@ class GoogleCalendarReconciliationWorker
             if ($result->googleEventId !== null && ! hash_equals($request->googleEventId, $result->googleEventId)) {
                 return $this->fail($claim, 'Processor returned an unexpected event ID.', false, $result->googleEventId);
             }
+
             return $this->complete($claim, $request, $result->remoteStateVerified);
         } catch (GoogleCalendarProcessingException $exception) {
             return $this->fail($claim, $exception->getMessage(), $exception->retryable, null, $exception->remoteOutcomeUnknown);
         } catch (Throwable $exception) {
             report($exception);
+
             return $this->fail($claim, 'Unclassified reconciliation failure: '.class_basename($exception), true, null, true);
         }
     }
@@ -221,6 +232,7 @@ class GoogleCalendarReconciliationWorker
             $mapping->sync_locked_until = $until;
             $row->save();
             $mapping->save();
+
             return true;
         }, 3);
     }
@@ -250,6 +262,7 @@ class GoogleCalendarReconciliationWorker
                 $mapping->sync_lease_token = null;
                 $mapping->sync_locked_until = null;
                 $mapping->save();
+
                 return false;
             }
             $mapping->google_event_id = $request->googleEventId;
@@ -266,11 +279,13 @@ class GoogleCalendarReconciliationWorker
             $mapping->sync_locked_until = null;
             $mapping->save();
             $this->finishGeneration($row, $claim);
+
             return true;
         }, 3);
         if (! $ok) {
             $this->reconciliations->request(Booking::query()->findOrFail($claim->bookingId), GoogleCalendarEventType::from($claim->eventType));
         }
+
         return $ok;
     }
 
@@ -287,6 +302,7 @@ class GoogleCalendarReconciliationWorker
             $mapping->sync_locked_until = null;
             $mapping->save();
             $this->finishGeneration($row, $claim);
+
             return true;
         }, 3);
     }
@@ -375,6 +391,7 @@ class GoogleCalendarReconciliationWorker
                 'unexpected_event_id' => $unexpectedEventId,
                 'error' => $row->last_error,
             ]);
+
             return true;
         }, 3);
 
@@ -410,6 +427,7 @@ class GoogleCalendarReconciliationWorker
         $base = max(1, (int) config('google_calendar.outbox.retry_base_seconds', 30));
         $maximum ??= max($base, (int) config('google_calendar.outbox.retry_max_seconds', 3600));
         $delay = min($maximum, $base * (2 ** min(20, max(0, $attempt - 1))));
+
         return min($maximum, $delay + random_int(0, max(1, intdiv($delay, 4))));
     }
 

@@ -315,8 +315,7 @@ class GoogleCalendarOutboxService
         Booking $booking,
         GoogleCalendarEventType $eventType,
         ?string $requestedCalendarId,
-    ): ?GoogleCalendarOutbox
-    {
+    ): ?GoogleCalendarOutbox {
         $existing = GoogleCalendarOutbox::query()->where('idempotency_key', $key)->first();
 
         if (! $existing instanceof GoogleCalendarOutbox) {

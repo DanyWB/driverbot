@@ -2,10 +2,10 @@
 
 namespace App\Domain\Integrations\GoogleCalendar\Data;
 
+use App\Domain\Integrations\GoogleCalendar\Exceptions\GoogleCalendarProcessingException;
 use Closure;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
-use App\Domain\Integrations\GoogleCalendar\Exceptions\GoogleCalendarProcessingException;
 
 final readonly class GoogleCalendarOperationContext
 {

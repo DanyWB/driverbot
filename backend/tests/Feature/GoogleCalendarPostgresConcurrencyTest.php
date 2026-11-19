@@ -8,8 +8,8 @@ use App\Domain\Bookings\Enums\BookingSource;
 use App\Domain\Bookings\Enums\BookingStatus;
 use App\Domain\Bookings\Services\BookingService;
 use App\Domain\Integrations\GoogleCalendar\Enums\GoogleCalendarEventType;
-use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarOutboxWorker;
 use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarOutboxService;
+use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarOutboxWorker;
 use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarReconciliationService;
 use App\Domain\Integrations\GoogleCalendar\Services\GoogleCalendarReconciliationWorker;
 use App\Domain\Pricing\Enums\PricingSeasonKey;
@@ -23,13 +23,13 @@ use App\Models\PricingSeason;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehiclePriceTier;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Symfony\Component\Process\Process;
-use Tests\TestCase;
 use Tests\Support\GoogleCalendarPostgresTestGuard;
+use Tests\TestCase;
 
 /** Real process-level claim/trigger schedules for the release PostgreSQL engine. */
 class GoogleCalendarPostgresConcurrencyTest extends TestCase
@@ -334,6 +334,7 @@ class GoogleCalendarPostgresConcurrencyTest extends TestCase
                 $this->assertTrue($worker->isSuccessful(), $worker->getErrorOutput());
                 $results[] = json_decode(trim($worker->getOutput()), true, flags: JSON_THROW_ON_ERROR);
             }
+
             return $results;
         } finally {
             foreach ($workers as $worker) {
@@ -368,6 +369,7 @@ class GoogleCalendarPostgresConcurrencyTest extends TestCase
     private function paths(): array
     {
         $id = bin2hex(random_bytes(12));
+
         return ['started' => sys_get_temp_dir().DIRECTORY_SEPARATOR.'gcal-'.$id.'.started', 'release' => sys_get_temp_dir().DIRECTORY_SEPARATOR.'gcal-'.$id.'.release'];
     }
 

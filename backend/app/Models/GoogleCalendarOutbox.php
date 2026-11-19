@@ -29,7 +29,7 @@ class GoogleCalendarOutbox extends Model
         return $this->belongsTo(Booking::class);
     }
 
-    /** @return array<string, string> */
+    /** @return array{event_revision: 'integer', retry_count: 'integer', available_at: 'immutable_datetime', locked_until: 'immutable_datetime', processed_at: 'immutable_datetime'} */
     protected function casts(): array
     {
         return [

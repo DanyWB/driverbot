@@ -86,12 +86,14 @@ function claimOutbox(GoogleCalendarOutboxWorker $worker): array
         return ['claimed' => false];
     }
     $row = DB::table('google_calendar_outbox')->where('id', $claim->outboxId)->first();
+
     return ['claimed' => true, 'id' => $claim->outboxId, 'token' => $claim->leaseToken, 'event_type' => $row->event_type];
 }
 
 function claimReconciliation(GoogleCalendarReconciliationWorker $worker): array
 {
     $claim = $worker->claimNext();
+
     return $claim === null ? ['claimed' => false] : [
         'claimed' => true, 'id' => $claim->reconciliationId, 'generation' => $claim->generation, 'token' => $claim->leaseToken,
     ];
@@ -101,6 +103,7 @@ function requestReconciliation(GoogleCalendarReconciliationService $service, arr
 {
     $booking = Booking::query()->findOrFail($input['booking_id']);
     $row = $service->request($booking, GoogleCalendarEventType::from($input['event_type']));
+
     return ['id' => $row?->id, 'requested' => $row?->requested_generation, 'completed' => $row?->completed_generation];
 }
 
@@ -114,6 +117,7 @@ function claimAndHoldReconciliation($app, array $input): array
     $processor = new class(function (GoogleCalendarOperationRequest $request, GoogleCalendarOperationContext $context) use ($input): GoogleCalendarOperationResult {
         touch($input['started']);
         awaitRelease($input['release']);
+
         return new GoogleCalendarOperationResult($request->googleEventId);
     }) implements GoogleCalendarOperationProcessor {
         public function __construct(private Closure $handler) {}
@@ -123,6 +127,7 @@ function claimAndHoldReconciliation($app, array $input): array
         }
     };
     $app->instance(GoogleCalendarOperationProcessor::class, $processor);
+
     return ['claimed' => true, 'acknowledged' => $worker->processClaim($claim), 'generation' => $claim->generation];
 }
 
@@ -133,6 +138,7 @@ function processOutboxHold($app, array $input): array
         touch($input['started']);
         awaitRelease($input['release']);
         $renewed = $context->renewLease();
+
         return new GoogleCalendarOperationResult($request->googleEventId);
     }) implements GoogleCalendarOperationProcessor {
         public function __construct(private Closure $handler) {}
@@ -144,6 +150,7 @@ function processOutboxHold($app, array $input): array
     $app->instance(GoogleCalendarOperationProcessor::class, $processor);
     $claim = new GoogleCalendarOutboxClaim((int) $input['outbox_id'], (string) $input['token']);
     $acknowledged = $app->make(GoogleCalendarOutboxWorker::class)->processClaim($claim);
+
     return ['renewed' => $renewed, 'acknowledged' => $acknowledged];
 }
 
@@ -152,6 +159,7 @@ function processReconciliationHold($app, array $input): array
     $processor = new class(function (GoogleCalendarOperationRequest $request, GoogleCalendarOperationContext $context) use ($input): GoogleCalendarOperationResult {
         touch($input['started']);
         awaitRelease($input['release']);
+
         return new GoogleCalendarOperationResult($request->googleEventId);
     }) implements GoogleCalendarOperationProcessor {
         public function __construct(private Closure $handler) {}
@@ -162,6 +170,7 @@ function processReconciliationHold($app, array $input): array
     };
     $app->instance(GoogleCalendarOperationProcessor::class, $processor);
     $claim = new GoogleCalendarReconciliationClaim((int) $input['reconciliation_id'], (int) $input['booking_id'], 'pickup', (int) $input['generation'], (string) $input['token']);
+
     return ['acknowledged' => $app->make(GoogleCalendarReconciliationWorker::class)->processClaim($claim)];
 }
 

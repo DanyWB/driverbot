@@ -21,7 +21,7 @@ class GoogleCalendarEvent extends Model
         return $this->belongsTo(Booking::class);
     }
 
-    /** @return array<string, string> */
+    /** @return array{last_requested_revision: 'integer', last_applied_revision: 'integer', sync_locked_until: 'immutable_datetime', last_synced_at: 'immutable_datetime', last_remote_verified_at: 'immutable_datetime'} */
     protected function casts(): array
     {
         return [
