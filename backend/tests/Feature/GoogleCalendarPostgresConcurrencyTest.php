@@ -359,6 +359,9 @@ class GoogleCalendarPostgresConcurrencyTest extends TestCase
             'DB_SSLMODE' => (string) $connection['sslmode'], 'CACHE_STORE' => 'array', 'QUEUE_CONNECTION' => 'sync',
             'SESSION_DRIVER' => 'array', 'GOOGLE_CALENDAR_PG_RACE_TESTING' => $verifiedEnvironment['GOOGLE_CALENDAR_PG_RACE_TESTING'],
             'GOOGLE_CALENDAR_PG_RACE_DATABASE' => $verifiedEnvironment['GOOGLE_CALENDAR_PG_RACE_DATABASE'],
+            'GOOGLE_CALENDAR_DRIVER' => 'local',
+            'GOOGLE_CALENDAR_PICKUP_ID' => 'synthetic-pickup-calendar',
+            'GOOGLE_CALENDAR_RETURN_ID' => 'synthetic-return-calendar',
         ];
 
         return new Process([PHP_BINARY, base_path('tests/Support/google_calendar_pg_race_worker.php')], base_path(), $environment,
