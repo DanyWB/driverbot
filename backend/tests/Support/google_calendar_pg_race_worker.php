@@ -109,11 +109,6 @@ function requestReconciliation(GoogleCalendarReconciliationService $service, arr
 
 function claimAndHoldReconciliation($app, array $input): array
 {
-    $worker = $app->make(GoogleCalendarReconciliationWorker::class);
-    $claim = $worker->claimNext();
-    if ($claim === null) {
-        return ['claimed' => false];
-    }
     $processor = new class(function (GoogleCalendarOperationRequest $request, GoogleCalendarOperationContext $context) use ($input): GoogleCalendarOperationResult {
         touch($input['started']);
         awaitRelease($input['release']);
@@ -127,6 +122,11 @@ function claimAndHoldReconciliation($app, array $input): array
         }
     };
     $app->instance(GoogleCalendarOperationProcessor::class, $processor);
+    $worker = $app->make(GoogleCalendarReconciliationWorker::class);
+    $claim = $worker->claimNext();
+    if ($claim === null) {
+        return ['claimed' => false];
+    }
 
     return ['claimed' => true, 'acknowledged' => $worker->processClaim($claim), 'generation' => $claim->generation];
 }
